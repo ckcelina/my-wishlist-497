@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,18 +22,25 @@ import {
 } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
+import { useAuth } from "@/providers/AuthProvider";
 
 export default function ProfileScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const { user, wishlists, sharedLists, allProducts } = useWishlistContext();
+  const { profile, signOut, isSigningOut } = useAuth();
+
+  const displayName = profile?.full_name || user.name;
+  const displayEmail = profile?.email || user.email;
+  const displayCountry = profile?.country || user.country;
+  const displayCurrency = profile?.currency || user.currency;
 
   const settingsSections = [
     {
       title: "PREFERENCES",
       items: [
-        { icon: Globe, label: "Country", value: user.country },
-        { icon: DollarSign, label: "Currency", value: user.currency },
+        { icon: Globe, label: "Country", value: displayCountry },
+        { icon: DollarSign, label: "Currency", value: displayCurrency },
       ],
     },
     {
@@ -49,9 +57,12 @@ export default function ProfileScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={[styles.profileHeader, { paddingTop: insets.top + 20, backgroundColor: colors.surface }]}>
-          <Image source={{ uri: user.avatar }} style={[styles.avatar, { borderColor: colors.primary }]} />
-          <Text style={[styles.name, { color: colors.text }]}>{user.name}</Text>
-          <Text style={[styles.email, { color: colors.textSecondary }]}>{user.email}</Text>
+          <Image
+            source={profile?.avatar_url ? { uri: profile.avatar_url } : require("@/assets/images/icon.png")}
+            style={[styles.avatar, { borderColor: colors.primary }]}
+          />
+          <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
+          <Text style={[styles.email, { color: colors.textSecondary }]}>{displayEmail}</Text>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -99,6 +110,26 @@ export default function ProfileScreen() {
                         borderBottomColor: colors.borderLight,
                       },
                     ]}
+                    onPress={() => {
+                      if (isDestructive) {
+                        Alert.alert(
+                          "Sign Out",
+                          "Are you sure you want to sign out?",
+                          [
+                            { text: "Cancel", style: "cancel" },
+                            {
+                              text: isSigningOut ? "Signing Out..." : "Sign Out",
+                              style: "destructive",
+                              onPress: () => {
+                                signOut().catch((err: unknown) => {
+                                  console.log("Sign out error:", err);
+                                });
+                              },
+                            },
+                          ]
+                        );
+                      }
+                    }}
                   >
                     <View style={styles.settingLeft}>
                       <Icon size={20} color={isDestructive ? colors.error : colors.primary} />
