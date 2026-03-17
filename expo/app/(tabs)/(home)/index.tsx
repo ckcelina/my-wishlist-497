@@ -1,0 +1,259 @@
+import React, { useRef, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  FlatList,
+  Animated,
+  TextInput,
+} from "react-native";
+import { Image } from "expo-image";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { Search, Gift, Sparkles } from "lucide-react-native";
+import { useAppColors } from "@/hooks/useColorScheme";
+import { useWishlistContext } from "@/providers/WishlistProvider";
+import WishlistCard from "@/components/WishlistCard";
+import ProductCard from "@/components/ProductCard";
+import SectionHeader from "@/components/SectionHeader";
+
+export default function HomeScreen() {
+  const colors = useAppColors();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { user, myLists, sharedLists, allProducts, trendingProducts } = useWishlistContext();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
+
+  const recentProducts = allProducts.slice(0, 4);
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 20 }}
+      >
+        <Animated.View
+          style={[
+            styles.header,
+            { paddingTop: insets.top + 12, opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <View style={styles.greetingRow}>
+            <View style={styles.greetingContent}>
+              <Text style={[styles.greeting, { color: colors.textSecondary }]}>
+                Good morning
+              </Text>
+              <Text style={[styles.userName, { color: colors.text }]}>
+                {user.name} <Text style={styles.wave}>👋</Text>
+              </Text>
+            </View>
+            <Pressable onPress={() => router.push("/(tabs)/profile")}>
+              <Image
+                source={{ uri: user.avatar }}
+                style={[styles.avatar, { borderColor: colors.primary + "40" }]}
+              />
+            </Pressable>
+          </View>
+
+          <View style={[styles.searchBar, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+            <Search size={18} color={colors.textTertiary} />
+            <TextInput
+              placeholder="Search products, lists..."
+              placeholderTextColor={colors.textTertiary}
+              style={[styles.searchInput, { color: colors.text }]}
+              editable={false}
+              onPressIn={() => router.push("/(tabs)/explore")}
+            />
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={[styles.statCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
+              <Gift size={18} color={colors.primary} />
+              <Text style={[styles.statNumber, { color: colors.primary }]}>
+                {myLists.length + sharedLists.length}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Lists</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
+              <Sparkles size={18} color={colors.primary} />
+              <Text style={[styles.statNumber, { color: colors.primary }]}>
+                {allProducts.length}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Items</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
+              <Text style={styles.statEmoji}>🤝</Text>
+              <Text style={[styles.statNumber, { color: colors.primary }]}>
+                {sharedLists.length}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Shared</Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        <SectionHeader title="My Lists" onSeeAll={() => {}} />
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={myLists}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.horizontalList}
+          renderItem={({ item }) => (
+            <WishlistCard
+              wishlist={item}
+              onPress={() => router.push({ pathname: "/wishlist-detail", params: { id: item.id } })}
+            />
+          )}
+          ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+        />
+
+        {sharedLists.length > 0 && (
+          <>
+            <SectionHeader title="Shared With Me" onSeeAll={() => {}} />
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={sharedLists}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.horizontalList}
+              renderItem={({ item }) => (
+                <WishlistCard
+                  wishlist={item}
+                  onPress={() => router.push({ pathname: "/wishlist-detail", params: { id: item.id } })}
+                />
+              )}
+              ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+            />
+          </>
+        )}
+
+        <SectionHeader title="Recently Added" onSeeAll={() => {}} />
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={recentProducts}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.horizontalList}
+          renderItem={({ item }) => (
+            <ProductCard
+              product={item}
+              onPress={() => router.push({ pathname: "/product-detail", params: { id: item.id } })}
+            />
+          )}
+          ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+        />
+
+        <SectionHeader title="Trending Wishes" onSeeAll={() => router.push("/(tabs)/explore")} />
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={trendingProducts}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.horizontalList}
+          renderItem={({ item }) => (
+            <ProductCard
+              product={item}
+              onPress={() => router.push({ pathname: "/product-detail", params: { id: item.id } })}
+            />
+          )}
+          ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+        />
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  greetingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  greetingContent: {
+    gap: 2,
+  },
+  greeting: {
+    fontSize: 14,
+    fontWeight: "500" as const,
+  },
+  userName: {
+    fontSize: 26,
+    fontWeight: "800" as const,
+  },
+  wave: {
+    fontSize: 24,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 3,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    gap: 10,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 4,
+    borderWidth: 1,
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: "800" as const,
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: "500" as const,
+  },
+  statEmoji: {
+    fontSize: 18,
+  },
+  horizontalList: {
+    paddingHorizontal: 20,
+  },
+});

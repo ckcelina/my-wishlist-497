@@ -1,0 +1,9 @@
+{
+  "apps": [
+    {
+      "name": "My Wishlist",
+      "path": "expo",
+      "framework": "react-native"
+    }
+  ]
+}
