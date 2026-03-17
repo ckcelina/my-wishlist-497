@@ -7,6 +7,7 @@ import {
   Pressable,
   Animated,
   Alert,
+  Share,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,14 +16,19 @@ import {
   ArrowLeft,
   Share2,
   Users,
-  MoreHorizontal,
   Check,
   Trash2,
+  MessageCircle,
+  Gift,
+  Globe,
+  Lock,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useAppColors } from "@/hooks/useColorScheme";
-import { useWishlistById, useWishlistContext } from "@/providers/WishlistProvider";
+import { useWishlistById, useWishlistContext, useItemAssignments } from "@/providers/WishlistProvider";
 import ProductCard from "@/components/ProductCard";
+
+const appLogo = require("@/assets/images/logo.png");
 
 export default function WishlistDetailScreen() {
   const colors = useAppColors();
@@ -30,9 +36,12 @@ export default function WishlistDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const wishlist = useWishlistById(id ?? "");
-  const { togglePurchased, removeProductFromWishlist } = useWishlistContext();
+  const { togglePurchased, removeProductFromWishlist, toggleShareWishlist, user } = useWishlistContext();
+  const itemAssignments = useItemAssignments(id ?? "");
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const isOwner = wishlist?.collaborators.find((c) => c.id === user.id)?.role === "owner";
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -51,7 +60,7 @@ export default function WishlistDetailScreen() {
           </Pressable>
         </View>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyEmoji}>📭</Text>
+          <Text style={{ fontSize: 48 }}>{"📭"}</Text>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>List not found</Text>
         </View>
       </View>
@@ -77,6 +86,37 @@ export default function WishlistDetailScreen() {
     ]);
   };
 
+  const handleShare = async () => {
+    try {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await Share.share({
+        message: `Check out my wishlist "${wishlist.title}" on My Wishlist! ${wishlist.items.length} items waiting to be discovered.`,
+        title: wishlist.title,
+      });
+    } catch (error) {
+      console.log("Share error:", error);
+    }
+  };
+
+  const handleToggleShared = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    toggleShareWishlist(wishlist.id);
+    if (!wishlist.isShared) {
+      Alert.alert("List Shared!", "This wishlist is now visible to your collaborators. A group chat has been enabled.");
+    } else {
+      Alert.alert("List Unshared", "This wishlist is now private.");
+    }
+  };
+
+  const handleOpenChat = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({ pathname: "/wishlist-chat", params: { id: wishlist.id } });
+  };
+
+  const getItemAssignment = (productId: string) => {
+    return itemAssignments.find((a) => a.productId === productId);
+  };
+
   const purchasedCount = wishlist.items.filter((i) => i.isPurchased).length;
   const progress = wishlist.items.length > 0 ? purchasedCount / wishlist.items.length : 0;
 
@@ -88,11 +128,16 @@ export default function WishlistDetailScreen() {
             <ArrowLeft size={22} color={colors.text} />
           </Pressable>
           <View style={styles.topBarRight}>
-            <Pressable style={[styles.iconBtn, { backgroundColor: colors.surface }]}>
+            {wishlist.isShared && (
+              <Pressable onPress={handleOpenChat} style={[styles.iconBtn, { backgroundColor: colors.primaryFaded }]}>
+                <MessageCircle size={18} color={colors.primary} />
+              </Pressable>
+            )}
+            <Pressable onPress={handleShare} style={[styles.iconBtn, { backgroundColor: colors.surface }]}>
               <Share2 size={18} color={colors.text} />
             </Pressable>
-            <Pressable style={[styles.iconBtn, { backgroundColor: colors.surface }]}>
-              <MoreHorizontal size={18} color={colors.text} />
+            <Pressable onPress={handleToggleShared} style={[styles.iconBtn, { backgroundColor: wishlist.isShared ? colors.success + "20" : colors.surface }]}>
+              {wishlist.isShared ? <Globe size={18} color={colors.success} /> : <Lock size={18} color={colors.textTertiary} />}
             </Pressable>
           </View>
         </View>
@@ -108,6 +153,15 @@ export default function WishlistDetailScreen() {
                 {wishlist.description}
               </Text>
             ) : null}
+
+            {wishlist.isShared && (
+              <Pressable onPress={handleOpenChat} style={[styles.chatBanner, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "25" }]}>
+                <MessageCircle size={16} color={colors.primary} />
+                <Text style={[styles.chatBannerText, { color: colors.primary }]}>
+                  Open group chat to coordinate with {wishlist.collaborators.length - 1} collaborator{wishlist.collaborators.length > 2 ? "s" : ""}
+                </Text>
+              </Pressable>
+            )}
 
             {wishlist.collaborators.length > 1 && (
               <View style={styles.collaboratorsRow}>
@@ -151,7 +205,7 @@ export default function WishlistDetailScreen() {
 
           {wishlist.items.length === 0 ? (
             <View style={styles.emptyItems}>
-              <Text style={styles.emptyItemsEmoji}>🛒</Text>
+              <Image source={appLogo} style={styles.emptyLogo} contentFit="contain" />
               <Text style={[styles.emptyItemsTitle, { color: colors.text }]}>No items yet</Text>
               <Text style={[styles.emptyItemsDesc, { color: colors.textSecondary }]}>
                 Start adding products to this list
@@ -159,36 +213,49 @@ export default function WishlistDetailScreen() {
             </View>
           ) : (
             <View style={styles.itemsList}>
-              {wishlist.items.map((product) => (
-                <View key={product.id} style={styles.itemRow}>
-                  <View style={{ flex: 1 }}>
-                    <ProductCard
-                      product={product}
-                      variant="horizontal"
-                      onPress={() => router.push({ pathname: "/product-detail", params: { id: product.id, wishlistId: wishlist.id } })}
-                    />
+              {wishlist.items.map((product) => {
+                const assignment = getItemAssignment(product.id);
+                return (
+                  <View key={product.id}>
+                    <View style={styles.itemRow}>
+                      <View style={{ flex: 1 }}>
+                        <ProductCard
+                          product={product}
+                          variant="horizontal"
+                          onPress={() => router.push({ pathname: "/product-detail", params: { id: product.id, wishlistId: wishlist.id } })}
+                        />
+                      </View>
+                      <View style={styles.itemActions}>
+                        <Pressable
+                          onPress={() => handleTogglePurchased(product.id)}
+                          style={[
+                            styles.actionBtn,
+                            {
+                              backgroundColor: product.isPurchased ? colors.success + "20" : colors.surfaceSecondary,
+                            },
+                          ]}
+                        >
+                          <Check size={16} color={product.isPurchased ? colors.success : colors.textTertiary} />
+                        </Pressable>
+                        <Pressable
+                          onPress={() => handleRemoveProduct(product.id, product.title)}
+                          style={[styles.actionBtn, { backgroundColor: colors.error + "10" }]}
+                        >
+                          <Trash2 size={16} color={colors.error} />
+                        </Pressable>
+                      </View>
+                    </View>
+                    {assignment && (
+                      <View style={[styles.assignmentIndicator, { backgroundColor: colors.success + "10" }]}>
+                        <Gift size={12} color={colors.success} />
+                        <Text style={[styles.assignmentIndicatorText, { color: colors.success }]}>
+                          {isOwner ? "Someone has this covered \u{2728}" : `Claimed by ${assignment.assignedToName}`}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                  <View style={styles.itemActions}>
-                    <Pressable
-                      onPress={() => handleTogglePurchased(product.id)}
-                      style={[
-                        styles.actionBtn,
-                        {
-                          backgroundColor: product.isPurchased ? colors.success + "20" : colors.surfaceSecondary,
-                        },
-                      ]}
-                    >
-                      <Check size={16} color={product.isPurchased ? colors.success : colors.textTertiary} />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => handleRemoveProduct(product.id, product.title)}
-                      style={[styles.actionBtn, { backgroundColor: colors.error + "10" }]}
-                    >
-                      <Trash2 size={16} color={colors.error} />
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
         </ScrollView>
@@ -254,6 +321,22 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginBottom: 16,
   },
+  chatBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+    width: "100%",
+  },
+  chatBannerText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    flex: 1,
+  },
   collaboratorsRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -317,14 +400,26 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  assignmentIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    marginTop: -4,
+    marginBottom: 8,
+    marginLeft: 8,
+  },
+  assignmentIndicatorText: {
+    fontSize: 12,
+    fontWeight: "500" as const,
+  },
   emptyState: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     gap: 8,
-  },
-  emptyEmoji: {
-    fontSize: 48,
   },
   emptyTitle: {
     fontSize: 18,
@@ -335,9 +430,12 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
     gap: 8,
   },
-  emptyItemsEmoji: {
-    fontSize: 48,
+  emptyLogo: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
     marginBottom: 8,
+    opacity: 0.7,
   },
   emptyItemsTitle: {
     fontSize: 18,

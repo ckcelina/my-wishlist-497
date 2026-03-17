@@ -19,6 +19,8 @@ import WishlistCard from "@/components/WishlistCard";
 import ProductCard from "@/components/ProductCard";
 import SectionHeader from "@/components/SectionHeader";
 
+const appLogo = require("@/assets/images/logo.png");
+
 export default function HomeScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
@@ -57,13 +59,16 @@ export default function HomeScreen() {
           ]}
         >
           <View style={styles.greetingRow}>
-            <View style={styles.greetingContent}>
-              <Text style={[styles.greeting, { color: colors.textSecondary }]}>
-                Good morning
-              </Text>
-              <Text style={[styles.userName, { color: colors.text }]}>
-                {user.name} <Text style={styles.wave}>👋</Text>
-              </Text>
+            <View style={styles.greetingLeft}>
+              <Image source={appLogo} style={styles.logo} contentFit="contain" />
+              <View style={styles.greetingContent}>
+                <Text style={[styles.greeting, { color: colors.textSecondary }]}>
+                  Good morning
+                </Text>
+                <Text style={[styles.userName, { color: colors.text }]}>
+                  {user.name} <Text style={styles.wave}>{"👋"}</Text>
+                </Text>
+              </View>
             </View>
             <Pressable onPress={() => router.push("/(tabs)/profile")}>
               <Image
@@ -100,7 +105,7 @@ export default function HomeScreen() {
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Items</Text>
             </View>
             <View style={[styles.statCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
-              <Text style={styles.statEmoji}>🤝</Text>
+              <Text style={styles.statEmoji}>{"🤝"}</Text>
               <Text style={[styles.statNumber, { color: colors.primary }]}>
                 {sharedLists.length}
               </Text>
@@ -194,6 +199,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
+  },
+  greetingLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  logo: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
   },
   greetingContent: {
     gap: 2,

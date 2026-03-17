@@ -1,4 +1,4 @@
-import { Product, Wishlist, Category, Notification, UserProfile } from "@/types";
+import { Product, Wishlist, Category, Notification, UserProfile, ChatMessage, ItemAssignment } from "@/types";
 
 export const mockUser: UserProfile = {
   id: "u1",
@@ -114,8 +114,8 @@ export const mockWishlists: Wishlist[] = [
     id: "w1",
     title: "Tech Essentials",
     description: "Must-have gadgets and electronics",
-    emoji: "💻",
-    color: "#6B2FA0",
+    emoji: "\u{1F4BB}",
+    color: "#8032ee",
     itemCount: 3,
     collaborators: [
       { id: "u1", name: "Alex", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop", role: "owner" },
@@ -129,7 +129,7 @@ export const mockWishlists: Wishlist[] = [
     id: "w2",
     title: "Birthday Gift Ideas",
     description: "Gifts for Sarah's 30th birthday",
-    emoji: "🎁",
+    emoji: "\u{1F381}",
     color: "#E91E63",
     itemCount: 2,
     collaborators: [
@@ -146,7 +146,7 @@ export const mockWishlists: Wishlist[] = [
     id: "w3",
     title: "Home Renovation",
     description: "Things we need for the new apartment",
-    emoji: "🏠",
+    emoji: "\u{1F3E0}",
     color: "#FF9800",
     itemCount: 1,
     collaborators: [
@@ -162,8 +162,8 @@ export const mockWishlists: Wishlist[] = [
     id: "w4",
     title: "Summer Wardrobe",
     description: "Clothes and accessories for summer",
-    emoji: "👗",
-    color: "#00BCD4",
+    emoji: "\u{1F457}",
+    color: "#4c2090",
     itemCount: 1,
     collaborators: [
       { id: "u1", name: "Alex", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop", role: "owner" },
@@ -176,14 +176,14 @@ export const mockWishlists: Wishlist[] = [
 ];
 
 export const mockCategories: Category[] = [
-  { id: "c1", name: "Electronics", emoji: "📱", productCount: 156 },
-  { id: "c2", name: "Fashion", emoji: "👟", productCount: 234 },
-  { id: "c3", name: "Home", emoji: "🏡", productCount: 189 },
-  { id: "c4", name: "Beauty", emoji: "✨", productCount: 98 },
-  { id: "c5", name: "Books", emoji: "📚", productCount: 312 },
-  { id: "c6", name: "Sports", emoji: "⚽", productCount: 145 },
-  { id: "c7", name: "Toys", emoji: "🧸", productCount: 87 },
-  { id: "c8", name: "Garden", emoji: "🌱", productCount: 64 },
+  { id: "c1", name: "Electronics", emoji: "\u{1F4F1}", productCount: 156 },
+  { id: "c2", name: "Fashion", emoji: "\u{1F45F}", productCount: 234 },
+  { id: "c3", name: "Home", emoji: "\u{1F3E1}", productCount: 189 },
+  { id: "c4", name: "Beauty", emoji: "\u{2728}", productCount: 98 },
+  { id: "c5", name: "Books", emoji: "\u{1F4DA}", productCount: 312 },
+  { id: "c6", name: "Sports", emoji: "\u{26BD}", productCount: 145 },
+  { id: "c7", name: "Toys", emoji: "\u{1F9F8}", productCount: 87 },
+  { id: "c8", name: "Garden", emoji: "\u{1F331}", productCount: 64 },
 ];
 
 export const mockNotifications: Notification[] = [
@@ -222,6 +222,102 @@ export const mockNotifications: Notification[] = [
     timestamp: "2026-03-14T12:00:00Z",
     isRead: true,
     image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=100&h=100&fit=crop",
+  },
+];
+
+export const mockChatMessages: ChatMessage[] = [
+  {
+    id: "msg1",
+    wishlistId: "w2",
+    senderId: "u2",
+    senderName: "Jordan",
+    senderAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
+    text: "Hey everyone! Let's coordinate gifts for Sarah's birthday \u{1F382}",
+    timestamp: "2026-03-14T10:00:00Z",
+    type: "message",
+  },
+  {
+    id: "msg2",
+    wishlistId: "w2",
+    senderId: "u3",
+    senderName: "Taylor",
+    senderAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
+    text: "I'll get the Aesop hand wash! \u{1F381}",
+    timestamp: "2026-03-14T10:30:00Z",
+    type: "assignment",
+    assignedItemId: "p6",
+    assignedTo: "u3",
+  },
+  {
+    id: "msg3",
+    wishlistId: "w2",
+    senderId: "u2",
+    senderName: "Jordan",
+    senderAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
+    text: "Perfect! I'll handle the Nike Air Max \u{1F45F}",
+    timestamp: "2026-03-14T11:00:00Z",
+    type: "assignment",
+    assignedItemId: "p3",
+    assignedTo: "u2",
+  },
+  {
+    id: "msg4",
+    wishlistId: "w2",
+    senderId: "u3",
+    senderName: "Taylor",
+    senderAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
+    text: "Should we also plan a surprise party?",
+    timestamp: "2026-03-16T09:00:00Z",
+    type: "message",
+  },
+  {
+    id: "msg5",
+    wishlistId: "w3",
+    senderId: "u4",
+    senderName: "Riley",
+    senderAvatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
+    text: "I found the dutch oven on sale! Already ordered it \u{1F389}",
+    timestamp: "2026-03-15T10:00:00Z",
+    type: "message",
+  },
+  {
+    id: "msg6",
+    wishlistId: "w3",
+    senderId: "u4",
+    senderName: "Riley",
+    senderAvatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
+    text: "I'll get the Le Creuset Dutch Oven \u{1F381}",
+    timestamp: "2026-03-15T10:05:00Z",
+    type: "assignment",
+    assignedItemId: "p4",
+    assignedTo: "u4",
+  },
+];
+
+export const mockAssignments: ItemAssignment[] = [
+  {
+    productId: "p6",
+    assignedTo: "u3",
+    assignedToName: "Taylor",
+    assignedBy: "u3",
+    wishlistId: "w2",
+    timestamp: "2026-03-14T10:30:00Z",
+  },
+  {
+    productId: "p3",
+    assignedTo: "u2",
+    assignedToName: "Jordan",
+    assignedBy: "u2",
+    wishlistId: "w2",
+    timestamp: "2026-03-14T11:00:00Z",
+  },
+  {
+    productId: "p4",
+    assignedTo: "u4",
+    assignedToName: "Riley",
+    assignedBy: "u4",
+    wishlistId: "w3",
+    timestamp: "2026-03-15T10:05:00Z",
   },
 ];
 

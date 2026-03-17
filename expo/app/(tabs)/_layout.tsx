@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, Compass, Plus, Bell, User } from "lucide-react-native";
+import { Home, Compass, Plus, MessageCircle, User } from "lucide-react-native";
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
@@ -7,7 +7,7 @@ import { useWishlistContext } from "@/providers/WishlistProvider";
 
 export default function TabLayout() {
   const colors = useAppColors();
-  const { unreadCount } = useWishlistContext();
+  const { unreadChatCount } = useWishlistContext();
 
   return (
     <Tabs
@@ -52,11 +52,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="notifications"
+        name="chats"
         options={{
-          title: "Alerts",
-          tabBarIcon: ({ color, size }) => <Bell size={size} color={color} />,
-          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          title: "Chats",
+          tabBarIcon: ({ color, size }) => <MessageCircle size={size} color={color} />,
+          tabBarBadge: unreadChatCount > 0 ? unreadChatCount : undefined,
           tabBarBadgeStyle: {
             backgroundColor: colors.error,
             fontSize: 10,

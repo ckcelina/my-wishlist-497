@@ -28,6 +28,13 @@ function RootLayoutNav() {
         }}
       />
       <Stack.Screen
+        name="wishlist-chat"
+        options={{
+          headerShown: false,
+          presentation: "card",
+        }}
+      />
+      <Stack.Screen
         name="add-item"
         options={{
           headerShown: false,

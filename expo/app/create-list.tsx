@@ -18,7 +18,7 @@ import { Wishlist } from "@/types";
 import { mockUser } from "@/mocks/data";
 
 const EMOJIS = ["🎁", "💻", "👗", "🏠", "🎮", "📚", "✨", "🎂", "🏖️", "🎄", "💍", "🧸"];
-const COLORS = ["#6B2FA0", "#E91E63", "#FF9800", "#4CAF50", "#2196F3", "#00BCD4", "#9C27B0", "#F44336"];
+const COLORS = ["#8032ee", "#4c2090", "#36204e", "#E91E63", "#FF9800", "#4CAF50", "#2196F3", "#00BCD4"];
 
 export default function CreateListScreen() {
   const colors = useAppColors();

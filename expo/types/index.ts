@@ -63,6 +63,28 @@ export interface Notification {
   actionUrl?: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  wishlistId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar: string;
+  text: string;
+  timestamp: string;
+  type: "message" | "assignment" | "system";
+  assignedItemId?: string;
+  assignedTo?: string;
+}
+
+export interface ItemAssignment {
+  productId: string;
+  assignedTo: string;
+  assignedToName: string;
+  assignedBy: string;
+  wishlistId: string;
+  timestamp: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
