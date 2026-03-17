@@ -8,27 +8,63 @@ import {
   Pressable,
   Alert,
   Animated,
+  ActivityIndicator,
+  Platform,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { Link2, PenLine, ShoppingBag, ChevronRight, Plus, Sparkles } from "lucide-react-native";
+import {
+  Link2,
+  PenLine,
+  Camera,
+  ChevronRight,
+  Plus,
+  Sparkles,
+  ImagePlus,
+  Search,
+  X,
+  Check,
+} from "lucide-react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as Haptics from "expo-haptics";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { Product } from "@/types";
+import { generateObject } from "@rork-ai/toolkit-sdk";
+import { searchProducts, SerpApiResult } from "@/lib/api";
+import { z } from "zod";
+
+const productSchema = z.object({
+  title: z.string().describe("Product name/title detected from the image"),
+  description: z.string().describe("Brief product description"),
+  category: z.string().describe("Product category like Electronics, Fashion, Home, Beauty, etc."),
+  estimatedPrice: z.number().optional().describe("Estimated price if visible"),
+  brand: z.string().optional().describe("Brand name if identifiable"),
+  searchQuery: z.string().describe("Best search query to find this product online"),
+});
+
+type DetectedProduct = z.infer<typeof productSchema>;
 
 export default function AddScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+
   const { wishlists, addProductToWishlist } = useWishlistContext();
 
-  const [mode, setMode] = useState<"menu" | "link" | "manual">("menu");
+  const [mode, setMode] = useState<"menu" | "link" | "manual" | "image">("menu");
   const [productUrl, setProductUrl] = useState("");
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [store, setStore] = useState("");
   const [description, setDescription] = useState("");
   const [selectedList, setSelectedList] = useState<string>("");
+
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [detectedProduct, setDetectedProduct] = useState<DetectedProduct | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<SerpApiResult[]>([]);
+  const [selectedResult, setSelectedResult] = useState<SerpApiResult | null>(null);
 
   const scaleAnim1 = useRef(new Animated.Value(1)).current;
   const scaleAnim2 = useRef(new Animated.Value(1)).current;
@@ -42,6 +78,173 @@ export default function AddScreen() {
       Animated.spring(anim, { toValue: 1, friction: 3, useNativeDriver: true }).start();
     },
   });
+
+  const resetImageState = () => {
+    setSelectedImage(null);
+    setDetectedProduct(null);
+    setSearchResults([]);
+    setSelectedResult(null);
+    setIsDetecting(false);
+    setIsSearching(false);
+    setSelectedList("");
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const permResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permResult.granted) {
+        Alert.alert("Permission Needed", "Please allow access to your photo library.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        base64: true,
+        allowsEditing: true,
+      });
+
+      if (result.canceled || !result.assets[0]) return;
+
+      const asset = result.assets[0];
+      setSelectedImage(asset.uri);
+      setDetectedProduct(null);
+      setSearchResults([]);
+      setSelectedResult(null);
+
+      if (asset.base64) {
+        await detectProductFromImage(asset.base64, asset.mimeType || "image/jpeg");
+      } else {
+        Alert.alert("Error", "Could not read image data. Please try again.");
+      }
+    } catch (err) {
+      console.error("[ImagePicker] Error:", err);
+      Alert.alert("Error", "Failed to pick image.");
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const permResult = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permResult.granted) {
+        Alert.alert("Permission Needed", "Please allow camera access.");
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.7,
+        base64: true,
+        allowsEditing: true,
+      });
+
+      if (result.canceled || !result.assets[0]) return;
+
+      const asset = result.assets[0];
+      setSelectedImage(asset.uri);
+      setDetectedProduct(null);
+      setSearchResults([]);
+      setSelectedResult(null);
+
+      if (asset.base64) {
+        await detectProductFromImage(asset.base64, asset.mimeType || "image/jpeg");
+      }
+    } catch (err) {
+      console.error("[Camera] Error:", err);
+      Alert.alert("Error", "Failed to take photo.");
+    }
+  };
+
+  const detectProductFromImage = async (base64: string, mimeType: string) => {
+    setIsDetecting(true);
+    try {
+      console.log("[AI] Detecting product from image...");
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const detected = await generateObject({
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Analyze this product image. Identify the product name, description, category, estimated price if visible, brand if identifiable, and a good search query to find this product on shopping sites.",
+              },
+              {
+                type: "image",
+                image: `data:${mimeType};base64,${base64}`,
+              },
+            ],
+          },
+        ],
+        schema: productSchema,
+      });
+
+      console.log("[AI] Detected product:", JSON.stringify(detected));
+      setDetectedProduct(detected);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      await searchForProduct(detected.searchQuery);
+    } catch (err) {
+      console.error("[AI] Detection failed:", err);
+      Alert.alert("Detection Failed", "Could not identify the product. Try manual entry instead.");
+    } finally {
+      setIsDetecting(false);
+    }
+  };
+
+  const searchForProduct = async (query: string) => {
+    setIsSearching(true);
+    try {
+      console.log("[Search] Searching for:", query);
+      const { results, error } = await searchProducts(query);
+
+      if (error) {
+        console.log("[Search] Error:", error);
+      }
+
+      setSearchResults(results);
+      console.log(`[Search] Got ${results.length} results`);
+    } catch (err) {
+      console.error("[Search] Failed:", err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleAddDetectedProduct = () => {
+    if (!selectedList) {
+      Alert.alert("Select a List", "Please choose a wishlist to add to.");
+      return;
+    }
+
+    const productTitle = selectedResult?.title || detectedProduct?.title || "Unknown Product";
+    const productPrice = selectedResult?.price || detectedProduct?.estimatedPrice || 0;
+    const productStore = selectedResult?.store || "Unknown Store";
+    const productImage = selectedResult?.image || selectedImage || "";
+    const productDesc = detectedProduct?.description || selectedResult?.snippet || "";
+
+    const newProduct: Product = {
+      id: `img_${Date.now()}`,
+      title: productTitle,
+      image: productImage,
+      price: productPrice,
+      currency: selectedResult?.currency || "USD",
+      store: productStore,
+      storeUrl: selectedResult?.link || "",
+      description: productDesc,
+      category: detectedProduct?.category || "Other",
+      isPurchased: false,
+      addedAt: new Date().toISOString().split("T")[0],
+      country: "US",
+      rating: selectedResult?.rating,
+    };
+
+    addProductToWishlist(selectedList, newProduct);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert("Added!", `"${productTitle}" has been added to your wishlist.`);
+    resetImageState();
+    setMode("menu");
+  };
 
   const handleAddFromLink = () => {
     if (!productUrl.trim()) {
@@ -80,6 +283,7 @@ export default function AddScreen() {
     };
 
     addProductToWishlist(selectedList, newProduct);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert("Added!", `"${title}" has been added to your wishlist.`);
     setTitle("");
     setPrice("");
@@ -89,9 +293,206 @@ export default function AddScreen() {
     setMode("menu");
   };
 
-  const handleCreateList = () => {
-    router.push("/create-list");
-  };
+  if (mode === "image") {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView
+          contentContainerStyle={[styles.formContent, { paddingTop: insets.top + 16 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Pressable onPress={() => { resetImageState(); setMode("menu"); }} style={styles.backButton}>
+            <Text style={[styles.backText, { color: colors.primary }]}>← Back</Text>
+          </Pressable>
+          <Text style={[styles.formTitle, { color: colors.text }]}>Scan Product</Text>
+          <Text style={[styles.formSubtitle, { color: colors.textSecondary }]}>
+            Upload or take a photo to auto-detect
+          </Text>
+
+          {!selectedImage ? (
+            <View style={styles.imagePickerArea}>
+              <Pressable
+                onPress={handlePickImage}
+                style={[styles.imagePickerCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "30" }]}
+              >
+                <ImagePlus size={32} color={colors.primary} />
+                <Text style={[styles.imagePickerLabel, { color: colors.text }]}>Upload Photo</Text>
+                <Text style={[styles.imagePickerHint, { color: colors.textSecondary }]}>
+                  From gallery
+                </Text>
+              </Pressable>
+
+              {Platform.OS !== "web" && (
+                <Pressable
+                  onPress={handleTakePhoto}
+                  style={[styles.imagePickerCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "30" }]}
+                >
+                  <Camera size={32} color={colors.primary} />
+                  <Text style={[styles.imagePickerLabel, { color: colors.text }]}>Take Photo</Text>
+                  <Text style={[styles.imagePickerHint, { color: colors.textSecondary }]}>
+                    Use camera
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          ) : (
+            <View style={styles.detectionArea}>
+              <View style={styles.imagePreviewRow}>
+                <Image source={{ uri: selectedImage }} style={styles.previewImage} contentFit="cover" />
+                <Pressable
+                  onPress={resetImageState}
+                  style={[styles.removeImageBtn, { backgroundColor: colors.error + "20" }]}
+                >
+                  <X size={16} color={colors.error} />
+                </Pressable>
+              </View>
+
+              {isDetecting && (
+                <View style={[styles.statusCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
+                  <ActivityIndicator color={colors.primary} size="small" />
+                  <Text style={[styles.statusText, { color: colors.primary }]}>
+                    Analyzing product with AI...
+                  </Text>
+                </View>
+              )}
+
+              {detectedProduct && !isDetecting && (
+                <View style={[styles.detectedCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+                  <View style={styles.detectedHeader}>
+                    <Sparkles size={18} color={colors.primary} />
+                    <Text style={[styles.detectedTitle, { color: colors.primary }]}>Product Detected</Text>
+                  </View>
+                  <Text style={[styles.detectedName, { color: colors.text }]}>{detectedProduct.title}</Text>
+                  {detectedProduct.brand && (
+                    <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>
+                      Brand: {detectedProduct.brand}
+                    </Text>
+                  )}
+                  <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>
+                    Category: {detectedProduct.category}
+                  </Text>
+                  {detectedProduct.estimatedPrice !== undefined && detectedProduct.estimatedPrice > 0 && (
+                    <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>
+                      Est. Price: ${detectedProduct.estimatedPrice.toFixed(2)}
+                    </Text>
+                  )}
+                  <Text style={[styles.detectedDesc, { color: colors.textSecondary }]} numberOfLines={2}>
+                    {detectedProduct.description}
+                  </Text>
+                </View>
+              )}
+
+              {isSearching && (
+                <View style={[styles.statusCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
+                  <ActivityIndicator color={colors.primary} size="small" />
+                  <Text style={[styles.statusText, { color: colors.primary }]}>
+                    Searching stores...
+                  </Text>
+                </View>
+              )}
+
+              {searchResults.length > 0 && !isSearching && (
+                <View style={styles.resultsSection}>
+                  <View style={styles.resultsSectionHeader}>
+                    <Search size={16} color={colors.textSecondary} />
+                    <Text style={[styles.resultsSectionTitle, { color: colors.text }]}>
+                      Found in Stores ({searchResults.length})
+                    </Text>
+                  </View>
+                  {searchResults.map((result, idx) => (
+                    <Pressable
+                      key={`result-${idx}`}
+                      onPress={() => {
+                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setSelectedResult(selectedResult === result ? null : result);
+                      }}
+                      style={[
+                        styles.resultCard,
+                        {
+                          backgroundColor: selectedResult === result ? colors.primaryFaded : colors.surface,
+                          borderColor: selectedResult === result ? colors.primary : colors.borderLight,
+                        },
+                      ]}
+                    >
+                      {result.image ? (
+                        <Image source={{ uri: result.image }} style={styles.resultImage} contentFit="cover" />
+                      ) : (
+                        <View style={[styles.resultImagePlaceholder, { backgroundColor: colors.surfaceSecondary }]}>
+                          <Search size={16} color={colors.textTertiary} />
+                        </View>
+                      )}
+                      <View style={styles.resultInfo}>
+                        <Text style={[styles.resultTitle, { color: colors.text }]} numberOfLines={2}>
+                          {result.title}
+                        </Text>
+                        <View style={styles.resultMeta}>
+                          <Text style={[styles.resultPrice, { color: colors.primary }]}>
+                            {result.price > 0 ? `$${result.price.toFixed(2)}` : "Price N/A"}
+                          </Text>
+                          <Text style={[styles.resultStore, { color: colors.textSecondary }]}>
+                            {result.store}
+                          </Text>
+                        </View>
+                      </View>
+                      {selectedResult === result && (
+                        <View style={[styles.checkBadge, { backgroundColor: colors.primary }]}>
+                          <Check size={14} color="#FFFFFF" />
+                        </View>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              {detectedProduct && !isDetecting && !isSearching && (
+                <>
+                  <View style={styles.formGroup}>
+                    <Text style={[styles.label, { color: colors.textSecondary }]}>ADD TO WISHLIST *</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <View style={styles.listChips}>
+                        {wishlists.map((list) => (
+                          <Pressable
+                            key={list.id}
+                            onPress={() => setSelectedList(list.id)}
+                            style={[
+                              styles.listChip,
+                              {
+                                backgroundColor: selectedList === list.id ? colors.primary : colors.surface,
+                                borderColor: selectedList === list.id ? colors.primary : colors.border,
+                              },
+                            ]}
+                          >
+                            <Text style={{ fontSize: 16 }}>{list.emoji}</Text>
+                            <Text
+                              style={[
+                                styles.chipText,
+                                { color: selectedList === list.id ? "#FFFFFF" : colors.text },
+                              ]}
+                            >
+                              {list.title}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+
+                  <Pressable
+                    onPress={handleAddDetectedProduct}
+                    style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+                  >
+                    <Plus size={18} color="#FFFFFF" />
+                    <Text style={styles.primaryButtonText}>
+                      {selectedResult ? "Add Selected Product" : "Add Detected Product"}
+                    </Text>
+                  </Pressable>
+                </>
+              )}
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    );
+  }
 
   if (mode === "link") {
     return (
@@ -248,7 +649,7 @@ export default function AddScreen() {
 
         <View style={styles.menuCards}>
           <Pressable
-            onPress={() => setMode("link")}
+            onPress={() => setMode("image")}
             {...createPressHandlers(scaleAnim1)}
           >
             <Animated.View
@@ -258,7 +659,30 @@ export default function AddScreen() {
               ]}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: colors.primaryFaded }]}>
-                <Link2 size={28} color={colors.primary} />
+                <Camera size={28} color={colors.primary} />
+              </View>
+              <View style={styles.menuCardContent}>
+                <Text style={[styles.menuCardTitle, { color: colors.text }]}>Scan from Image</Text>
+                <Text style={[styles.menuCardDesc, { color: colors.textSecondary }]}>
+                  Upload a photo to auto-detect products
+                </Text>
+              </View>
+              <ChevronRight size={20} color={colors.textTertiary} />
+            </Animated.View>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setMode("link")}
+            {...createPressHandlers(scaleAnim2)}
+          >
+            <Animated.View
+              style={[
+                styles.menuCard,
+                { backgroundColor: colors.surface, borderColor: colors.borderLight, transform: [{ scale: scaleAnim2 }] },
+              ]}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: "#EDE7F6" }]}>
+                <Link2 size={28} color="#7C4DFF" />
               </View>
               <View style={styles.menuCardContent}>
                 <Text style={[styles.menuCardTitle, { color: colors.text }]}>Paste Product Link</Text>
@@ -272,12 +696,12 @@ export default function AddScreen() {
 
           <Pressable
             onPress={() => setMode("manual")}
-            {...createPressHandlers(scaleAnim2)}
+            {...createPressHandlers(scaleAnim3)}
           >
             <Animated.View
               style={[
                 styles.menuCard,
-                { backgroundColor: colors.surface, borderColor: colors.borderLight, transform: [{ scale: scaleAnim2 }] },
+                { backgroundColor: colors.surface, borderColor: colors.borderLight, transform: [{ scale: scaleAnim3 }] },
               ]}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: "#E8F5E9" }]}>
@@ -287,29 +711,6 @@ export default function AddScreen() {
                 <Text style={[styles.menuCardTitle, { color: colors.text }]}>Manual Entry</Text>
                 <Text style={[styles.menuCardDesc, { color: colors.textSecondary }]}>
                   Add product details yourself
-                </Text>
-              </View>
-              <ChevronRight size={20} color={colors.textTertiary} />
-            </Animated.View>
-          </Pressable>
-
-          <Pressable
-            onPress={handleCreateList}
-            {...createPressHandlers(scaleAnim3)}
-          >
-            <Animated.View
-              style={[
-                styles.menuCard,
-                { backgroundColor: colors.surface, borderColor: colors.borderLight, transform: [{ scale: scaleAnim3 }] },
-              ]}
-            >
-              <View style={[styles.menuIconContainer, { backgroundColor: "#FFF3E0" }]}>
-                <ShoppingBag size={28} color="#FF9800" />
-              </View>
-              <View style={styles.menuCardContent}>
-                <Text style={[styles.menuCardTitle, { color: colors.text }]}>Create New List</Text>
-                <Text style={[styles.menuCardDesc, { color: colors.textSecondary }]}>
-                  Start a fresh wishlist collection
                 </Text>
               </View>
               <ChevronRight size={20} color={colors.textTertiary} />
@@ -341,8 +742,8 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   menuCard: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     padding: 18,
     borderRadius: 20,
     borderWidth: 1,
@@ -352,8 +753,8 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
   },
   menuCardContent: {
     flex: 1,
@@ -387,8 +788,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 14,
@@ -405,7 +806,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   formRow: {
-    flexDirection: "row",
+    flexDirection: "row" as const,
     gap: 12,
   },
   label: {
@@ -427,13 +828,13 @@ const styles = StyleSheet.create({
     paddingTop: 14,
   },
   listChips: {
-    flexDirection: "row",
+    flexDirection: "row" as const,
     gap: 10,
     paddingVertical: 4,
   },
   listChip: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,
@@ -445,9 +846,9 @@ const styles = StyleSheet.create({
     fontWeight: "500" as const,
   },
   primaryButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
     padding: 16,
     borderRadius: 16,
     gap: 8,
@@ -457,5 +858,149 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700" as const,
+  },
+  imagePickerArea: {
+    flexDirection: "row" as const,
+    gap: 14,
+  },
+  imagePickerCard: {
+    flex: 1,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingVertical: 36,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderStyle: "dashed" as const,
+    gap: 10,
+  },
+  imagePickerLabel: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+  },
+  imagePickerHint: {
+    fontSize: 12,
+  },
+  detectionArea: {
+    gap: 16,
+  },
+  imagePreviewRow: {
+    position: "relative" as const,
+  },
+  previewImage: {
+    width: "100%" as const,
+    height: 220,
+    borderRadius: 20,
+  },
+  removeImageBtn: {
+    position: "absolute" as const,
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  statusCard: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+  },
+  detectedCard: {
+    padding: 18,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 6,
+  },
+  detectedHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    marginBottom: 4,
+  },
+  detectedTitle: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.6,
+  },
+  detectedName: {
+    fontSize: 18,
+    fontWeight: "700" as const,
+  },
+  detectedMeta: {
+    fontSize: 13,
+  },
+  detectedDesc: {
+    fontSize: 13,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  resultsSection: {
+    gap: 10,
+  },
+  resultsSectionHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    marginBottom: 4,
+  },
+  resultsSectionTitle: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+  },
+  resultCard: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+  },
+  resultImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+  },
+  resultImagePlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  resultInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  resultTitle: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+  },
+  resultMeta: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+  },
+  resultPrice: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+  },
+  resultStore: {
+    fontSize: 12,
+  },
+  checkBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
   },
 });
