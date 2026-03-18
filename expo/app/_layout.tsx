@@ -5,6 +5,7 @@ import React, { useEffect, useRef } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { WishlistProvider } from "@/providers/WishlistProvider";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -111,11 +112,13 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={authStyles.flex}>
         <ErrorBoundary>
-          <AuthProvider>
-            <WishlistProvider>
-              <RootLayoutNav />
-            </WishlistProvider>
-          </AuthProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <WishlistProvider>
+                <RootLayoutNav />
+              </WishlistProvider>
+            </AuthProvider>
+          </ThemeProvider>
         </ErrorBoundary>
       </GestureHandlerRootView>
     </QueryClientProvider>

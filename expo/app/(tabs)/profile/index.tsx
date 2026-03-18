@@ -27,11 +27,16 @@ import {
   Database,
   CircleCheck as CheckCircle2,
   CircleAlert as AlertCircle,
+  Sun,
+  Moon,
+  Monitor,
+  Palette,
 } from "lucide-react-native";
 import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { useAuth } from "@/providers/AuthProvider";
+import { useTheme, ThemeMode } from "@/providers/ThemeProvider";
 import { checkDatabaseHealth, DbHealthResult } from "@/lib/api";
 
 const COUNTRIES = [
@@ -60,8 +65,10 @@ export default function ProfileScreen() {
   const { user, wishlists, sharedLists, allProducts } = useWishlistContext();
   const { profile, signOut, isSigningOut, updateProfile, isUpdatingProfile } = useAuth();
 
+  const { themeMode, setThemeMode } = useTheme();
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(false);
   const [showNameEditor, setShowNameEditor] = useState(false);
   const [editName, setEditName] = useState("");
   const [dbHealth, setDbHealth] = useState<DbHealthResult | null>(null);
@@ -196,6 +203,21 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>PREFERENCES</Text>
           <View style={[styles.sectionCards, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+            <Pressable
+              style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
+              onPress={() => setShowThemePicker(true)}
+            >
+              <View style={styles.settingLeft}>
+                <Palette size={20} color={colors.primary} />
+                <Text style={[styles.settingLabel, { color: colors.text }]}>Appearance</Text>
+              </View>
+              <View style={styles.settingRight}>
+                <Text style={[styles.settingValue, { color: colors.textTertiary }]}>
+                  {themeMode === "system" ? "System" : themeMode === "light" ? "Light" : "Dark"}
+                </Text>
+                <ChevronRight size={18} color={colors.textTertiary} />
+              </View>
+            </Pressable>
             <Pressable
               style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
               onPress={() => setShowCountryPicker(true)}
@@ -351,6 +373,62 @@ export default function ProfileScreen() {
                 </Pressable>
               ))}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showThemePicker} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Appearance</Text>
+              <Pressable onPress={() => setShowThemePicker(false)}>
+                <X size={22} color={colors.text} />
+              </Pressable>
+            </View>
+            <View style={styles.themeOptionsContainer}>
+              {([
+                { mode: "system" as ThemeMode, label: "System", description: "Match device settings", Icon: Monitor },
+                { mode: "light" as ThemeMode, label: "Light", description: "Always light theme", Icon: Sun },
+                { mode: "dark" as ThemeMode, label: "Dark", description: "Always dark theme", Icon: Moon },
+              ]).map(({ mode, label, description, Icon }) => {
+                const isActive = themeMode === mode;
+                return (
+                  <Pressable
+                    key={mode}
+                    onPress={() => {
+                      void setThemeMode(mode);
+                      setShowThemePicker(false);
+                    }}
+                    style={[
+                      styles.themeOption,
+                      {
+                        backgroundColor: isActive ? colors.primaryFaded : colors.surfaceSecondary,
+                        borderColor: isActive ? colors.primary : colors.borderLight,
+                      },
+                    ]}
+                  >
+                    <View style={[
+                      styles.themeIconBg,
+                      { backgroundColor: isActive ? colors.primary : colors.border },
+                    ]}>
+                      <Icon size={22} color={isActive ? "#FFFFFF" : colors.textSecondary} />
+                    </View>
+                    <Text style={[styles.themeLabel, { color: isActive ? colors.primary : colors.text }]}>
+                      {label}
+                    </Text>
+                    <Text style={[styles.themeDescription, { color: colors.textTertiary }]}>
+                      {description}
+                    </Text>
+                    {isActive && (
+                      <View style={[styles.themeCheckmark, { backgroundColor: colors.primary }]}>
+                        <Check size={14} color="#FFFFFF" />
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         </View>
       </Modal>
@@ -567,5 +645,48 @@ const styles = StyleSheet.create({
   nameBtnText: {
     fontSize: 16,
     fontWeight: "600" as const,
+  },
+  themeOptionsContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+    gap: 12,
+  },
+  themeOption: {
+    flex: 1,
+    alignItems: "center" as const,
+    paddingVertical: 20,
+    paddingHorizontal: 8,
+    borderRadius: 16,
+    borderWidth: 2,
+    gap: 8,
+    position: "relative" as const,
+  },
+  themeIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    marginBottom: 4,
+  },
+  themeLabel: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+  },
+  themeDescription: {
+    fontSize: 11,
+    textAlign: "center" as const,
+    lineHeight: 14,
+  },
+  themeCheckmark: {
+    position: "absolute" as const,
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
   },
 });
