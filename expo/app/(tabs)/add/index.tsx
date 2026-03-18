@@ -1194,7 +1194,7 @@ export default function AddScreen() {
                   <View style={[styles.searchQueryTag, { backgroundColor: colors.primaryFaded }]}>
                     <Search size={12} color={colors.primary} />
                     <Text style={[styles.searchQueryText, { color: colors.primary }]} numberOfLines={1}>
-                      Searching: "{textExtractResult.suggestedSearchQuery}"
+                      {`Searching: "${textExtractResult.suggestedSearchQuery}"`}
                     </Text>
                   </View>
                 </View>
@@ -1304,7 +1304,7 @@ export default function AddScreen() {
                 <View style={[styles.searchQueryTag, { backgroundColor: colors.primaryFaded }]}>
                   <Eye size={12} color={colors.primary} />
                   <Text style={[styles.searchQueryText, { color: colors.primary }]} numberOfLines={1}>
-                    Lens identified: "{visualSearchQuery}"
+                    {`Lens identified: "${visualSearchQuery}"`}
                   </Text>
                 </View>
               )}
@@ -1421,7 +1421,7 @@ export default function AddScreen() {
           </Pressable>
           <Text style={[styles.formTitle, { color: colors.text }]}>Paste Product Link</Text>
           <Text style={[styles.formSubtitle, { color: colors.textSecondary }]}>
-            We'll automatically detect the product details
+            {"We'll automatically detect the product details"}
           </Text>
 
           <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -1615,7 +1615,7 @@ export default function AddScreen() {
       <ScrollView contentContainerStyle={[styles.menuContent, { paddingTop: insets.top + 20 }]}>
         <Text style={[styles.menuTitle, { color: colors.text }]}>Add to Wishlist</Text>
         <Text style={[styles.menuSubtitle, { color: colors.textSecondary }]}>
-          Choose how you'd like to add an item
+          {"Choose how you'd like to add an item"}
         </Text>
 
         {!hasWishlists && (

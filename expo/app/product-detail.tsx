@@ -151,6 +151,27 @@ export default function ProductDetailScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const priceAlertEnabled = product ? hasAlert(product.id) : false;
+  const priceHistory = product ? getProductHistory(product.id) : [];
+
+  useEffect(() => {
+    if (sellers.length > 0 && product) {
+      const now = new Date().toISOString();
+      for (const seller of sellers.slice(0, 3)) {
+        if (seller.price > 0) {
+          void addPriceHistoryEntry(product.id, {
+            productId: product.id,
+            price: seller.price,
+            currency: product.currency,
+            store: seller.name,
+            checkedAt: now,
+          } as PriceHistoryEntry);
+        }
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sellers.length]);
+
   if (!product) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -187,27 +208,6 @@ export default function ProductDetailScreen() {
     const listName = wishlists.find((w) => w.id === listId)?.title || "wishlist";
     Alert.alert("Saved!", `"${product.title}" added to ${listName}`);
   };
-
-  const priceAlertEnabled = product ? hasAlert(product.id) : false;
-  const priceHistory = product ? getProductHistory(product.id) : [];
-
-  useEffect(() => {
-    if (sellers.length > 0 && product) {
-      const now = new Date().toISOString();
-      for (const seller of sellers.slice(0, 3)) {
-        if (seller.price > 0) {
-          void addPriceHistoryEntry(product.id, {
-            productId: product.id,
-            price: seller.price,
-            currency: product.currency,
-            store: seller.name,
-            checkedAt: now,
-          } as PriceHistoryEntry);
-        }
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sellers.length]);
 
   const handleTogglePriceAlert = () => {
     if (!product) return;

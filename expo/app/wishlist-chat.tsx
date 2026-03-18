@@ -282,7 +282,7 @@ export default function WishlistChatScreen() {
             </Pressable>
           </View>
           <Text style={[styles.claimPanelSubtitle, { color: colors.textSecondary }]}>
-            The wishlist owner won't see your claim
+            {"The wishlist owner won't see your claim"}
           </Text>
           <ScrollView showsVerticalScrollIndicator={false}>
             {wishlist.items.map((item) => {
