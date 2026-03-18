@@ -15,6 +15,8 @@ import { useWishlistContext } from "@/providers/WishlistProvider";
 
 const appLogo = require("@/assets/images/logo.png");
 
+const ChatSeparator = () => <View style={{ height: 10 }} />;
+
 function formatTimeAgo(timestamp: string): string {
   const now = new Date();
   const date = new Date(timestamp);
@@ -143,7 +145,7 @@ export default function ChatsScreen() {
           renderItem={renderChatThread}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          ItemSeparatorComponent={ChatSeparator}
         />
       )}
     </View>

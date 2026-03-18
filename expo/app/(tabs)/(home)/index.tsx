@@ -119,7 +119,7 @@ export default function HomeScreen() {
               {currency?.symbol} {currency?.code}
             </Text>
             <ChevronRight size={14} color={colors.primary} />
-          </View>
+          </Pressable>
 
           <View style={styles.quickStats} testID="home-quick-stats">
             <View style={[styles.statPill, { backgroundColor: colors.primaryFaded }]}>

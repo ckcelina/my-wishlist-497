@@ -305,8 +305,7 @@ export default function ExploreScreen() {
                 )}
               </View>
               <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
+                onPress={() => {
                   void removeSearch(item.query);
                 }}
                 hitSlop={8}
