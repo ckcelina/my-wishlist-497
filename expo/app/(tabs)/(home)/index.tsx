@@ -101,7 +101,7 @@ export default function HomeScreen() {
     ]).start();
   }, [fadeAnim, slideAnim]);
 
-  const greeting = useMemo(() => {
+  const _greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 6) return "Good night";
     if (hour < 12) return "Good morning";
@@ -152,14 +152,6 @@ export default function HomeScreen() {
           <View style={styles.greetingRow}>
             <View style={styles.greetingLeft}>
               <Image source={appLogo} style={styles.logo} contentFit="contain" />
-              <View style={styles.greetingContent}>
-                <Text style={[styles.greeting, { color: colors.textSecondary }]}>
-                  {greeting}
-                </Text>
-                <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
-                  {user.name}
-                </Text>
-              </View>
             </View>
             <View style={styles.headerRightActions}>
               <Pressable
@@ -462,21 +454,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   logo: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-  },
-  greetingContent: {
-    gap: 2,
-    flex: 1,
-  },
-  greeting: {
-    fontSize: 13,
-    fontWeight: "500" as const,
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: "800" as const,
+    width: 160,
+    height: 44,
   },
   headerRightActions: {
     flexDirection: "row",
