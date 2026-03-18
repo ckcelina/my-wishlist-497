@@ -57,7 +57,7 @@ function AuthGate() {
 
   if (!isInitialized || isLoading || hasOnboarded === null) {
     return (
-      <View style={[authStyles.loadingContainer, { backgroundColor: colors.background }]}>
+      <View style={[authStyles.loadingOverlay, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -176,5 +176,15 @@ const authStyles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
   },
 });
