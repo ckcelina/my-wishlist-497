@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { WishlistProvider } from "@/providers/WishlistProvider";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
@@ -18,6 +18,7 @@ function AuthGate() {
   const segments = useSegments();
   const router = useRouter();
   const colors = useAppColors();
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     if (!isInitialized) return;
@@ -25,11 +26,15 @@ function AuthGate() {
     const inAuthGroup = segments[0] === "login" || segments[0] === "signup";
 
     if (!isAuthenticated && !inAuthGroup) {
-      console.log("Not authenticated, redirecting to login");
-      router.replace("/login");
+      console.log("[AuthGate] Not authenticated, redirecting to login");
+      hasRedirected.current = true;
+      setTimeout(() => router.replace("/login"), 0);
     } else if (isAuthenticated && inAuthGroup) {
-      console.log("Authenticated, redirecting to home");
-      router.replace("/");
+      console.log("[AuthGate] Authenticated, redirecting to home");
+      hasRedirected.current = true;
+      setTimeout(() => router.replace("/"), 0);
+    } else {
+      hasRedirected.current = false;
     }
   }, [isAuthenticated, isInitialized, segments, router]);
 
@@ -104,7 +109,7 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView>
+      <GestureHandlerRootView style={authStyles.flex}>
         <ErrorBoundary>
           <AuthProvider>
             <WishlistProvider>
@@ -118,6 +123,9 @@ export default function RootLayout() {
 }
 
 const authStyles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",

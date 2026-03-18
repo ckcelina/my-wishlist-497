@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import createContextHook from "@nkzw/create-context-hook";
 import { supabase } from "@/lib/supabase";
 import { Session, User } from "@supabase/supabase-js";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface UserProfile {
   id: string;
@@ -16,6 +17,7 @@ interface UserProfile {
 }
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -150,10 +152,24 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const signOutMutation = useMutation({
     mutationFn: async () => {
+      console.log("[Auth] Starting sign out...");
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       setProfile(null);
-      console.log("Sign out successful");
+      setSession(null);
+      setUser(null);
+      queryClient.clear();
+      try {
+        await AsyncStorage.multiRemove([
+          "wishlists_data",
+          "notifications_data",
+          "chat_messages_v2",
+          "item_assignments_v2",
+        ]);
+      } catch (e) {
+        console.log("[Auth] Error clearing AsyncStorage:", e);
+      }
+      console.log("[Auth] Sign out successful, all data cleared");
     },
   });
 

@@ -58,11 +58,11 @@ export default function LoginScreen() {
     ]).start();
 
     try {
-      await signIn({ email: email.trim().toLowerCase(), password });
-      console.log("Login successful, navigating to home");
+      const result = await signIn({ email: email.trim().toLowerCase(), password });
+      console.log("[Login] Success, user:", result.user?.id);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Login failed. Please try again.";
-      console.log("Login error:", message);
+      console.log("[Login] Error:", message);
       Alert.alert("Login Failed", message);
     }
   };

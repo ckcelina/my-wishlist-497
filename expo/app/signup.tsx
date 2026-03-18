@@ -78,20 +78,25 @@ export default function SignUpScreen() {
     ]).start();
 
     try {
-      await signUp({
+      const result = await signUp({
         email: email.trim().toLowerCase(),
         password,
         fullName: fullName.trim(),
       });
-      console.log("Sign up successful");
-      Alert.alert(
-        "Account Created",
-        "Your account has been created successfully. You can now sign in.",
-        [{ text: "OK" }]
-      );
+      console.log("[SignUp] Sign up successful, session:", result.session ? "exists" : "none");
+
+      if (result.session) {
+        console.log("[SignUp] Auto-signed in, AuthGate will redirect to home");
+      } else {
+        Alert.alert(
+          "Check Your Email",
+          "We sent a confirmation link to your email. Please verify your account, then sign in.",
+          [{ text: "Go to Sign In", onPress: () => router.replace("/login") }]
+        );
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Sign up failed. Please try again.";
-      console.log("Sign up error:", message);
+      console.log("[SignUp] Error:", message);
       Alert.alert("Sign Up Failed", message);
     }
   };
