@@ -37,6 +37,7 @@ import { usePriceAlerts } from "@/providers/PriceAlertProvider";
 import { mockProducts, trendingProducts } from "@/mocks/data";
 import { Product } from "@/types";
 import { comparePrices, getProductDetail, ProductSeller } from "@/lib/api";
+import PriceHistoryChart from "@/components/PriceHistoryChart";
 
 export default function ProductDetailScreen() {
   const colors = useAppColors();
@@ -497,6 +498,13 @@ export default function ProductDetailScreen() {
                     Price History
                   </Text>
                 </View>
+                <View style={[styles.chartContainer, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+                  <PriceHistoryChart
+                    entries={priceHistory}
+                    formatPrice={format}
+                    currency={product.currency}
+                  />
+                </View>
                 {priceHistory.slice(-5).map((entry, idx) => {
                   const entryPrice = format(entry.price, entry.currency);
                   const date = new Date(entry.checkedAt);
@@ -899,6 +907,12 @@ const styles = StyleSheet.create({
   },
   priceHistorySection: {
     marginBottom: 24,
+  },
+  chartContainer: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
   },
   historyRow: {
     flexDirection: "row" as const,

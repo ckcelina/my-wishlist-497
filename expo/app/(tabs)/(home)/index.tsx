@@ -11,12 +11,16 @@ import {
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Plus, ChevronRight, Sparkles, MapPin } from "lucide-react-native";
+import { Plus, ChevronRight, Sparkles, MapPin, Bell, TrendingUp, ShoppingBag } from "lucide-react-native";
+import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { useLocation } from "@/providers/LocationProvider";
+import { usePriceAlerts } from "@/providers/PriceAlertProvider";
+import { fetchTrendingProducts, SerpApiResult } from "@/lib/api";
 import WishlistCard from "@/components/WishlistCard";
 import ProductCard from "@/components/ProductCard";
+import { Product } from "@/types";
 
 const appLogo = require("@/assets/images/logo.png");
 
@@ -25,14 +29,57 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, myLists, sharedLists, trendingProducts, refreshWishlists } = useWishlistContext();
-  const { country, city, currency } = useLocation();
+  const { country, city, currency, serpApiCountryCode, format } = useLocation();
+  const { unreadDropCount, activeAlertCount, checkPricesNow, isCheckingPrices } = usePriceAlerts();
   const [refreshing, setRefreshing] = useState(false);
+  const [liveTrending, setLiveTrending] = useState<SerpApiResult[]>([]);
+
+  const trendingMutation = useMutation({
+    mutationFn: async () => {
+      console.log(`[Home] Fetching live trending for ${serpApiCountryCode}`);
+      return fetchTrendingProducts(serpApiCountryCode);
+    },
+    onSuccess: (data) => {
+      if (data.results && data.results.length > 0) {
+        setLiveTrending(data.results);
+        console.log(`[Home] Got ${data.results.length} trending results`);
+      }
+    },
+  });
+
+  useEffect(() => {
+    trendingMutation.mutate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serpApiCountryCode]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     refreshWishlists();
-    setTimeout(() => setRefreshing(false), 1000);
-  }, [refreshWishlists]);
+    trendingMutation.mutate();
+    if (activeAlertCount > 0) {
+      checkPricesNow();
+    }
+    setTimeout(() => setRefreshing(false), 1200);
+  }, [refreshWishlists, trendingMutation, activeAlertCount, checkPricesNow]);
+
+  const serpToProduct = useCallback(
+    (result: SerpApiResult, index: number): Product => ({
+      id: `trending_${index}_${Date.now()}`,
+      title: result.title,
+      image: result.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
+      price: result.price,
+      currency: result.currency || "USD",
+      store: result.store,
+      storeUrl: result.link,
+      description: result.snippet,
+      category: "Trending",
+      isPurchased: false,
+      addedAt: new Date().toISOString().split("T")[0],
+      country: serpApiCountryCode.toUpperCase(),
+      rating: result.rating,
+    }),
+    [serpApiCountryCode]
+  );
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
@@ -99,12 +146,25 @@ export default function HomeScreen() {
                 </Text>
               </View>
             </View>
-            <Pressable onPress={() => router.push("/(tabs)/profile")}>
-              <Image
-                source={user.avatar ? { uri: user.avatar } : require("@/assets/images/icon.png")}
-                style={[styles.avatar, { borderColor: colors.primary + "40" }]}
-              />
-            </Pressable>
+            <View style={styles.headerRightActions}>
+              <Pressable
+                onPress={() => router.push("/notifications" as never)}
+                style={[styles.notifBtn, { backgroundColor: colors.surfaceSecondary }]}
+              >
+                <Bell size={20} color={colors.text} />
+                {unreadDropCount > 0 && (
+                  <View style={[styles.notifDot, { backgroundColor: colors.error }]}>
+                    <Text style={styles.notifDotText}>{unreadDropCount > 9 ? "9+" : unreadDropCount}</Text>
+                  </View>
+                )}
+              </Pressable>
+              <Pressable onPress={() => router.push("/(tabs)/profile")}>
+                <Image
+                  source={user.avatar ? { uri: user.avatar } : require("@/assets/images/icon.png")}
+                  style={[styles.avatar, { borderColor: colors.primary + "40" }]}
+                />
+              </Pressable>
+            </View>
           </View>
 
           <Pressable
@@ -216,7 +276,84 @@ export default function HomeScreen() {
           </>
         )}
 
-        {trendingProducts.length > 0 && (
+        {activeAlertCount > 0 && (
+          <Pressable
+            onPress={() => router.push("/price-alerts" as never)}
+            style={[styles.alertBanner, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "25" }]}
+          >
+            <View style={[styles.alertBannerIcon, { backgroundColor: colors.primary + "20" }]}>
+              <Bell size={16} color={colors.primary} />
+            </View>
+            <View style={styles.alertBannerContent}>
+              <Text style={[styles.alertBannerTitle, { color: colors.text }]}>
+                {activeAlertCount} Price Alert{activeAlertCount !== 1 ? "s" : ""} Active
+              </Text>
+              <Text style={[styles.alertBannerSub, { color: colors.textSecondary }]}>
+                {isCheckingPrices ? "Checking prices..." : "Tap to manage your alerts"}
+              </Text>
+            </View>
+            <ChevronRight size={16} color={colors.primary} />
+          </Pressable>
+        )}
+
+        {liveTrending.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <TrendingUp size={18} color={colors.primary} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Trending in {country?.name ?? "your area"}</Text>
+              </View>
+              <Pressable
+                onPress={() => router.push("/(tabs)/explore")}
+                style={styles.seeAllBtn}
+              >
+                <Text style={[styles.seeAllText, { color: colors.primary }]}>See All</Text>
+                <ChevronRight size={16} color={colors.primary} />
+              </Pressable>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            >
+              {liveTrending.slice(0, 8).map((item, index) => {
+                const product = serpToProduct(item, index);
+                return (
+                  <Pressable
+                    key={`live-trending-${index}`}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/product-detail",
+                        params: { id: product.id, serpData: JSON.stringify(item) },
+                      })
+                    }
+                    style={[
+                      styles.trendingCard,
+                      { backgroundColor: colors.surface, borderColor: colors.borderLight },
+                      index > 0 ? { marginLeft: 12 } : undefined,
+                    ]}
+                  >
+                    <Image source={{ uri: item.image }} style={styles.trendingImage} contentFit="cover" />
+                    <View style={styles.trendingInfo}>
+                      <Text style={[styles.trendingTitle, { color: colors.text }]} numberOfLines={2}>
+                        {item.title}
+                      </Text>
+                      <View style={[styles.trendingStoreTag, { backgroundColor: colors.surfaceSecondary }]}>
+                        <ShoppingBag size={9} color={colors.textTertiary} />
+                        <Text style={[styles.trendingStore, { color: colors.textTertiary }]}>{item.store}</Text>
+                      </View>
+                      <Text style={[styles.trendingPrice, { color: colors.primary }]}>
+                        {format(item.price, item.currency)}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </>
+        )}
+
+        {trendingProducts.length > 0 && liveTrending.length === 0 && (
           <>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
@@ -289,12 +426,40 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800" as const,
   },
+  headerRightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  notifBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    position: "relative" as const,
+  },
+  notifDot: {
+    position: "absolute" as const,
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 3,
+  },
+  notifDotText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "700" as const,
+  },
   avatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
     borderWidth: 2,
-    marginLeft: 12,
   },
   locationBar: {
     flexDirection: "row" as const,
@@ -427,5 +592,70 @@ const styles = StyleSheet.create({
   createCardText: {
     fontSize: 13,
     fontWeight: "600" as const,
+  },
+  alertBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    marginHorizontal: 20,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 12,
+    marginTop: 20,
+  },
+  alertBannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  alertBannerContent: {
+    flex: 1,
+    gap: 2,
+  },
+  alertBannerTitle: {
+    fontSize: 14,
+    fontWeight: "700" as const,
+  },
+  alertBannerSub: {
+    fontSize: 12,
+  },
+  trendingCard: {
+    width: 160,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden" as const,
+  },
+  trendingImage: {
+    width: "100%" as const,
+    height: 120,
+  },
+  trendingInfo: {
+    padding: 10,
+    gap: 4,
+  },
+  trendingTitle: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    lineHeight: 17,
+  },
+  trendingStoreTag: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    alignSelf: "flex-start" as const,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    gap: 3,
+  },
+  trendingStore: {
+    fontSize: 10,
+    fontWeight: "500" as const,
+  },
+  trendingPrice: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+    marginTop: 2,
   },
 });
