@@ -847,6 +847,196 @@ app.post("/price-history/record", async (c) => {
   }
 });
 
+app.post("/search/visual", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { imageBase64, mimeType = "image/jpeg", country = "us", city = "" } = body as {
+      imageBase64: string;
+      mimeType?: string;
+      country?: string;
+      city?: string;
+    };
+
+    if (!imageBase64) {
+      return c.json({ visualMatches: [], shoppingResults: [], error: "Image data is required" }, 400);
+    }
+
+    const apiKey = process.env.SERPAPI_KEY;
+    if (!apiKey) {
+      return c.json({ visualMatches: [], shoppingResults: [], error: "SerpAPI key not configured" }, 500);
+    }
+
+    console.log(`[SerpAPI] Visual search in ${country}${city ? `, city: ${city}` : ""}`);
+
+    let imageUrl = "";
+    try {
+      const formData = new FormData();
+      const buffer = Buffer.from(imageBase64, "base64");
+      const ext = mimeType.includes("png") ? "png" : "jpg";
+      const blob = new Blob([buffer], { type: mimeType });
+      formData.append("file", blob, `upload.${ext}`);
+
+      console.log("[Upload] Uploading image to temp host...");
+      const uploadResp = await fetch("https://0x0.st", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (uploadResp.ok) {
+        imageUrl = (await uploadResp.text()).trim();
+        console.log(`[Upload] Image hosted at: ${imageUrl}`);
+      } else {
+        console.log(`[Upload] Upload failed: ${uploadResp.status}`);
+      }
+    } catch (uploadErr) {
+      console.log("[Upload] Temp upload failed:", uploadErr);
+    }
+
+    if (!imageUrl) {
+      try {
+        const formData = new FormData();
+        formData.append("reqtype", "fileupload");
+        const buffer = Buffer.from(imageBase64, "base64");
+        const ext = mimeType.includes("png") ? "png" : "jpg";
+        const blob = new Blob([buffer], { type: mimeType });
+        formData.append("fileToUpload", blob, `upload.${ext}`);
+
+        const uploadResp = await fetch("https://catbox.moe/user/api.php", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (uploadResp.ok) {
+          imageUrl = (await uploadResp.text()).trim();
+          console.log(`[Upload] Catbox hosted at: ${imageUrl}`);
+        }
+      } catch (catboxErr) {
+        console.log("[Upload] Catbox fallback failed:", catboxErr);
+      }
+    }
+
+    if (!imageUrl) {
+      return c.json({
+        visualMatches: [],
+        shoppingResults: [],
+        error: "Could not upload image for visual search. Try text search instead.",
+      }, 500);
+    }
+
+    const lensParams = new URLSearchParams({
+      engine: "google_lens",
+      url: imageUrl,
+      api_key: apiKey,
+      hl: "en",
+      country: country,
+    });
+
+    console.log(`[SerpAPI] Calling Google Lens...`);
+    const lensResp = await fetch(`https://serpapi.com/search.json?${lensParams.toString()}`);
+
+    let visualMatches: {
+      title: string;
+      link: string;
+      source: string;
+      thumbnail: string;
+      price?: string;
+    }[] = [];
+    let searchQuery = "";
+
+    if (lensResp.ok) {
+      const lensData = (await lensResp.json()) as Record<string, unknown>;
+
+      const vMatches = (lensData.visual_matches as Record<string, unknown>[]) || [];
+      visualMatches = vMatches.slice(0, 15).map((m) => ({
+        title: (m.title as string) || "",
+        link: (m.link as string) || "",
+        source: (m.source as string) || "",
+        thumbnail: (m.thumbnail as string) || "",
+        price: m.price ? JSON.stringify(m.price) : undefined,
+      }));
+
+      const knowledgeGraph = lensData.knowledge_graph as Record<string, unknown>[] | undefined;
+      if (knowledgeGraph && knowledgeGraph.length > 0) {
+        searchQuery = (knowledgeGraph[0].title as string) || "";
+      }
+
+      if (!searchQuery && visualMatches.length > 0) {
+        searchQuery = visualMatches[0].title;
+      }
+
+      console.log(`[SerpAPI] Google Lens found ${visualMatches.length} visual matches, query: "${searchQuery}"`);
+    } else {
+      const errText = await lensResp.text();
+      console.log(`[SerpAPI] Google Lens error ${lensResp.status}: ${errText.substring(0, 200)}`);
+      return c.json({ visualMatches: [], shoppingResults: [], error: `Google Lens failed: ${lensResp.status}` }, 502);
+    }
+
+    let shoppingResults: {
+      title: string;
+      price: number;
+      currency: string;
+      store: string;
+      link: string;
+      image: string;
+      rating?: number;
+      reviews?: number;
+      snippet: string;
+      productId: string;
+      delivery: string;
+    }[] = [];
+
+    if (searchQuery) {
+      const locationQuery = city
+        ? `${searchQuery} ${city} delivery`
+        : searchQuery;
+
+      const shopParams = new URLSearchParams({
+        engine: "google_shopping",
+        q: locationQuery,
+        api_key: apiKey,
+        gl: country,
+        hl: "en",
+        num: "20",
+      });
+
+      console.log(`[SerpAPI] Shopping search: "${locationQuery}" in ${country}`);
+      const shopResp = await fetch(`https://serpapi.com/search.json?${shopParams.toString()}`);
+
+      if (shopResp.ok) {
+        const shopData = (await shopResp.json()) as Record<string, unknown>;
+        const items = (shopData.shopping_results as Record<string, unknown>[]) || [];
+
+        shoppingResults = items.slice(0, 20).map((item: Record<string, unknown>) => ({
+          title: (item.title as string) || "",
+          price: typeof item.extracted_price === "number" ? item.extracted_price : 0,
+          currency: (item.currency as string) || "USD",
+          store: (item.source as string) || "Unknown",
+          link: (item.link as string) || (item.product_link as string) || "",
+          image: (item.thumbnail as string) || "",
+          rating: typeof item.rating === "number" ? item.rating : undefined,
+          reviews: typeof item.reviews === "number" ? item.reviews : undefined,
+          snippet: (item.snippet as string) || "",
+          productId: (item.product_id as string) || "",
+          delivery: (item.delivery as string) || "",
+        }));
+
+        console.log(`[SerpAPI] Shopping found ${shoppingResults.length} results`);
+      }
+    }
+
+    return c.json({
+      visualMatches,
+      shoppingResults,
+      searchQuery,
+      imageUrl,
+      error: null,
+    });
+  } catch (err) {
+    console.error("[SerpAPI] Visual search failed:", err);
+    return c.json({ visualMatches: [], shoppingResults: [], error: "Visual search failed" }, 500);
+  }
+});
+
 app.post("/search/barcode", async (c) => {
   try {
     const body = await c.req.json();

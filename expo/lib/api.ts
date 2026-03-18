@@ -498,6 +498,63 @@ export async function searchByBarcode(
   }
 }
 
+export interface VisualMatch {
+  title: string;
+  link: string;
+  source: string;
+  thumbnail: string;
+  price?: string;
+}
+
+export interface VisualSearchResult {
+  visualMatches: VisualMatch[];
+  shoppingResults: SerpApiResult[];
+  searchQuery: string;
+  imageUrl: string;
+  error: string | null;
+}
+
+export async function searchByImage(
+  imageBase64: string,
+  country: string = "us",
+  city: string = "",
+  mimeType: string = "image/jpeg"
+): Promise<VisualSearchResult> {
+  try {
+    const baseUrl = getBaseUrl();
+    if (!baseUrl) {
+      return { visualMatches: [], shoppingResults: [], searchQuery: "", imageUrl: "", error: "API URL not configured" };
+    }
+
+    console.log(`[API] Visual search in ${country}${city ? `, city: ${city}` : ""}`);
+    const response = await fetch(`${baseUrl}/api/search/visual`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageBase64, mimeType, country, city }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.log("[API] Visual search error:", JSON.stringify(errorData));
+      return {
+        visualMatches: [],
+        shoppingResults: [],
+        searchQuery: "",
+        imageUrl: "",
+        error: (errorData as Record<string, string>).error || `Request failed: ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    const result = data as VisualSearchResult;
+    console.log(`[API] Visual search: ${result.visualMatches.length} visual matches, ${result.shoppingResults.length} shopping results, query: "${result.searchQuery}"`);
+    return result;
+  } catch (err) {
+    console.error("[API] Visual search failed:", err);
+    return { visualMatches: [], shoppingResults: [], searchQuery: "", imageUrl: "", error: "Network error" };
+  }
+}
+
 export async function checkDatabaseHealth(): Promise<DbHealthResult> {
   try {
     const baseUrl = getBaseUrl();

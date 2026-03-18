@@ -46,7 +46,7 @@ This plan covers every function in the app that uses or should use SerpAPI for p
 - Tapping a result opens the Product Detail screen
 
 ### ➕ Add Tab
-- **Scan from Image:** AI detects product → auto-generates search query → calls Product Search to find matching listings
+- **Scan from Image:** Image uploaded → SerpAPI Google Lens identifies product visually → Google Shopping searches in user's country/city → AI detection runs in parallel as fallback
 - **Paste Link:** Scrapes the URL for product info → calls Product Search with the scraped title to find alternatives
 - **Manual Entry:** No SerpAPI involved
 
@@ -132,8 +132,10 @@ User taps a result → Product Detail screen →
   Backend: SerpAPI Google Product (productId) → sellers list
   Backend: SerpAPI Google Shopping × 5 countries → price comparison
   
-User scans image → AI detects "Nike Air Max" →
-  Backend: SerpAPI Google Shopping → matching products
+User scans image → Image uploaded to temp host → 
+  Backend: SerpAPI Google Lens → visual matches + product identification
+  Backend: SerpAPI Google Shopping (city + country) → local store results
+  Parallel: AI detects "Nike Air Max" → fallback search if Lens fails
   
 User pastes Amazon link → scrape HTML → title extracted →
   Backend: SerpAPI Google Shopping → alternative listings
@@ -160,6 +162,7 @@ User changes country from UAE to UK →
 | `/search/product-detail` | `google_product` | product_id, gl, hl | Seller details for a specific product |
 | `/search/compare-prices` | `google_shopping` × N | q, gl (per country), num=5 | Multi-country price comparison |
 | `/scrape/url` | None (direct fetch) | URL | Extract product info from any store page |
+| `/search/visual` | `google_lens` + `google_shopping` | imageBase64, country, city | Visual image search via Google Lens + local shopping |
 | `/search/barcode` | `google_shopping` | barcode, gl | Search by UPC/EAN/ISBN barcode |
 | `/exchange-rates` | None (static) | — | Currency conversion rates |
 | `/convert` | None (static) | amount, from, to | Convert between currencies |

@@ -27,6 +27,8 @@ import {
   Check,
   ScanBarcode,
   Type,
+  Eye,
+  ExternalLink,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
@@ -35,7 +37,7 @@ import { useWishlistContext } from "@/providers/WishlistProvider";
 import { useLocation } from "@/providers/LocationProvider";
 import { Product } from "@/types";
 import { generateObject } from "@rork-ai/toolkit-sdk";
-import { searchProducts, scrapeProductUrl, searchByBarcode, SerpApiResult } from "@/lib/api";
+import { searchProducts, scrapeProductUrl, searchByBarcode, searchByImage, SerpApiResult, VisualMatch } from "@/lib/api";
 import { z } from "zod";
 
 const productSchema = z.object({
@@ -73,7 +75,7 @@ export default function AddScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { serpApiCountryCode } = useLocation();
+  const { serpApiCountryCode, city } = useLocation();
 
   const { wishlists, addProductToWishlist } = useWishlistContext();
   const hasWishlists = wishlists.length > 0;
@@ -92,6 +94,10 @@ export default function AddScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SerpApiResult[]>([]);
   const [selectedResult, setSelectedResult] = useState<SerpApiResult | null>(null);
+  const [visualMatches, setVisualMatches] = useState<VisualMatch[]>([]);
+  const [isVisualSearching, setIsVisualSearching] = useState(false);
+  const [visualSearchQuery, setVisualSearchQuery] = useState("");
+  const [visualSearchError, setVisualSearchError] = useState<string | null>(null);
   const [isScrapingUrl, setIsScrapingUrl] = useState(false);
   const [scrapedData, setScrapedData] = useState<{ title: string; image: string; description: string; price: number; store: string } | null>(null);
   const [linkSearchResults, setLinkSearchResults] = useState<SerpApiResult[]>([]);
@@ -138,6 +144,10 @@ export default function AddScreen() {
     setIsDetecting(false);
     setIsSearching(false);
     setSelectedList("");
+    setVisualMatches([]);
+    setIsVisualSearching(false);
+    setVisualSearchQuery("");
+    setVisualSearchError(null);
   };
 
   const resetBarcodeState = () => {
@@ -185,7 +195,7 @@ export default function AddScreen() {
       setSelectedResult(null);
 
       if (asset.base64) {
-        await detectProductFromImage(asset.base64, asset.mimeType || "image/jpeg");
+        await processImageSearch(asset.base64, asset.mimeType || "image/jpeg");
       } else {
         Alert.alert("Error", "Could not read image data. Please try again.");
       }
@@ -216,9 +226,10 @@ export default function AddScreen() {
       setDetectedProduct(null);
       setSearchResults([]);
       setSelectedResult(null);
+      setVisualMatches([]);
 
       if (asset.base64) {
-        await detectProductFromImage(asset.base64, asset.mimeType || "image/jpeg");
+        await processImageSearch(asset.base64, asset.mimeType || "image/jpeg");
       }
     } catch (err) {
       console.error("[Camera] Error:", err);
@@ -226,11 +237,58 @@ export default function AddScreen() {
     }
   };
 
-  const detectProductFromImage = async (base64: string, mimeType: string) => {
+  const processImageSearch = async (base64: string, mimeType: string) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsVisualSearching(true);
     setIsDetecting(true);
+    setVisualSearchError(null);
+
+    const visualSearchPromise = searchByImage(
+      base64,
+      serpApiCountryCode,
+      city,
+      mimeType
+    ).then((result) => {
+      console.log("[VisualSearch] Got result:", result.visualMatches.length, "matches");
+      setVisualMatches(result.visualMatches);
+      setVisualSearchQuery(result.searchQuery);
+
+      if (result.shoppingResults.length > 0) {
+        setSearchResults(result.shoppingResults);
+        setIsSearching(false);
+      }
+
+      if (result.error) {
+        console.log("[VisualSearch] Error:", result.error);
+        setVisualSearchError(result.error);
+      }
+
+      return result;
+    }).catch((err) => {
+      console.error("[VisualSearch] Failed:", err);
+      setVisualSearchError("Visual search failed");
+      return null;
+    }).finally(() => {
+      setIsVisualSearching(false);
+    });
+
+    const aiDetectPromise = detectProductFromImage(base64, mimeType);
+
+    const [visualResult] = await Promise.allSettled([visualSearchPromise, aiDetectPromise]);
+
+    if (
+      visualResult.status === "fulfilled" &&
+      visualResult.value &&
+      visualResult.value.shoppingResults.length === 0 &&
+      detectedProduct
+    ) {
+      console.log("[ImageSearch] Visual search had no shopping results, using AI query as fallback");
+    }
+  };
+
+  const detectProductFromImage = async (base64: string, mimeType: string) => {
     try {
       console.log("[AI] Detecting product from image...");
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       const detected = await generateObject({
         messages: [
@@ -255,10 +313,15 @@ export default function AddScreen() {
       setDetectedProduct(detected);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      await searchForProduct(detected.searchQuery);
+      if (searchResults.length === 0) {
+        const cityQuery = city ? `${detected.searchQuery} ${city} delivery` : detected.searchQuery;
+        await searchForProduct(cityQuery);
+      }
     } catch (err) {
       console.error("[AI] Detection failed:", err);
-      Alert.alert("Detection Failed", "Could not identify the product. Try manual entry instead.");
+      if (searchResults.length === 0 && visualMatches.length === 0) {
+        Alert.alert("Detection Failed", "Could not identify the product. Try manual entry instead.");
+      }
     } finally {
       setIsDetecting(false);
     }
@@ -1213,12 +1276,87 @@ export default function AddScreen() {
                 </Pressable>
               </View>
 
-              {isDetecting && (
+              {(isVisualSearching || isDetecting) && (
                 <View style={[styles.statusCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
                   <ActivityIndicator color={colors.primary} size="small" />
-                  <Text style={[styles.statusText, { color: colors.primary }]}>
-                    Analyzing product with AI...
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.statusText, { color: colors.primary }]}>
+                      {isVisualSearching ? "Searching with Google Lens..." : "Analyzing product with AI..."}
+                    </Text>
+                    {isVisualSearching && (
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                        Uploading image & finding visual matches in {serpApiCountryCode.toUpperCase()}{city ? `, ${city}` : ""}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {visualSearchError && !isVisualSearching && !isDetecting && searchResults.length === 0 && (
+                <View style={[styles.statusCard, { backgroundColor: colors.error + "10", borderColor: colors.error + "30" }]}>
+                  <Text style={[styles.statusText, { color: colors.error }]}>
+                    {visualSearchError}
                   </Text>
+                </View>
+              )}
+
+              {visualSearchQuery && !isVisualSearching && (
+                <View style={[styles.searchQueryTag, { backgroundColor: colors.primaryFaded }]}>
+                  <Eye size={12} color={colors.primary} />
+                  <Text style={[styles.searchQueryText, { color: colors.primary }]} numberOfLines={1}>
+                    Lens identified: "{visualSearchQuery}"
+                  </Text>
+                </View>
+              )}
+
+              {visualMatches.length > 0 && !isVisualSearching && (
+                <View style={styles.resultsSection}>
+                  <View style={styles.resultsSectionHeader}>
+                    <Eye size={16} color={colors.textSecondary} />
+                    <Text style={[styles.resultsSectionTitle, { color: colors.text }]}>
+                      Visual Matches ({visualMatches.length})
+                    </Text>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+                    <View style={{ flexDirection: "row" as const, gap: 10 }}>
+                      {visualMatches.slice(0, 8).map((match, idx) => (
+                        <Pressable
+                          key={`vm-${idx}`}
+                          onPress={() => {
+                            if (match.link) {
+                              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            }
+                          }}
+                          style={[
+                            styles.visualMatchCard,
+                            { backgroundColor: colors.surface, borderColor: colors.borderLight },
+                          ]}
+                        >
+                          {match.thumbnail ? (
+                            <Image source={{ uri: match.thumbnail }} style={styles.visualMatchImage} contentFit="cover" />
+                          ) : (
+                            <View style={[styles.visualMatchImage, { backgroundColor: colors.surfaceSecondary, justifyContent: "center" as const, alignItems: "center" as const }]}>
+                              <Search size={16} color={colors.textTertiary} />
+                            </View>
+                          )}
+                          <Text style={[styles.visualMatchTitle, { color: colors.text }]} numberOfLines={2}>
+                            {match.title}
+                          </Text>
+                          <View style={{ flexDirection: "row" as const, alignItems: "center" as const, gap: 4 }}>
+                            <Text style={[styles.visualMatchSource, { color: colors.textSecondary }]} numberOfLines={1}>
+                              {match.source}
+                            </Text>
+                            {match.link ? <ExternalLink size={10} color={colors.textTertiary} /> : null}
+                          </View>
+                          {match.price ? (
+                            <Text style={[styles.visualMatchPrice, { color: colors.primary }]} numberOfLines={1}>
+                              {match.price.replace(/["{}]/g, "")}
+                            </Text>
+                          ) : null}
+                        </Pressable>
+                      ))}
+                    </View>
+                  </ScrollView>
                 </View>
               )}
 
@@ -1226,7 +1364,7 @@ export default function AddScreen() {
                 <View style={[styles.detectedCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
                   <View style={styles.detectedHeader}>
                     <Sparkles size={18} color={colors.primary} />
-                    <Text style={[styles.detectedTitle, { color: colors.primary }]}>Product Detected</Text>
+                    <Text style={[styles.detectedTitle, { color: colors.primary }]}>AI Detection</Text>
                   </View>
                   <Text style={[styles.detectedName, { color: colors.text }]}>{detectedProduct.title}</Text>
                   {detectedProduct.brand && (
@@ -1253,10 +1391,10 @@ export default function AddScreen() {
                 selectedResult,
                 setSelectedResult,
                 isSearching,
-                "Searching stores..."
+                `Searching stores in ${serpApiCountryCode.toUpperCase()}${city ? `, ${city}` : ""}...`
               )}
 
-              {detectedProduct && !isDetecting && !isSearching && (
+              {(detectedProduct || visualMatches.length > 0) && !isDetecting && !isSearching && !isVisualSearching && (
                 renderWishlistSelector(
                   selectedList,
                   setSelectedList,
@@ -1966,5 +2104,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600" as const,
     flex: 1,
+  },
+  visualMatchCard: {
+    width: 140,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden" as const,
+    paddingBottom: 10,
+  },
+  visualMatchImage: {
+    width: 140,
+    height: 100,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+  },
+  visualMatchTitle: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    lineHeight: 16,
+  },
+  visualMatchSource: {
+    fontSize: 10,
+    paddingHorizontal: 8,
+    paddingTop: 4,
+    flex: 1,
+  },
+  visualMatchPrice: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    paddingHorizontal: 8,
+    paddingTop: 4,
   },
 });
