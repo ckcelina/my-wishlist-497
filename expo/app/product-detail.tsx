@@ -8,6 +8,7 @@ import {
   Animated,
   Linking,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,12 +21,17 @@ import {
   Store,
   Share2,
   Check,
+  Globe,
+  TrendingDown,
+  ShoppingBag,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { mockProducts, trendingProducts } from "@/mocks/data";
 import { Product } from "@/types";
+import { comparePrices, getProductDetail, ProductSeller } from "@/lib/api";
 
 export default function ProductDetailScreen() {
   const colors = useAppColors();
@@ -35,16 +41,21 @@ export default function ProductDetailScreen() {
   const { wishlists, addProductToWishlist } = useWishlistContext();
 
   const [savedToList, setSavedToList] = useState<string | null>(null);
+  const [sellers, setSellers] = useState<ProductSeller[]>([]);
+  const [priceComparison, setPriceComparison] = useState<
+    { country: string; results: { title: string; price: number; currency: string; store: string; link: string }[] }[]
+  >([]);
 
   const allLocalProducts = [...mockProducts, ...trendingProducts];
-
   const wishlistItems = wishlists.flatMap((w) => w.items);
 
   let product: Product | undefined;
+  let serpProductId: string | undefined;
 
   if (serpData) {
     try {
       const parsed = JSON.parse(serpData);
+      serpProductId = parsed.productId;
       product = {
         id: id ?? `serp_${Date.now()}`,
         title: parsed.title || "Unknown Product",
@@ -69,6 +80,38 @@ export default function ProductDetailScreen() {
     product = allLocalProducts.find((p) => p.id === id) || wishlistItems.find((p) => p.id === id);
   }
 
+  const productDetailMutation = useMutation({
+    mutationFn: async (productIdParam: string) => {
+      console.log("[ProductDetail] Fetching product detail for:", productIdParam);
+      return getProductDetail(productIdParam);
+    },
+    onSuccess: (data) => {
+      if (data.sellers && data.sellers.length > 0) {
+        setSellers(data.sellers);
+        console.log(`[ProductDetail] Found ${data.sellers.length} sellers`);
+      }
+    },
+    onError: (err) => {
+      console.log("[ProductDetail] Product detail fetch error:", err);
+    },
+  });
+
+  const priceComparisonMutation = useMutation({
+    mutationFn: async (query: string) => {
+      console.log("[ProductDetail] Comparing prices for:", query);
+      return comparePrices(query, ["us", "uk", "ca", "au"]);
+    },
+    onSuccess: (data) => {
+      if (data.comparison && data.comparison.length > 0) {
+        setPriceComparison(data.comparison);
+        console.log(`[ProductDetail] Price comparison across ${data.comparison.length} countries`);
+      }
+    },
+    onError: (err) => {
+      console.log("[ProductDetail] Price comparison error:", err);
+    },
+  });
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -78,6 +121,16 @@ export default function ProductDetailScreen() {
       Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
     ]).start();
   }, [fadeAnim, slideAnim]);
+
+  useEffect(() => {
+    if (serpProductId) {
+      productDetailMutation.mutate(serpProductId);
+    }
+    if (product?.title) {
+      priceComparisonMutation.mutate(product.title);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!product) {
     return (
@@ -106,7 +159,6 @@ export default function ProductDetailScreen() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     addProductToWishlist(listId, product);
     setSavedToList(listId);
-
     const listName = wishlists.find((w) => w.id === listId)?.title || "wishlist";
     Alert.alert("Saved!", `"${product.title}" added to ${listName}`);
   };
@@ -115,6 +167,28 @@ export default function ProductDetailScreen() {
     const list = wishlists.find((w) => w.id === listId);
     if (!list) return false;
     return list.items.some((item) => item.id === product?.id) || savedToList === listId;
+  };
+
+  const countryNames: Record<string, string> = {
+    us: "United States",
+    uk: "United Kingdom",
+    ca: "Canada",
+    au: "Australia",
+    de: "Germany",
+    fr: "France",
+    jp: "Japan",
+    in: "India",
+  };
+
+  const countryFlags: Record<string, string> = {
+    us: "🇺🇸",
+    uk: "🇬🇧",
+    ca: "🇨🇦",
+    au: "🇦🇺",
+    de: "🇩🇪",
+    fr: "🇫🇷",
+    jp: "🇯🇵",
+    in: "🇮🇳",
   };
 
   return (
@@ -189,6 +263,50 @@ export default function ProductDetailScreen() {
               </View>
             ) : null}
 
+            {sellers.length > 0 && (
+              <View style={styles.sellersSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <ShoppingBag size={18} color={colors.primary} />
+                  <Text style={[styles.sectionLabel, { color: colors.text, marginBottom: 0 }]}>
+                    Online Sellers ({sellers.length})
+                  </Text>
+                </View>
+                {sellers.slice(0, 8).map((seller, index) => (
+                  <Pressable
+                    key={`seller-${index}`}
+                    onPress={() => {
+                      if (seller.link) void Linking.openURL(seller.link);
+                    }}
+                    style={[styles.sellerCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                  >
+                    <View style={styles.sellerLeft}>
+                      <Text style={[styles.sellerName, { color: colors.text }]}>{seller.name}</Text>
+                      {seller.delivery ? (
+                        <Text style={[styles.sellerDelivery, { color: colors.textTertiary }]}>
+                          {seller.delivery}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.sellerRight}>
+                      <Text style={[styles.sellerPrice, { color: colors.primary }]}>
+                        {seller.totalPrice || seller.basePrice || `$${seller.price.toFixed(2)}`}
+                      </Text>
+                      <ExternalLink size={14} color={colors.textTertiary} />
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
+            {productDetailMutation.isPending && (
+              <View style={[styles.loadingCard, { backgroundColor: colors.primaryFaded }]}>
+                <ActivityIndicator color={colors.primary} size="small" />
+                <Text style={[styles.loadingText, { color: colors.primary }]}>
+                  Finding more sellers...
+                </Text>
+              </View>
+            )}
+
             {product.alternatives && product.alternatives.length > 0 && (
               <View style={styles.alternativesSection}>
                 <Text style={[styles.sectionLabel, { color: colors.text }]}>Store Comparison</Text>
@@ -214,6 +332,78 @@ export default function ProductDetailScreen() {
                     </Text>
                   </View>
                 ))}
+              </View>
+            )}
+
+            {priceComparison.length > 0 && (
+              <View style={styles.comparisonSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <Globe size={18} color={colors.primary} />
+                  <Text style={[styles.sectionLabel, { color: colors.text, marginBottom: 0 }]}>
+                    Price by Country
+                  </Text>
+                </View>
+                {priceComparison.map((countryData) => {
+                  const bestResult = countryData.results[0];
+                  if (!bestResult) return null;
+                  return (
+                    <View
+                      key={countryData.country}
+                      style={[styles.countryCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                    >
+                      <View style={styles.countryHeader}>
+                        <Text style={styles.countryFlag}>
+                          {countryFlags[countryData.country] || "🌍"}
+                        </Text>
+                        <View style={styles.countryInfo}>
+                          <Text style={[styles.countryName, { color: colors.text }]}>
+                            {countryNames[countryData.country] || countryData.country.toUpperCase()}
+                          </Text>
+                          <Text style={[styles.countryStore, { color: colors.textTertiary }]}>
+                            {bestResult.store}
+                          </Text>
+                        </View>
+                        <View style={styles.countryPriceCol}>
+                          <Text style={[styles.countryPrice, { color: colors.primary }]}>
+                            {bestResult.currency === "GBP" ? "£" : bestResult.currency === "EUR" ? "€" : "$"}
+                            {bestResult.price.toFixed(2)}
+                          </Text>
+                          {bestResult.price < product.price && bestResult.price > 0 && (
+                            <View style={[styles.savingsBadge, { backgroundColor: colors.success + "15" }]}>
+                              <TrendingDown size={10} color={colors.success} />
+                              <Text style={[styles.savingsText, { color: colors.success }]}>
+                                Save ${(product.price - bestResult.price).toFixed(0)}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                      {countryData.results.length > 1 && (
+                        <View style={styles.moreStores}>
+                          {countryData.results.slice(1, 3).map((r, ri) => (
+                            <View key={`more-${ri}`} style={styles.moreStoreRow}>
+                              <Text style={[styles.moreStoreName, { color: colors.textSecondary }]}>
+                                {r.store}
+                              </Text>
+                              <Text style={[styles.moreStorePrice, { color: colors.textSecondary }]}>
+                                ${r.price.toFixed(2)}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {priceComparisonMutation.isPending && (
+              <View style={[styles.loadingCard, { backgroundColor: colors.primaryFaded }]}>
+                <ActivityIndicator color={colors.primary} size="small" />
+                <Text style={[styles.loadingText, { color: colors.primary }]}>
+                  Comparing prices worldwide...
+                </Text>
               </View>
             )}
 
@@ -270,14 +460,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topBar: {
-    position: "absolute",
+    position: "absolute" as const,
     top: 0,
     left: 0,
     right: 0,
     zIndex: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
     paddingHorizontal: 16,
     paddingBottom: 12,
   },
@@ -285,22 +475,22 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
   },
   topBarRight: {
-    flexDirection: "row",
+    flexDirection: "row" as const,
     gap: 8,
   },
   iconBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
   },
   productImage: {
-    width: "100%",
+    width: "100%" as const,
     height: 320,
   },
   content: {
@@ -308,7 +498,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   categoryBadge: {
-    flexDirection: "row",
+    flexDirection: "row" as const,
     marginBottom: 10,
   },
   categoryText: {
@@ -317,7 +507,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    overflow: "hidden",
+    overflow: "hidden" as const,
   },
   productTitle: {
     fontSize: 24,
@@ -326,14 +516,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     gap: 16,
     marginBottom: 20,
+    flexWrap: "wrap" as const,
   },
   ratingRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     gap: 4,
   },
   rating: {
@@ -341,17 +532,17 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
   },
   storeRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     gap: 4,
   },
   storeName: {
     fontSize: 13,
   },
   priceCard: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
     padding: 18,
     borderRadius: 18,
     borderWidth: 1,
@@ -366,8 +557,8 @@ const styles = StyleSheet.create({
     fontWeight: "800" as const,
   },
   visitBtn: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 14,
@@ -386,17 +577,67 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     marginBottom: 10,
   },
+  sectionHeaderRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    marginBottom: 12,
+  },
   description: {
     fontSize: 15,
     lineHeight: 22,
+  },
+  sellersSection: {
+    marginBottom: 24,
+  },
+  sellerCard: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  sellerLeft: {
+    flex: 1,
+    gap: 3,
+  },
+  sellerName: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+  },
+  sellerDelivery: {
+    fontSize: 12,
+  },
+  sellerRight: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+  },
+  sellerPrice: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+  },
+  loadingCard: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    padding: 16,
+    borderRadius: 14,
+    gap: 12,
+    marginBottom: 20,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
   },
   alternativesSection: {
     marginBottom: 24,
   },
   altCard: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
     padding: 16,
     borderRadius: 14,
     borderWidth: 1,
@@ -410,8 +651,8 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
   },
   altMeta: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     gap: 6,
   },
   altCountry: {
@@ -423,22 +664,89 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    overflow: "hidden",
+    overflow: "hidden" as const,
   },
   altPrice: {
     fontSize: 18,
     fontWeight: "700" as const,
   },
+  comparisonSection: {
+    marginBottom: 24,
+  },
+  countryCard: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  countryHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+  },
+  countryFlag: {
+    fontSize: 28,
+  },
+  countryInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  countryName: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+  },
+  countryStore: {
+    fontSize: 12,
+  },
+  countryPriceCol: {
+    alignItems: "flex-end" as const,
+    gap: 4,
+  },
+  countryPrice: {
+    fontSize: 17,
+    fontWeight: "700" as const,
+  },
+  savingsBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 3,
+  },
+  savingsText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+  },
+  moreStores: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#00000010",
+    gap: 6,
+  },
+  moreStoreRow: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+  },
+  moreStoreName: {
+    fontSize: 13,
+  },
+  moreStorePrice: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+  },
   saveSection: {
     marginBottom: 24,
   },
   saveChips: {
-    flexDirection: "row",
+    flexDirection: "row" as const,
     gap: 10,
   },
   saveChip: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,
@@ -451,8 +759,8 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
     gap: 8,
   },
   emptyEmoji: {

@@ -8,6 +8,7 @@ import {
   Alert,
   Modal,
   TextInput,
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,10 +24,15 @@ import {
   Gift,
   X,
   Check,
+  Database,
+  CircleCheck as CheckCircle2,
+  CircleAlert as AlertCircle,
 } from "lucide-react-native";
+import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { useAuth } from "@/providers/AuthProvider";
+import { checkDatabaseHealth, DbHealthResult } from "@/lib/api";
 
 const COUNTRIES = [
   "United States", "United Kingdom", "Canada", "Australia", "Germany",
@@ -58,6 +64,31 @@ export default function ProfileScreen() {
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [showNameEditor, setShowNameEditor] = useState(false);
   const [editName, setEditName] = useState("");
+  const [dbHealth, setDbHealth] = useState<DbHealthResult | null>(null);
+
+  const dbHealthMutation = useMutation({
+    mutationFn: async () => {
+      return checkDatabaseHealth();
+    },
+    onSuccess: (data) => {
+      setDbHealth(data);
+      if (data.status === "ok") {
+        Alert.alert("Database Status", "All tables are set up correctly!");
+      } else {
+        const missing = Object.entries(data.tables)
+          .filter(([, t]) => !t.exists)
+          .map(([name]) => name);
+        Alert.alert(
+          "Missing Tables",
+          `The following tables need to be created in Supabase:\n\n${missing.join(", ")}\n\nRun the SQL migration in your Supabase dashboard SQL editor.`
+        );
+      }
+    },
+    onError: (err) => {
+      console.log("[Profile] DB health check error:", err);
+      Alert.alert("Error", "Failed to check database status.");
+    },
+  });
 
   const displayName = profile?.full_name || user.name;
   const displayEmail = profile?.email || user.email;
@@ -219,6 +250,29 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.settingRight}>
                 <ChevronRight size={18} color={colors.textTertiary} />
+              </View>
+            </Pressable>
+            <Pressable
+              style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
+              onPress={() => dbHealthMutation.mutate()}
+              disabled={dbHealthMutation.isPending}
+            >
+              <View style={styles.settingLeft}>
+                <Database size={20} color={colors.primary} />
+                <Text style={[styles.settingLabel, { color: colors.text }]}>Database Status</Text>
+              </View>
+              <View style={styles.settingRight}>
+                {dbHealthMutation.isPending ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : dbHealth ? (
+                  dbHealth.status === "ok" ? (
+                    <CheckCircle2 size={18} color={colors.success} />
+                  ) : (
+                    <AlertCircle size={18} color={colors.warning} />
+                  )
+                ) : (
+                  <ChevronRight size={18} color={colors.textTertiary} />
+                )}
               </View>
             </Pressable>
             <Pressable
