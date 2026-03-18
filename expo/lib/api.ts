@@ -344,6 +344,118 @@ export async function checkPrices(
   }
 }
 
+export interface PriceHistoryRecordResult {
+  entry: {
+    productId: string;
+    price: number;
+    currency: string;
+    store: string;
+    checkedAt: string;
+  };
+  livePrice: number | null;
+  dropped: boolean;
+  savings: number;
+}
+
+export async function recordPriceHistory(
+  productId: string,
+  title: string,
+  price: number,
+  currency: string,
+  store: string,
+  country: string
+): Promise<PriceHistoryRecordResult> {
+  try {
+    const baseUrl = getBaseUrl();
+    if (!baseUrl) {
+      return {
+        entry: { productId, price, currency, store, checkedAt: new Date().toISOString() },
+        livePrice: null,
+        dropped: false,
+        savings: 0,
+      };
+    }
+
+    console.log(`[API] Recording price history for: "${title}"`);
+    const response = await fetch(`${baseUrl}/api/price-history/record`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId, title, price, currency, store, country }),
+    });
+
+    if (!response.ok) {
+      console.log(`[API] Price history record failed: ${response.status}`);
+      return {
+        entry: { productId, price, currency, store, checkedAt: new Date().toISOString() },
+        livePrice: null,
+        dropped: false,
+        savings: 0,
+      };
+    }
+
+    const data = await response.json();
+    console.log(`[API] Price history recorded, dropped: ${(data as PriceHistoryRecordResult).dropped}`);
+    return data as PriceHistoryRecordResult;
+  } catch (err) {
+    console.error("[API] Price history record failed:", err);
+    return {
+      entry: { productId, price, currency, store, checkedAt: new Date().toISOString() },
+      livePrice: null,
+      dropped: false,
+      savings: 0,
+    };
+  }
+}
+
+export async function savePriceAlertsToBackend(
+  userId: string,
+  alerts: unknown[],
+  priceHistory: Record<string, unknown[]>,
+  priceDrops: unknown[]
+): Promise<{ success: boolean }> {
+  try {
+    const baseUrl = getBaseUrl();
+    if (!baseUrl) return { success: false };
+
+    console.log(`[API] Saving price alerts for user: ${userId}`);
+    const response = await fetch(`${baseUrl}/api/price-alerts/save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, alerts, priceHistory, priceDrops }),
+    });
+
+    if (!response.ok) return { success: false };
+    return { success: true };
+  } catch (err) {
+    console.error("[API] Save alerts failed:", err);
+    return { success: false };
+  }
+}
+
+export async function loadPriceAlertsFromBackend(
+  userId: string
+): Promise<{ alerts: unknown[]; priceHistory: Record<string, unknown[]>; priceDrops: unknown[] }> {
+  try {
+    const baseUrl = getBaseUrl();
+    if (!baseUrl) return { alerts: [], priceHistory: {}, priceDrops: [] };
+
+    console.log(`[API] Loading price alerts for user: ${userId}`);
+    const response = await fetch(`${baseUrl}/api/price-alerts/load`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (!response.ok) return { alerts: [], priceHistory: {}, priceDrops: [] };
+
+    const data = await response.json();
+    return data as { alerts: unknown[]; priceHistory: Record<string, unknown[]>; priceDrops: unknown[] };
+  } catch (err) {
+    console.error("[API] Load alerts failed:", err);
+    return { alerts: [], priceHistory: {}, priceDrops: [] };
+  }
+}
+
 export async function checkDatabaseHealth(): Promise<DbHealthResult> {
   try {
     const baseUrl = getBaseUrl();

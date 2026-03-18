@@ -667,6 +667,186 @@ app.post("/search/price-check", async (c) => {
   }
 });
 
+app.post("/price-alerts/save", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { userId, alerts, priceHistory, priceDrops } = body as {
+      userId: string;
+      alerts: unknown[];
+      priceHistory: Record<string, unknown[]>;
+      priceDrops: unknown[];
+    };
+
+    if (!userId) {
+      return c.json({ error: "userId is required" }, 400);
+    }
+
+    console.log(`[PriceAlerts] Saving ${alerts?.length ?? 0} alerts, ${priceDrops?.length ?? 0} drops for user ${userId}`);
+
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (supabaseUrl && supabaseKey) {
+      try {
+        await fetch(`${supabaseUrl}/rest/v1/price_alerts`, {
+          method: "POST",
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates",
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            alerts_data: JSON.stringify(alerts ?? []),
+            history_data: JSON.stringify(priceHistory ?? {}),
+            drops_data: JSON.stringify(priceDrops ?? []),
+            updated_at: new Date().toISOString(),
+          }),
+        });
+        console.log(`[PriceAlerts] Saved to Supabase`);
+      } catch (dbErr) {
+        console.log(`[PriceAlerts] Supabase save failed (non-critical):`, dbErr);
+      }
+    }
+
+    return c.json({ success: true });
+  } catch (err) {
+    console.error("[PriceAlerts] Save failed:", err);
+    return c.json({ error: "Failed to save alerts" }, 500);
+  }
+});
+
+app.post("/price-alerts/load", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { userId } = body as { userId: string };
+
+    if (!userId) {
+      return c.json({ error: "userId is required" }, 400);
+    }
+
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      return c.json({ alerts: [], priceHistory: {}, priceDrops: [] });
+    }
+
+    try {
+      const resp = await fetch(
+        `${supabaseUrl}/rest/v1/price_alerts?user_id=eq.${userId}&select=*&limit=1`,
+        {
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+          },
+        }
+      );
+
+      if (resp.ok) {
+        const rows = (await resp.json()) as Record<string, string>[];
+        if (rows.length > 0) {
+          const row = rows[0];
+          console.log(`[PriceAlerts] Loaded data for user ${userId}`);
+          return c.json({
+            alerts: JSON.parse(row.alerts_data || "[]"),
+            priceHistory: JSON.parse(row.history_data || "{}"),
+            priceDrops: JSON.parse(row.drops_data || "[]"),
+          });
+        }
+      }
+    } catch (dbErr) {
+      console.log(`[PriceAlerts] Supabase load failed:`, dbErr);
+    }
+
+    return c.json({ alerts: [], priceHistory: {}, priceDrops: [] });
+  } catch (err) {
+    console.error("[PriceAlerts] Load failed:", err);
+    return c.json({ error: "Failed to load alerts" }, 500);
+  }
+});
+
+app.post("/price-history/record", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { productId, title, price, currency, store, country } = body as {
+      productId: string;
+      title: string;
+      price: number;
+      currency: string;
+      store: string;
+      country: string;
+    };
+
+    if (!productId || !title) {
+      return c.json({ error: "productId and title are required" }, 400);
+    }
+
+    const apiKey = process.env.SERPAPI_KEY;
+    if (!apiKey) {
+      return c.json({
+        entry: {
+          productId,
+          price,
+          currency,
+          store,
+          checkedAt: new Date().toISOString(),
+        },
+        livePrice: null,
+      });
+    }
+
+    const params = new URLSearchParams({
+      engine: "google_shopping",
+      q: title,
+      api_key: apiKey,
+      gl: country || "us",
+      hl: "en",
+      num: "3",
+    });
+
+    console.log(`[PriceHistory] Checking live price for: "${title}"`);
+    const response = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
+
+    let livePrice = price;
+    let liveStore = store;
+    let liveCurrency = currency;
+
+    if (response.ok) {
+      const data = (await response.json()) as Record<string, unknown>;
+      const shoppingResults = (data.shopping_results as Record<string, unknown>[]) || [];
+      if (shoppingResults.length > 0) {
+        const top = shoppingResults[0];
+        if (typeof top.extracted_price === "number" && top.extracted_price > 0) {
+          livePrice = top.extracted_price;
+          liveStore = (top.source as string) || store;
+          liveCurrency = (top.currency as string) || currency;
+          console.log(`[PriceHistory] Live price: ${livePrice} ${liveCurrency} from ${liveStore}`);
+        }
+      }
+    }
+
+    const entry = {
+      productId,
+      price: livePrice,
+      currency: liveCurrency,
+      store: liveStore,
+      checkedAt: new Date().toISOString(),
+    };
+
+    return c.json({
+      entry,
+      livePrice: livePrice !== price ? livePrice : null,
+      dropped: livePrice < price,
+      savings: livePrice < price ? price - livePrice : 0,
+    });
+  } catch (err) {
+    console.error("[PriceHistory] Record failed:", err);
+    return c.json({ error: "Price history record failed" }, 500);
+  }
+});
+
 app.get("/db/health", async (c) => {
   const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;

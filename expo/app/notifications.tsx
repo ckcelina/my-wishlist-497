@@ -6,6 +6,8 @@ import {
   FlatList,
   Pressable,
   Animated,
+  Linking,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,6 +21,8 @@ import {
   Settings,
   CheckCheck,
   Package,
+  ExternalLink,
+  Trash2,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useAppColors } from "@/hooks/useColorScheme";
@@ -31,7 +35,7 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { notifications, markNotificationRead } = useWishlistContext();
-  const { priceDrops, markDropAsRead } = usePriceAlerts();
+  const { priceDrops, markDropAsRead, markAllDropsAsRead, clearAllDrops } = usePriceAlerts();
   const { format } = useLocation();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -60,6 +64,7 @@ export default function NotificationsScreen() {
       store: string;
       link: string;
     };
+    notifType?: string;
   };
 
   const combinedNotifications: CombinedNotification[] = [
@@ -88,6 +93,7 @@ export default function NotificationsScreen() {
       image: n.image,
       timestamp: n.timestamp,
       isRead: n.isRead,
+      notifType: n.type,
     })),
   ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
@@ -105,9 +111,34 @@ export default function NotificationsScreen() {
 
   const handleMarkAllRead = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    priceDrops.filter((d) => !d.isRead).forEach((d) => markDropAsRead(d.id));
+    markAllDropsAsRead();
     notifications.filter((n) => !n.isRead).forEach((n) => markNotificationRead(n.id));
-  }, [priceDrops, notifications, markDropAsRead, markNotificationRead]);
+  }, [notifications, markAllDropsAsRead, markNotificationRead]);
+
+  const handleClearAll = useCallback(() => {
+    Alert.alert(
+      "Clear All Notifications",
+      "Are you sure you want to clear all notifications?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear All",
+          style: "destructive",
+          onPress: () => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            clearAllDrops();
+          },
+        },
+      ]
+    );
+  }, [clearAllDrops]);
+
+  const handleVisitStore = useCallback((link: string) => {
+    if (link) {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Linking.openURL(link);
+    }
+  }, []);
 
   const formatTimeAgo = (timestamp: string): string => {
     const now = new Date();
@@ -174,21 +205,35 @@ export default function NotificationsScreen() {
             </Text>
 
             {item.priceInfo && (
-              <View style={styles.priceDropRow}>
-                <View style={styles.priceComparison}>
-                  <Text style={[styles.oldPrice, { color: colors.textTertiary }]}>
-                    {format(item.priceInfo.previousPrice, item.priceInfo.currency)}
-                  </Text>
-                  <Text style={[styles.newPrice, { color: colors.success }]}>
-                    {format(item.priceInfo.currentPrice, item.priceInfo.currency)}
-                  </Text>
+              <View style={styles.priceDropSection}>
+                <View style={styles.priceDropRow}>
+                  <View style={styles.priceComparison}>
+                    <Text style={[styles.oldPrice, { color: colors.textTertiary }]}>
+                      {format(item.priceInfo.previousPrice, item.priceInfo.currency)}
+                    </Text>
+                    <Text style={[styles.newPrice, { color: colors.success }]}>
+                      {format(item.priceInfo.currentPrice, item.priceInfo.currency)}
+                    </Text>
+                  </View>
+                  <View style={[styles.savingsPill, { backgroundColor: colors.success + "15" }]}>
+                    <TrendingDown size={10} color={colors.success} />
+                    <Text style={[styles.savingsText, { color: colors.success }]}>
+                      Save {format(item.priceInfo.savings, item.priceInfo.currency)}
+                    </Text>
+                  </View>
                 </View>
-                <View style={[styles.savingsPill, { backgroundColor: colors.success + "15" }]}>
-                  <TrendingDown size={10} color={colors.success} />
-                  <Text style={[styles.savingsText, { color: colors.success }]}>
-                    Save {format(item.priceInfo.savings, item.priceInfo.currency)}
-                  </Text>
-                </View>
+
+                {item.priceInfo.link ? (
+                  <Pressable
+                    onPress={() => handleVisitStore(item.priceInfo?.link ?? "")}
+                    style={[styles.visitStoreBtn, { backgroundColor: colors.primary }]}
+                  >
+                    <ExternalLink size={13} color="#FFFFFF" />
+                    <Text style={styles.visitStoreBtnText}>
+                      Buy at {item.priceInfo.store}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
             )}
           </View>
@@ -222,6 +267,11 @@ export default function NotificationsScreen() {
                 <CheckCheck size={18} color={colors.primary} />
               </Pressable>
             )}
+            {combinedNotifications.length > 0 && (
+              <Pressable onPress={handleClearAll} style={[styles.actionBtn, { backgroundColor: colors.surface }]}>
+                <Trash2 size={18} color={colors.error} />
+              </Pressable>
+            )}
             <Pressable
               onPress={() => router.push("/price-alerts" as never)}
               style={[styles.actionBtn, { backgroundColor: colors.surface }]}
@@ -230,6 +280,21 @@ export default function NotificationsScreen() {
             </Pressable>
           </View>
         </View>
+
+        {priceDrops.length > 0 && (
+          <View style={[styles.summaryBar, { backgroundColor: colors.success + "10", borderColor: colors.success + "30" }]}>
+            <TrendingDown size={16} color={colors.success} />
+            <Text style={[styles.summaryText, { color: colors.success }]}>
+              {priceDrops.filter((d) => !d.isRead).length} new price drop{priceDrops.filter((d) => !d.isRead).length !== 1 ? "s" : ""} detected
+            </Text>
+            <Pressable
+              onPress={() => router.push("/price-alerts" as never)}
+              style={[styles.summaryBtn, { backgroundColor: colors.success + "20" }]}
+            >
+              <Text style={[styles.summaryBtnText, { color: colors.success }]}>Manage</Text>
+            </Pressable>
+          </View>
+        )}
 
         {combinedNotifications.length === 0 ? (
           <View style={styles.emptyState}>
@@ -271,7 +336,7 @@ const styles = StyleSheet.create({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 12,
     gap: 12,
   },
   backBtn: {
@@ -314,6 +379,31 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: "center" as const,
     alignItems: "center" as const,
+  },
+  summaryBar: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  summaryText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600" as const,
+  },
+  summaryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  summaryBtnText: {
+    fontSize: 12,
+    fontWeight: "700" as const,
   },
   listContent: {
     paddingHorizontal: 16,
@@ -362,11 +452,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  priceDropSection: {
+    marginTop: 8,
+    gap: 8,
+  },
   priceDropRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "space-between" as const,
-    marginTop: 6,
   },
   priceComparison: {
     flexDirection: "row" as const,
@@ -392,6 +485,19 @@ const styles = StyleSheet.create({
   },
   savingsText: {
     fontSize: 11,
+    fontWeight: "700" as const,
+  },
+  visitStoreBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingVertical: 9,
+    borderRadius: 10,
+    gap: 6,
+  },
+  visitStoreBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
     fontWeight: "700" as const,
   },
   unreadDot: {

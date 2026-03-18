@@ -72,37 +72,47 @@ This plan covers every function in the app that uses or should use SerpAPI for p
 
 ## **Features That Need To Be Built or Improved**
 
-### A. Price Alerts Backend
-- **Current state:** Toggle is UI-only, shows an alert message but doesn't persist
-- **Needed:** Backend endpoint to save price alerts per product per user, and a mechanism to periodically re-search and compare prices
+### A. Price Alerts Backend ✅
+- **Current state:** Fully implemented with AsyncStorage persistence + backend sync
+- **Built:** Backend endpoints `/price-alerts/save` and `/price-alerts/load` for cloud persistence
+- **Built:** Auto-check prices every 30 minutes and on app foreground
+- **Built:** Price drops persist to AsyncStorage and survive app restarts
 
-### B. Trending / Popular Searches
-- **Current state:** Shows mock trending products
-- **Needed:** Backend endpoint that runs SerpAPI searches for popular categories in the user's country and caches results
+### B. Trending / Popular Searches ✅
+- **Current state:** Live trending via SerpAPI on Home tab + popular search chips on Explore
+- **Built:** Backend `/search/trending` endpoint with category rotation
 
-### C. Deals & Sales Discovery
-- **Current state:** Not built
-- **Needed:** A "Deals" section on Explore that searches with `sortBy: "price_low_to_high"` or uses SerpAPI's deal filters
+### C. Deals & Sales Discovery ✅
+- **Current state:** Deals section on Explore with category filters
+- **Built:** Backend `/search/deals` endpoint with `sort_by: price_low_to_high`
 
-### D. Search History & Suggestions
-- **Current state:** No search history saved
-- **Needed:** Save recent searches locally, show them as suggestions before the user types
+### D. Search History & Suggestions ✅
+- **Current state:** Full search history with suggestions
+- **Built:** SearchHistoryProvider with AsyncStorage, recent searches, and fuzzy suggestions
 
-### E. Store-Specific Browsing
-- **Current state:** Store chips exist but just trigger a generic search with the store name
-- **Needed:** More refined queries per store (e.g., searching within Amazon, Noon, Deliveroo specifically)
+### E. Store-Specific Browsing ✅
+- **Current state:** Store chips generate country-aware queries
+- **Built:** Queries combine store name + country name + "delivery" for relevant results
 
-### F. Price History Tracking
-- **Current state:** Not built
-- **Needed:** When a product is saved to a wishlist, periodically re-fetch its price via SerpAPI and store historical prices for chart display
+### F. Price History Tracking ✅
+- **Current state:** Fully implemented with bar chart visualization
+- **Built:** Backend `/price-history/record` endpoint that fetches live prices via SerpAPI
+- **Built:** Auto-records price when product is viewed, when alert is created, and when sellers are fetched
+- **Built:** Enhanced PriceHistoryChart with trend indicators, average, min/max stats
+- **Built:** Up to 30 price points stored per product
 
 ### G. Barcode / Text Search from Camera
 - **Current state:** Image detection uses AI to identify products, then searches SerpAPI
 - **Enhancement:** Could add barcode scanning that extracts a UPC/EAN and searches SerpAPI with it
+- **Status:** Pending (Phase 5)
 
-### H. Notification System for Price Drops
-- **Current state:** Notification type exists in types but no real push notification
-- **Needed:** Backend scheduled job that re-searches wishlist items and creates notifications when prices drop
+### H. Notification System for Price Drops ✅
+- **Current state:** Fully implemented with in-app notifications
+- **Built:** Auto-detect price drops during periodic checks and product views
+- **Built:** PriceDropNotification objects with store link, savings amount, previous/current price
+- **Built:** Notifications screen with actionable "Buy at Store" buttons
+- **Built:** Price alerts screen with mini price charts, trend indicators, and tracking duration
+- **Built:** Mark all read, clear all, remove all management options
 
 ---
 

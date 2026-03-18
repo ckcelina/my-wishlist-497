@@ -33,7 +33,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { useLocation } from "@/providers/LocationProvider";
-import { usePriceAlerts } from "@/providers/PriceAlertProvider";
+import { usePriceAlerts, PriceHistoryEntry } from "@/providers/PriceAlertProvider";
 import { mockProducts, trendingProducts } from "@/mocks/data";
 import { Product } from "@/types";
 import { comparePrices, getProductDetail, ProductSeller } from "@/lib/api";
@@ -46,7 +46,7 @@ export default function ProductDetailScreen() {
   const { id, serpData } = useLocalSearchParams<{ id: string; serpData?: string }>();
   const { wishlists, addProductToWishlist } = useWishlistContext();
   const { country, serpApiCountryCode, format, convert, currencyCode, getCurrencySymbol } = useLocation();
-  const { hasAlert, addAlert, removeAlert, getProductHistory } = usePriceAlerts();
+  const { hasAlert, addAlert, removeAlert, getProductHistory, recordProductView, addPriceHistoryEntry } = usePriceAlerts();
 
   const [savedToList, setSavedToList] = useState<string | null>(null);
   const [sellers, setSellers] = useState<ProductSeller[]>([]);
@@ -137,6 +137,16 @@ export default function ProductDetailScreen() {
     if (product?.title) {
       priceComparisonMutation.mutate(product.title);
     }
+    if (product) {
+      void recordProductView(
+        product.id,
+        product.title,
+        product.price,
+        product.currency,
+        product.store,
+        serpApiCountryCode
+      );
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -179,6 +189,24 @@ export default function ProductDetailScreen() {
 
   const priceAlertEnabled = product ? hasAlert(product.id) : false;
   const priceHistory = product ? getProductHistory(product.id) : [];
+
+  useEffect(() => {
+    if (sellers.length > 0 && product) {
+      const now = new Date().toISOString();
+      for (const seller of sellers.slice(0, 3)) {
+        if (seller.price > 0) {
+          void addPriceHistoryEntry(product.id, {
+            productId: product.id,
+            price: seller.price,
+            currency: product.currency,
+            store: seller.name,
+            checkedAt: now,
+          } as PriceHistoryEntry);
+        }
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sellers.length]);
 
   const handleTogglePriceAlert = () => {
     if (!product) return;
@@ -505,21 +533,27 @@ export default function ProductDetailScreen() {
                     currency={product.currency}
                   />
                 </View>
-                {priceHistory.slice(-5).map((entry, idx) => {
-                  const entryPrice = format(entry.price, entry.currency);
-                  const date = new Date(entry.checkedAt);
-                  const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
-                  return (
-                    <View
-                      key={`history-${idx}`}
-                      style={[styles.historyRow, { borderBottomColor: colors.borderLight }]}
-                    >
-                      <Text style={[styles.historyDate, { color: colors.textTertiary }]}>{dateStr}</Text>
-                      <Text style={[styles.historyStore, { color: colors.textSecondary }]}>{entry.store}</Text>
-                      <Text style={[styles.historyPrice, { color: colors.primary }]}>{entryPrice}</Text>
-                    </View>
-                  );
-                })}
+                <View style={[styles.historyList, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+                  <Text style={[styles.historyListTitle, { color: colors.textSecondary }]}>Recent Checks</Text>
+                  {priceHistory.slice(-5).reverse().map((entry, idx) => {
+                    const entryPrice = format(entry.price, entry.currency);
+                    const date = new Date(entry.checkedAt);
+                    const dateStr = `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+                    const isFirst = idx === 0;
+                    return (
+                      <View
+                        key={`history-${idx}`}
+                        style={[styles.historyRow, { borderBottomColor: colors.borderLight }]}
+                      >
+                        {isFirst && <View style={[styles.historyDot, { backgroundColor: colors.primary }]} />}
+                        {!isFirst && <View style={[styles.historyDot, { backgroundColor: colors.textTertiary + "40" }]} />}
+                        <Text style={[styles.historyDate, { color: isFirst ? colors.text : colors.textTertiary }]}>{dateStr}</Text>
+                        <Text style={[styles.historyStore, { color: colors.textSecondary }]} numberOfLines={1}>{entry.store}</Text>
+                        <Text style={[styles.historyPrice, { color: isFirst ? colors.primary : colors.textSecondary }]}>{entryPrice}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
               </View>
             )}
 
@@ -914,17 +948,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 12,
   },
+  historyList: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 4,
+  },
+  historyListTitle: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    marginBottom: 6,
+  },
   historyRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderBottomWidth: 0.5,
-    gap: 12,
+    gap: 10,
+  },
+  historyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   historyDate: {
     fontSize: 12,
     fontWeight: "600" as const,
-    width: 40,
+    width: 50,
   },
   historyStore: {
     fontSize: 13,
