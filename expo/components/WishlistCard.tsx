@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { View, Text, StyleSheet, Pressable, Animated } from "react-native";
+import { View, Text, StyleSheet, Pressable, Animated, Platform } from "react-native";
 import { Image } from "expo-image";
 import { Users, Lock, ShoppingBag } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
@@ -21,11 +21,11 @@ export default React.memo(function WishlistCard({
   const themeColor = wishlist.color || colors.primary;
 
   const handlePressIn = () => {
-    Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true }).start();
+    Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: Platform.OS !== 'web' }).start();
   };
 
   const handlePressOut = () => {
-    Animated.spring(scaleAnim, { toValue: 1, friction: 3, useNativeDriver: true }).start();
+    Animated.spring(scaleAnim, { toValue: 1, friction: 3, useNativeDriver: Platform.OS !== 'web' }).start();
   };
 
   const purchasedCount = wishlist.items.filter((i) => i.isPurchased).length;

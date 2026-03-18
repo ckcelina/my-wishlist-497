@@ -53,7 +53,7 @@ export default function WishlistDetailScreen() {
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 400,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [fadeAnim]);
 
@@ -61,7 +61,7 @@ export default function WishlistDetailScreen() {
     Animated.timing(menuAnim, {
       toValue: showMenu ? 1 : 0,
       duration: 200,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [showMenu, menuAnim]);
 
@@ -539,11 +539,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     minWidth: 180,
     overflow: "hidden",
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 },
+      android: { elevation: 8 },
+      web: { boxShadow: "0 4px 12px rgba(0,0,0,0.15)" },
+    }),
   },
   menuItem: {
     flexDirection: "row",

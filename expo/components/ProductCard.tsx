@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Pressable,
   Animated,
+  Platform,
 } from "react-native";
 import { Image } from "expo-image";
 import { Heart, ExternalLink, Check } from "lucide-react-native";
@@ -28,7 +29,7 @@ export default React.memo(function ProductCard({
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
       toValue: 0.96,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
 
@@ -36,7 +37,7 @@ export default React.memo(function ProductCard({
     Animated.spring(scaleAnim, {
       toValue: 1,
       friction: 3,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
 

@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useEffect } from "react";
-import { View, Text, StyleSheet, Animated } from "react-native";
+import { View, Text, StyleSheet, Animated, Platform } from "react-native";
 import { TrendingDown, TrendingUp, Minus } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { PriceHistoryEntry } from "@/providers/PriceAlertProvider";
@@ -18,7 +18,7 @@ export default function PriceHistoryChart({ entries, formatPrice, currency }: Pr
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [fadeAnim]);
 

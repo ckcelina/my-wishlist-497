@@ -53,8 +53,8 @@ export default function LoginScreen() {
     if (!validate()) return;
 
     Animated.sequence([
-      Animated.timing(buttonScale, { toValue: 0.96, duration: 80, useNativeDriver: true }),
-      Animated.timing(buttonScale, { toValue: 1, duration: 80, useNativeDriver: true }),
+      Animated.timing(buttonScale, { toValue: 0.96, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(buttonScale, { toValue: 1, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
 
     try {

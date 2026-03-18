@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 const getBaseUrl = () => {
   const url = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
   if (!url) {
@@ -5,6 +7,14 @@ const getBaseUrl = () => {
     return "";
   }
   return url;
+};
+
+const logApiError = (label: string, err: unknown) => {
+  if (Platform.OS === 'web') {
+    console.warn(`${label}:`, err);
+  } else {
+    console.error(`${label}:`, err);
+  }
 };
 
 export interface SerpApiResult {
@@ -126,7 +136,7 @@ export async function scrapeProductUrl(url: string): Promise<ScrapeResult> {
     console.log("[API] Scrape result:", JSON.stringify(data).substring(0, 200));
     return data as ScrapeResult;
   } catch (err) {
-    console.error("[API] Scrape failed:", err);
+    logApiError("[API] Scrape failed", err);
     return { title: "", image: "", description: "", price: 0, currency: "USD", store: "", url, error: "Network error" };
   }
 }
@@ -169,7 +179,7 @@ export async function searchProducts(
     console.log(`[API] Search returned ${result.results.length} results`);
     return result;
   } catch (err) {
-    console.error("[API] Search failed:", err);
+    logApiError("[API] Search failed", err);
     return { results: [], error: "Network error" };
   }
 }
@@ -203,7 +213,7 @@ export async function getProductDetail(
     console.log("[API] Product detail result:", JSON.stringify(data).substring(0, 200));
     return data as ProductDetailResult;
   } catch (err) {
-    console.error("[API] Product detail failed:", err);
+    logApiError("[API] Product detail failed", err);
     return { title: "", description: "", prices: null, images: [], highlights: [], sellers: [], error: "Network error" };
   }
 }
@@ -237,7 +247,7 @@ export async function comparePrices(
     console.log("[API] Price comparison result received");
     return data as PriceComparisonResult;
   } catch (err) {
-    console.error("[API] Price comparison failed:", err);
+    logApiError("[API] Price comparison failed", err);
     return { comparison: [], error: "Network error" };
   }
 }
@@ -272,7 +282,7 @@ export async function fetchTrendingProducts(
     console.log(`[API] Trending returned ${(data as TrendingResult).results.length} results`);
     return data as TrendingResult;
   } catch (err) {
-    console.error("[API] Trending failed:", err);
+    logApiError("[API] Trending failed", err);
     return { results: [], category: "", error: "Network error" };
   }
 }
@@ -306,7 +316,7 @@ export async function fetchDeals(
     console.log(`[API] Deals returned ${(data as DealsResult).results.length} results`);
     return data as DealsResult;
   } catch (err) {
-    console.error("[API] Deals failed:", err);
+    logApiError("[API] Deals failed", err);
     return { results: [], error: "Network error" };
   }
 }
@@ -339,7 +349,7 @@ export async function checkPrices(
     console.log(`[API] Price check complete`);
     return data as PriceCheckResult;
   } catch (err) {
-    console.error("[API] Price check failed:", err);
+    logApiError("[API] Price check failed", err);
     return { results: [], error: "Network error" };
   }
 }
@@ -397,7 +407,7 @@ export async function recordPriceHistory(
     console.log(`[API] Price history recorded, dropped: ${(data as PriceHistoryRecordResult).dropped}`);
     return data as PriceHistoryRecordResult;
   } catch (err) {
-    console.error("[API] Price history record failed:", err);
+    logApiError("[API] Price history record failed", err);
     return {
       entry: { productId, price, currency, store, checkedAt: new Date().toISOString() },
       livePrice: null,
@@ -427,7 +437,7 @@ export async function savePriceAlertsToBackend(
     if (!response.ok) return { success: false };
     return { success: true };
   } catch (err) {
-    console.error("[API] Save alerts failed:", err);
+    logApiError("[API] Save alerts failed", err);
     return { success: false };
   }
 }
@@ -451,7 +461,7 @@ export async function loadPriceAlertsFromBackend(
     const data = await response.json();
     return data as { alerts: unknown[]; priceHistory: Record<string, unknown[]>; priceDrops: unknown[] };
   } catch (err) {
-    console.error("[API] Load alerts failed:", err);
+    logApiError("[API] Load alerts failed", err);
     return { alerts: [], priceHistory: {}, priceDrops: [] };
   }
 }
@@ -493,7 +503,7 @@ export async function searchByBarcode(
     console.log(`[API] Barcode search returned ${result.results.length} results`);
     return result;
   } catch (err) {
-    console.error("[API] Barcode search failed:", err);
+    logApiError("[API] Barcode search failed", err);
     return { results: [], barcode, error: "Network error" };
   }
 }
@@ -550,7 +560,7 @@ export async function searchByImage(
     console.log(`[API] Visual search: ${result.visualMatches.length} visual matches, ${result.shoppingResults.length} shopping results, query: "${result.searchQuery}"`);
     return result;
   } catch (err) {
-    console.error("[API] Visual search failed:", err);
+    logApiError("[API] Visual search failed", err);
     return { visualMatches: [], shoppingResults: [], searchQuery: "", imageUrl: "", error: "Network error" };
   }
 }
@@ -574,7 +584,7 @@ export async function checkDatabaseHealth(): Promise<DbHealthResult> {
     console.log(`[API] DB Health: ${result.status} - ${result.message}`);
     return result;
   } catch (err) {
-    console.error("[API] Health check failed:", err);
+    logApiError("[API] Health check failed", err);
     return { status: "error", message: "Network error", tables: {} };
   }
 }

@@ -58,8 +58,8 @@ export default function CreateListScreen() {
 
   const animatePress = useCallback((anim: Animated.Value) => {
     Animated.sequence([
-      Animated.timing(anim, { toValue: 0.92, duration: 80, useNativeDriver: true }),
-      Animated.spring(anim, { toValue: 1, friction: 4, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 0.92, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(anim, { toValue: 1, friction: 4, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
   }, []);
 

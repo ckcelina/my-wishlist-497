@@ -129,10 +129,10 @@ export default function AddScreen() {
 
   const createPressHandlers = (anim: Animated.Value) => ({
     onPressIn: () => {
-      Animated.spring(anim, { toValue: 0.95, useNativeDriver: true }).start();
+      Animated.spring(anim, { toValue: 0.95, useNativeDriver: Platform.OS !== 'web' }).start();
     },
     onPressOut: () => {
-      Animated.spring(anim, { toValue: 1, friction: 3, useNativeDriver: true }).start();
+      Animated.spring(anim, { toValue: 1, friction: 3, useNativeDriver: Platform.OS !== 'web' }).start();
     },
   });
 
