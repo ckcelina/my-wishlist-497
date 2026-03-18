@@ -45,7 +45,7 @@ export default function ProductDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id, serpData } = useLocalSearchParams<{ id: string; serpData?: string }>();
-  const { wishlists, addProductToWishlist } = useWishlistContext();
+  const { wishlists, addProductToWishlist, addToRecentlyViewed } = useWishlistContext();
   const { country, serpApiCountryCode, format, convert, currencyCode, getCurrencySymbol } = useLocation();
   const { hasAlert, addAlert, removeAlert, getProductHistory, recordProductView, addPriceHistoryEntry } = usePriceAlerts();
 
@@ -147,6 +147,7 @@ export default function ProductDetailScreen() {
         product.store,
         serpApiCountryCode
       );
+      addToRecentlyViewed(product);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -179,3 +179,113 @@ User changes country from UAE to UK →
 6. Product Detail's price comparison includes the new country
 
 This ensures the entire app reflects the user's current location or chosen country instantly.
+
+---
+
+## **Phase I–Z: Extended Features**
+
+### I. Search Error Display & Diagnostics ✅
+- Surface API errors in the explore tab search UI
+- Show specific reason when search fails (API key missing, network error, etc.)
+- Error message distinguishes between no results vs. service unavailable
+- Error resets on new search or clear
+
+### J. Recently Viewed Products ✅
+- Track last 10 viewed products in WishlistProvider
+- Persisted to AsyncStorage across app restarts
+- "Recently Viewed" section shown on Explore home screen
+- addToRecentlyViewed called from product-detail on mount
+
+### K. Wishlist Total Value & Budget Display ✅
+- Calculate total value of unpurchased items in each wishlist
+- Show total value badge in wishlist-detail header
+- Purchased vs. unpurchased breakdown
+- Total updates live as items are marked purchased
+
+### L. Target Price Alerts ✅
+- Set a target price (below current) when creating a price alert
+- Alert triggers when price drops to or below target
+- Visual indicator showing how close current price is to target
+- Target price stored alongside alert in PriceAlertProvider
+
+### M. Product Notes & Priority ✅
+- notes?: string field on Product type
+- priority?: 'high' | 'medium' | 'low' field on Product type
+- Priority badge shown on product cards in wishlist
+- Notes shown as subtitle in wishlist items
+- updateProductInWishlist() function in WishlistProvider
+
+### N. Batch Price Refresh ✅
+- "Refresh Prices" button in wishlist detail
+- Checks live prices for all items via SerpAPI price-check endpoint
+- Highlights items with price drops in green
+- Loading state per item during refresh
+
+### O. Wishlist Templates ✅
+- Quick-start templates in create-list screen
+- Templates: Birthday 🎂, Wedding 💍, Travel ✈️, Tech 💻, Baby 🍼, Holiday 🎄, Self-Care 💆, Gaming 🎮
+- One-tap to fill emoji and color fields
+- Template picker shown prominently before manual entry
+
+### P. Smart Share (Enhanced) ✅
+- Share wishlist with formatted product list including prices
+- Already has Share.share() integration
+- Share text includes store names and total value
+
+### Q. Store Filter in Search ✅
+- Filter search results by specific store name
+- "Free delivery only" toggle filter
+- Store filter chips from user's available stores list
+- Applied filters shown as active badges
+
+### R. Spend Analytics Dashboard ✅
+- Analytics section on Profile screen
+- Total wishlist value across all lists
+- Category breakdown with visual bars
+- Purchased vs. pending item counts and values
+- Top stores by items saved
+
+### S. Product Comparison (Sellers View) ✅
+- Already exists via Product Detail sellers list
+- Shows all sellers with prices side by side
+- Highlights best price seller
+
+### T. Onboarding Flow ✅
+- Welcome screen shown once on first app launch
+- Slides: Welcome → Country Setup → Key Features → Get Started
+- hasOnboarded stored in AsyncStorage
+- Redirects to home after completion
+- Skippable
+
+### U. Currency Converter Quick Widget ✅
+- Quick conversion widget on Explore home screen
+- Enter amount in any currency, see in user's home currency
+- Uses existing exchange rates from LocationProvider
+- Interactive with real-time output
+
+### V. Smart Search Suggestions (Context-Aware) ✅
+- Search suggestions based on wishlist category content
+- Popular search chips update based on what user has saved
+- Already has search suggestions from SearchHistoryProvider
+
+### W. Product Tags ✅
+- tags?: string[] field on Product type
+- Add custom tags to wishlist items (#sale, #priority, #birthday)
+- Filter wishlist by tags
+- Tag chips shown on product cards
+
+### X. Price Trend Indicators on Cards ✅
+- Show ↑ ↓ → price trend on product cards
+- Based on price history from PriceAlertProvider
+- Color coded: green = dropped, red = increased, gray = stable
+
+### Y. Spend Insights Summary ✅
+- "My Shopping Stats" card on profile screen
+- Total items saved, total value, items purchased
+- Category with most items
+- Wishlists count breakdown
+
+### Z. Wishlist Sorting & Filtering ✅
+- Sort wishlists by: recently updated, name, item count, total value
+- Filter: All / Shared / Private
+- Sort controls on home tab wishlist list

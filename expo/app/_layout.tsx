@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { WishlistProvider } from "@/providers/WishlistProvider";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
@@ -23,11 +24,19 @@ function AuthGate() {
   const router = useRouter();
   const colors = useAppColors();
   const hasRedirected = useRef(false);
+  const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (!isInitialized) return;
+    AsyncStorage.getItem("has_onboarded_v1").then((val) => {
+      setHasOnboarded(val === "true");
+    }).catch(() => setHasOnboarded(true));
+  }, []);
+
+  useEffect(() => {
+    if (!isInitialized || hasOnboarded === null) return;
 
     const inAuthGroup = segments[0] === "login" || segments[0] === "signup";
+    const inOnboarding = segments[0] === "onboarding";
 
     if (!isAuthenticated && !inAuthGroup) {
       console.log("[AuthGate] Not authenticated, redirecting to login");
@@ -37,12 +46,16 @@ function AuthGate() {
       console.log("[AuthGate] Authenticated, redirecting to home");
       hasRedirected.current = true;
       setTimeout(() => router.replace("/"), 0);
+    } else if (isAuthenticated && !hasOnboarded && !inOnboarding) {
+      console.log("[AuthGate] First time user, showing onboarding");
+      hasRedirected.current = true;
+      setTimeout(() => router.replace("/onboarding"), 0);
     } else {
       hasRedirected.current = false;
     }
-  }, [isAuthenticated, isInitialized, segments, router]);
+  }, [isAuthenticated, isInitialized, segments, router, hasOnboarded]);
 
-  if (!isInitialized || isLoading) {
+  if (!isInitialized || isLoading || hasOnboarded === null) {
     return (
       <View style={[authStyles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -113,6 +126,13 @@ function RootLayoutNav() {
           options={{
             headerShown: false,
             presentation: "card",
+          }}
+        />
+        <Stack.Screen
+          name="onboarding"
+          options={{
+            headerShown: false,
+            gestureEnabled: false,
           }}
         />
       </Stack>

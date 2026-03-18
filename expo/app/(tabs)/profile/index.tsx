@@ -56,6 +56,7 @@ export default function ProfileScreen() {
     availableStores, availableCities,
     setCountry, setCity, setCurrency,
     allCountries, allCurrencies,
+    convert, format,
   } = useLocation();
 
   const [showCountryPicker, setShowCountryPicker] = useState(false);
@@ -116,6 +117,39 @@ export default function ProfileScreen() {
         c.symbol.toLowerCase().includes(q)
     );
   }, [currencySearch, allCurrencies]);
+
+  const totalItems = useMemo(
+    () => wishlists.reduce((sum, w) => sum + w.items.length, 0),
+    [wishlists]
+  );
+  const purchasedItems = useMemo(
+    () => wishlists.reduce((sum, w) => sum + w.items.filter((i) => i.isPurchased).length, 0),
+    [wishlists]
+  );
+  const totalWishlistValue = useMemo(
+    () =>
+      wishlists.reduce(
+        (sum, w) =>
+          sum +
+          w.items
+            .filter((i) => !i.isPurchased)
+            .reduce((ws, item) => ws + convert(item.price, item.currency), 0),
+        0
+      ),
+    [wishlists, convert]
+  );
+  const topCategories = useMemo(() => {
+    const catMap: Record<string, number> = {};
+    wishlists.forEach((w) =>
+      w.items.forEach((item) => {
+        const cat = item.category || "Other";
+        catMap[cat] = (catMap[cat] || 0) + 1;
+      })
+    );
+    return Object.entries(catMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+  }, [wishlists]);
 
   const handleSelectCountry = useCallback(
     (c: CountryData) => {
@@ -277,6 +311,58 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+
+        {totalItems > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>MY SHOPPING STATS</Text>
+            <View style={[styles.sectionCards, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+              <View style={styles.analyticsGrid}>
+                <View style={styles.analyticItem}>
+                  <Text style={[styles.analyticValue, { color: colors.text }]}>{totalItems}</Text>
+                  <Text style={[styles.analyticLabel, { color: colors.textTertiary }]}>Saved</Text>
+                </View>
+                <View style={[styles.analyticDivider, { backgroundColor: colors.borderLight }]} />
+                <View style={styles.analyticItem}>
+                  <Text style={[styles.analyticValue, { color: colors.success }]}>{purchasedItems}</Text>
+                  <Text style={[styles.analyticLabel, { color: colors.textTertiary }]}>Bought</Text>
+                </View>
+                <View style={[styles.analyticDivider, { backgroundColor: colors.borderLight }]} />
+                <View style={styles.analyticItem}>
+                  <Text style={[styles.analyticValue, { color: colors.primary }]} numberOfLines={1}>
+                    {format(totalWishlistValue, currencyCode)}
+                  </Text>
+                  <Text style={[styles.analyticLabel, { color: colors.textTertiary }]}>Value</Text>
+                </View>
+              </View>
+              {topCategories.length > 0 && (
+                <View style={[styles.categorySection, { borderTopColor: colors.borderLight }]}>
+                  <Text style={[styles.categorySectionTitle, { color: colors.textSecondary }]}>
+                    Top Categories
+                  </Text>
+                  {topCategories.map(([cat, count]) => (
+                    <View key={cat} style={styles.categoryBarRow}>
+                      <Text style={[styles.categoryBarLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {cat}
+                      </Text>
+                      <View style={[styles.categoryBarTrack, { backgroundColor: colors.surfaceSecondary }]}>
+                        <View
+                          style={[
+                            styles.categoryBarFill,
+                            {
+                              backgroundColor: colors.primary,
+                              width: `${Math.min(100, (count / (topCategories[0]?.[1] || 1)) * 100)}%` as unknown as number,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.categoryBarCount, { color: colors.textTertiary }]}>{count}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>LOCATION & CURRENCY</Text>
@@ -989,5 +1075,64 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     justifyContent: "center" as const,
     alignItems: "center" as const,
+  },
+  analyticsGrid: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+  },
+  analyticItem: {
+    flex: 1,
+    alignItems: "center" as const,
+    gap: 4,
+  },
+  analyticValue: {
+    fontSize: 22,
+    fontWeight: "800" as const,
+  },
+  analyticLabel: {
+    fontSize: 11,
+    fontWeight: "500" as const,
+  },
+  analyticDivider: {
+    width: 1,
+    height: 40,
+  },
+  categorySection: {
+    borderTopWidth: 1,
+    padding: 16,
+    gap: 10,
+  },
+  categorySectionTitle: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  categoryBarRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+  },
+  categoryBarLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "500" as const,
+  },
+  categoryBarTrack: {
+    flex: 2,
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden" as const,
+  },
+  categoryBarFill: {
+    height: "100%" as unknown as number,
+    borderRadius: 3,
+  },
+  categoryBarCount: {
+    fontSize: 11,
+    width: 20,
+    textAlign: "right" as const,
   },
 });

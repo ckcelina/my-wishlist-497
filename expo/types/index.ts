@@ -13,6 +13,9 @@ export interface Product {
   country: string;
   rating?: number;
   alternatives?: StoreAlternative[];
+  priority?: 'high' | 'medium' | 'low';
+  notes?: string;
+  tags?: string[];
 }
 
 export interface StoreAlternative {

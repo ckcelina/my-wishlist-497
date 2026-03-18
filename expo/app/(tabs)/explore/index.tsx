@@ -29,6 +29,8 @@ import {
   Sparkles,
   ArrowRight,
   Zap,
+  Eye,
+  ArrowLeftRight,
 } from "lucide-react-native";
 import { useMutation } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
@@ -111,7 +113,7 @@ export default function ExploreScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { allProducts, trendingProducts } = useWishlistContext();
+  const { allProducts, trendingProducts, recentlyViewed } = useWishlistContext();
   const { country, serpApiCountryCode, availableStores, format, getCurrencySymbol, currencyCode } = useLocation();
   const { getRecentSearches, getSuggestions, addSearch, removeSearch, clearHistory } = useSearchHistory();
   const { activeAlertCount } = usePriceAlerts();
@@ -124,6 +126,8 @@ export default function ExploreScreen() {
   const [showSearchHistory, setShowSearchHistory] = useState(false);
   const [filters, setFilters] = useState<FilterState>({ sortBy: "relevance" as SortOption });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [convertAmount, setConvertAmount] = useState("");
 
   const searchInputRef = useRef<TextInput>(null);
 
@@ -145,16 +149,20 @@ export default function ExploreScreen() {
       if (error) {
         console.log("[Explore] Search error:", error);
       }
-      return { results, query };
+      return { results, query, error };
     },
-    onSuccess: ({ results, query }) => {
+    onSuccess: ({ results, query, error }) => {
       setSerpResults(results);
+      setSearchError(error);
       setHasSearched(true);
       setShowSearchHistory(false);
-      void addSearch(query, serpApiCountryCode, results.length);
-      console.log(`[Explore] Got ${results.length} results from SerpAPI`);
+      if (results.length > 0) {
+        void addSearch(query, serpApiCountryCode, results.length);
+      }
+      console.log(`[Explore] Got ${results.length} results. Error: ${error ?? "none"}`);
     },
     onError: () => {
+      setSearchError("Search failed. Please check your connection.");
       setHasSearched(true);
       setShowSearchHistory(false);
     },
@@ -212,6 +220,8 @@ export default function ExploreScreen() {
     setSerpResults([]);
     setHasSearched(false);
     setShowSearchHistory(false);
+    setSearchError(null);
+    setConvertAmount("");
     setFilters({ sortBy: "relevance" as SortOption });
   }, []);
 
@@ -292,6 +302,26 @@ export default function ExploreScreen() {
     }),
     [serpApiCountryCode]
   );
+
+  const filteredSerpResults = useMemo(() => {
+    let results = serpResults;
+    if (filters.freeDeliveryOnly) {
+      results = results.filter(
+        (r) => r.delivery?.toLowerCase().includes("free") || !r.delivery
+      );
+    }
+    if (filters.storeFilter) {
+      const sq = filters.storeFilter.toLowerCase();
+      results = results.filter((r) => r.store.toLowerCase().includes(sq));
+    }
+    return results;
+  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter]);
+
+  const convertedAmount = useMemo(() => {
+    const num = parseFloat(convertAmount);
+    if (!convertAmount || isNaN(num) || num <= 0) return null;
+    return format(num, "USD");
+  }, [convertAmount, format]);
 
   const isSearchActive = searchQuery.length > 0 || hasSearched;
 
@@ -455,7 +485,7 @@ export default function ExploreScreen() {
               </View>
             )}
 
-            {serpResults.length > 0 && !searchMutation.isPending && (
+            {filteredSerpResults.length > 0 && !searchMutation.isPending && (
               <View style={styles.resultSection}>
                 <View style={styles.resultSectionHeader}>
                   <View style={[styles.resultBadge, { backgroundColor: colors.primaryFaded }]}>
@@ -463,14 +493,14 @@ export default function ExploreScreen() {
                   </View>
                   <View>
                     <Text style={[styles.resultSectionTitle, { color: colors.text }]}>
-                      {serpResults.length} Results Found
+                      {filteredSerpResults.length} Results Found{filters.storeFilter || filters.freeDeliveryOnly ? " (filtered)" : ""}
                     </Text>
                     <Text style={[styles.resultSectionSub, { color: colors.textTertiary }]}>
                       in {country?.name} · prices in {currencyCode}
                     </Text>
                   </View>
                 </View>
-                {serpResults.map((result, idx) => {
+                {filteredSerpResults.map((result, idx) => {
                   const product = serpToProduct(result, idx);
                   const displayPrice = format(product.price, product.currency);
                   return (
@@ -575,14 +605,20 @@ export default function ExploreScreen() {
             )}
 
             {hasSearched &&
-              serpResults.length === 0 &&
+              filteredSerpResults.length === 0 &&
               localResults.length === 0 &&
               !searchMutation.isPending && (
                 <View style={styles.emptySearch}>
-                  <Text style={styles.emptyEmoji}>🔍</Text>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>No results found</Text>
+                  <Text style={styles.emptyEmoji}>{searchError ? "⚠️" : "🔍"}</Text>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                    {searchError ? "Search Unavailable" : "No results found"}
+                  </Text>
                   <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                    Try different keywords or change your country in settings
+                    {searchError
+                      ? (searchError.includes("key") || searchError.includes("configured")
+                        ? "Product search is not set up. Browse categories or deals below."
+                        : searchError)
+                      : "Try different keywords or change your country in settings"}
                   </Text>
                   <Pressable
                     onPress={handleClear}
@@ -623,6 +659,76 @@ export default function ExploreScreen() {
                 </Pressable>
               ))}
             </ScrollView>
+          </View>
+
+          {recentlyViewed.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionRow}>
+                <Eye size={16} color={colors.primary} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Recently Viewed</Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalList}
+              >
+                {recentlyViewed.map((item, index) => {
+                  const displayPrice = format(item.price, item.currency);
+                  return (
+                    <Pressable
+                      key={item.id}
+                      onPress={() =>
+                        router.push({ pathname: "/product-detail", params: { id: item.id } })
+                      }
+                      style={[
+                        styles.trendingCard,
+                        { backgroundColor: colors.surface, borderColor: colors.borderLight },
+                        index > 0 ? { marginLeft: 12 } : undefined,
+                      ]}
+                    >
+                      <Image source={{ uri: item.image }} style={styles.trendingImage} contentFit="cover" />
+                      <View style={styles.trendingInfo}>
+                        <Text style={[styles.trendingTitle, { color: colors.text }]} numberOfLines={2}>
+                          {item.title}
+                        </Text>
+                        <Text style={[styles.trendingStore, { color: colors.textTertiary }]}>{item.store}</Text>
+                        <Text style={[styles.trendingPrice, { color: colors.primary }]}>{displayPrice}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionRow}>
+              <ArrowLeftRight size={16} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Currency Converter</Text>
+            </View>
+            <View style={[styles.converterCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+              <View style={styles.converterRow}>
+                <View style={styles.converterSide}>
+                  <Text style={[styles.converterLabel, { color: colors.textTertiary }]}>USD</Text>
+                  <TextInput
+                    value={convertAmount}
+                    onChangeText={setConvertAmount}
+                    placeholder="0"
+                    keyboardType="numeric"
+                    style={[styles.converterInputField, { color: colors.text }]}
+                    placeholderTextColor={colors.textTertiary}
+                    testID="currency-converter-input"
+                  />
+                </View>
+                <ArrowRight size={20} color={colors.textTertiary} />
+                <View style={[styles.converterSide, styles.converterOutput, { backgroundColor: colors.primaryFaded }]}>
+                  <Text style={[styles.converterLabel, { color: colors.primary }]}>{currencyCode}</Text>
+                  <Text style={[styles.converterResult, { color: colors.primary }]}>
+                    {convertedAmount ?? (convertAmount ? "—" : "—")}
+                  </Text>
+                </View>
+              </View>
+            </View>
           </View>
 
           {availableStores.length > 0 && (
@@ -1321,5 +1427,39 @@ const styles = StyleSheet.create({
   emptyBtnText: {
     fontSize: 14,
     fontWeight: "600" as const,
+  },
+  converterCard: {
+    marginHorizontal: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+  },
+  converterRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+  },
+  converterSide: {
+    flex: 1,
+    gap: 6,
+  },
+  converterLabel: {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    letterSpacing: 0.5,
+  },
+  converterInputField: {
+    fontSize: 26,
+    fontWeight: "700" as const,
+    padding: 0,
+  },
+  converterOutput: {
+    padding: 12,
+    borderRadius: 12,
+    alignItems: "flex-start" as const,
+  },
+  converterResult: {
+    fontSize: 24,
+    fontWeight: "800" as const,
   },
 });

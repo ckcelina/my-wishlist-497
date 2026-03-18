@@ -18,6 +18,7 @@ const WISHLISTS_KEY = "wishlists_data";
 const NOTIFICATIONS_KEY = "notifications_data";
 const CHAT_KEY = "chat_messages_v2";
 const ASSIGNMENTS_KEY = "item_assignments_v2";
+const RECENTLY_VIEWED_KEY = "recently_viewed_v1";
 
 export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
   const queryClient = useQueryClient();
@@ -27,6 +28,7 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [assignments, setAssignments] = useState<ItemAssignment[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<Product[]>([]);
 
   const user = useMemo<UserProfile>(() => {
     if (profile && authUser) {
@@ -170,6 +172,18 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
     },
     enabled: user.id !== "",
   });
+
+  const recentlyViewedQuery = useQuery({
+    queryKey: ["recentlyViewed"],
+    queryFn: async () => {
+      const stored = await AsyncStorage.getItem(RECENTLY_VIEWED_KEY);
+      return stored ? (JSON.parse(stored) as Product[]) : [];
+    },
+  });
+
+  useEffect(() => {
+    if (recentlyViewedQuery.data) setRecentlyViewed(recentlyViewedQuery.data);
+  }, [recentlyViewedQuery.data]);
 
   useEffect(() => {
     if (wishlistsQuery.data) setWishlists(wishlistsQuery.data);
@@ -439,6 +453,32 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
     void queryClient.invalidateQueries({ queryKey: ["wishlists", user.id] });
   }, [queryClient, user.id]);
 
+  const addToRecentlyViewed = useCallback((product: Product) => {
+    setRecentlyViewed((prev) => {
+      const updated = [product, ...prev.filter((p) => p.id !== product.id)].slice(0, 10);
+      void AsyncStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const updateProductInWishlist = useCallback(
+    (wishlistId: string, productId: string, updates: Partial<Product>) => {
+      const updated = wishlists.map((w) => {
+        if (w.id !== wishlistId) return w;
+        return {
+          ...w,
+          items: w.items.map((item) =>
+            item.id === productId ? { ...item, ...updates } : item
+          ),
+          updatedAt: new Date().toISOString().split("T")[0],
+        };
+      });
+      setWishlists(updated);
+      syncWishlists.mutate(updated);
+    },
+    [wishlists, syncWishlists]
+  );
+
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.isRead).length,
     [notifications]
@@ -490,6 +530,9 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       toggleShareWishlist,
       deleteWishlistById,
       refreshWishlists,
+      recentlyViewed,
+      addToRecentlyViewed,
+      updateProductInWishlist,
     }),
     [
       wishlists, myLists, sharedLists, notifications, unreadCount, user,
@@ -499,6 +542,7 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       togglePurchased, markNotificationRead,
       sendMessage, assignItem, unassignItem, toggleShareWishlist,
       deleteWishlistById, refreshWishlists,
+      recentlyViewed, addToRecentlyViewed, updateProductInWishlist,
     ]
   );
 });

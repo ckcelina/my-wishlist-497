@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   Share,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,10 +27,15 @@ import {
   Copy,
   Plus,
   ShoppingBag,
+  RefreshCw,
+  TrendingDown,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
 import { useAppColors } from "@/hooks/useColorScheme";
+import { useLocation } from "@/providers/LocationProvider";
+import { useMutation } from "@tanstack/react-query";
+import { checkPrices } from "@/lib/api";
 import { useWishlistById, useWishlistContext, useItemAssignments } from "@/providers/WishlistProvider";
 import ProductCard from "@/components/ProductCard";
 
@@ -41,8 +47,10 @@ export default function WishlistDetailScreen() {
   const wishlist = useWishlistById(id ?? "");
   const { togglePurchased, removeProductFromWishlist, toggleShareWishlist, user, deleteWishlistById } = useWishlistContext();
   const itemAssignments = useItemAssignments(id ?? "");
+  const { format, convert, currencyCode, serpApiCountryCode } = useLocation();
 
   const [showMenu, setShowMenu] = useState(false);
+  const [priceDropMap, setPriceDropMap] = useState<Record<string, number>>({});
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const menuAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -76,6 +84,45 @@ export default function WishlistDetailScreen() {
       }).start();
     }
   }, [wishlist, progressAnim]);
+
+  const totalValue = useMemo(() => {
+    if (!wishlist) return 0;
+    return wishlist.items
+      .filter((i) => !i.isPurchased)
+      .reduce((sum, item) => sum + convert(item.price, item.currency), 0);
+  }, [wishlist, convert]);
+
+  const batchRefreshMutation = useMutation({
+    mutationFn: async () => {
+      if (!wishlist || wishlist.items.length === 0) {
+        return { results: [], error: "No items" };
+      }
+      const products = wishlist.items.slice(0, 5).map((item) => ({
+        title: item.title,
+        lastPrice: item.price,
+        currency: item.currency,
+        country: item.country || serpApiCountryCode || "us",
+      }));
+      return checkPrices(products);
+    },
+    onSuccess: (data) => {
+      if (!data.results.length) return;
+      const dropMap: Record<string, number> = {};
+      data.results.forEach((result, idx) => {
+        if (result.dropped && wishlist?.items[idx]) {
+          dropMap[wishlist.items[idx].id] = result.savings ?? 0;
+        }
+      });
+      setPriceDropMap(dropMap);
+      const dropped = Object.keys(dropMap).length;
+      Alert.alert(
+        dropped > 0 ? "Price Drops Found! 🎉" : "Prices Stable",
+        dropped > 0
+          ? `${dropped} item${dropped > 1 ? "s have" : " has"} dropped in price!`
+          : "All prices are stable right now."
+      );
+    },
+  });
 
   if (!wishlist) {
     return (
@@ -119,13 +166,16 @@ export default function WishlistDetailScreen() {
     try {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       const shareLink = `mywishlist://list/${wishlist.id}`;
-      const itemNames = wishlist.items.slice(0, 3).map((i) => i.title).join(", ");
+      const itemLines = wishlist.items.slice(0, 5).map(
+        (i) => `\u2022 ${i.title} \u2014 ${format(i.price, i.currency)} at ${i.store}`
+      ).join("\n");
       const itemSummary = wishlist.items.length > 0
-        ? `\n\nItems: ${itemNames}${wishlist.items.length > 3 ? ` and ${wishlist.items.length - 3} more` : ""}`
+        ? `\n\n${itemLines}${wishlist.items.length > 5 ? `\n...and ${wishlist.items.length - 5} more items` : ""}`
         : "";
+      const totalStr = totalValue > 0 ? `\nTotal: ${format(totalValue, currencyCode)}` : "";
 
       await Share.share({
-        message: `Check out my wishlist "${wishlist.title}"! ${wishlist.items.length} items.${itemSummary}\n\n${shareLink}`,
+        message: `${wishlist.emoji} ${wishlist.title}\n${wishlist.items.length} items${totalStr}${itemSummary}\n\n${shareLink}`,
         title: wishlist.title,
       });
     } catch (error) {
@@ -250,6 +300,13 @@ export default function WishlistDetailScreen() {
                   {wishlist.items.length} {wishlist.items.length === 1 ? "item" : "items"}
                 </Text>
               </View>
+              {totalValue > 0 && (
+                <View style={[styles.metaBadge, { backgroundColor: colors.success + "20" }]}>
+                  <Text style={[styles.metaBadgeText, { color: colors.success }]}>
+                    {format(totalValue, currencyCode)}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {wishlist.collaborators.length > 1 && (
@@ -374,13 +431,25 @@ export default function WishlistDetailScreen() {
             <View style={styles.itemsList}>
               <View style={styles.itemsHeader}>
                 <Text style={[styles.itemsHeaderTitle, { color: colors.text }]}>Items</Text>
-                <Pressable
-                  onPress={() => router.push("/(tabs)/add")}
-                  style={[styles.addMoreBtn, { backgroundColor: themeColor + "12" }]}
-                >
-                  <Plus size={14} color={themeColor} />
-                  <Text style={[styles.addMoreText, { color: themeColor }]}>Add</Text>
-                </Pressable>
+                <View style={styles.itemsHeaderRight}>
+                  <Pressable
+                    onPress={() => batchRefreshMutation.mutate()}
+                    disabled={batchRefreshMutation.isPending}
+                    style={[styles.refreshBtn, { backgroundColor: colors.primaryFaded }]}
+                  >
+                    {batchRefreshMutation.isPending
+                      ? <ActivityIndicator size="small" color={colors.primary} />
+                      : <RefreshCw size={12} color={colors.primary} />}
+                    <Text style={[styles.refreshBtnText, { color: colors.primary }]}>Prices</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => router.push("/(tabs)/add")}
+                    style={[styles.addMoreBtn, { backgroundColor: themeColor + "12" }]}
+                  >
+                    <Plus size={14} color={themeColor} />
+                    <Text style={[styles.addMoreText, { color: themeColor }]}>Add</Text>
+                  </Pressable>
+                </View>
               </View>
 
               {wishlist.items.map((product) => {
@@ -417,6 +486,32 @@ export default function WishlistDetailScreen() {
                         </Pressable>
                       </View>
                     </View>
+                    {(product.priority || product.notes || priceDropMap[product.id] !== undefined) && (
+                      <View style={styles.itemMetaRow}>
+                        {product.priority ? (
+                          <View style={[styles.priorityBadge, {
+                            backgroundColor: product.priority === "high" ? "#FF4F4F20" : product.priority === "medium" ? "#FF8C0015" : "#00B89415"
+                          }]}>
+                            <Text style={[styles.priorityText, {
+                              color: product.priority === "high" ? "#FF4F4F" : product.priority === "medium" ? "#FF8C00" : "#00B894"
+                            }]}>
+                              {product.priority === "high" ? "🔴 High" : product.priority === "medium" ? "🟡 Medium" : "🟢 Low"}
+                            </Text>
+                          </View>
+                        ) : null}
+                        {priceDropMap[product.id] !== undefined ? (
+                          <View style={styles.priceDropBadge}>
+                            <TrendingDown size={10} color="#00B894" />
+                            <Text style={[styles.priceDropText, { color: "#00B894" }]}>Price dropped!</Text>
+                          </View>
+                        ) : null}
+                        {product.notes ? (
+                          <Text style={[styles.itemNotes, { color: colors.textTertiary }]} numberOfLines={1}>
+                            📝 {product.notes}
+                          </Text>
+                        ) : null}
+                      </View>
+                    )}
                     {assignment && (
                       <View style={[styles.assignmentIndicator, { backgroundColor: "#00B89410" }]}>
                         <Gift size={12} color="#00B894" />
@@ -712,5 +807,57 @@ const styles = StyleSheet.create({
   emptyDesc: {
     fontSize: 14,
     textAlign: "center" as const,
+  },
+  itemsHeaderRight: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+  },
+  refreshBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    gap: 4,
+  },
+  refreshBtnText: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+  },
+  itemMetaRow: {
+    flexDirection: "row" as const,
+    flexWrap: "wrap" as const,
+    gap: 6,
+    paddingLeft: 8,
+    marginTop: 4,
+    marginBottom: 2,
+    alignItems: "center" as const,
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  priorityText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+  },
+  priceDropBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: "#00B89415",
+  },
+  priceDropText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+  },
+  itemNotes: {
+    fontSize: 11,
+    flex: 1,
   },
 });

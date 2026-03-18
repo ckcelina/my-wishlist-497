@@ -33,6 +33,7 @@ export default function HomeScreen() {
   const { country, city, currency, serpApiCountryCode, format } = useLocation();
   const { unreadDropCount, activeAlertCount, checkPricesNow, isCheckingPrices } = usePriceAlerts();
   const [refreshing, setRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState<"updated" | "name" | "items">("updated");
   const [liveTrending, setLiveTrending] = useState<SerpApiResult[]>([]);
 
   const trendingMutation = useMutation({
@@ -114,6 +115,19 @@ export default function HomeScreen() {
   }, [myLists, sharedLists]);
 
   const allLists = useMemo(() => [...myLists, ...sharedLists], [myLists, sharedLists]);
+
+  const sortedMyLists = useMemo(() => {
+    switch (sortBy) {
+      case "name":
+        return [...myLists].sort((a, b) => a.title.localeCompare(b.title));
+      case "items":
+        return [...myLists].sort((a, b) => b.items.length - a.items.length);
+      default:
+        return [...myLists].sort(
+          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+    }
+  }, [myLists, sortBy]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -198,6 +212,43 @@ export default function HomeScreen() {
           </View>
         </Animated.View>
 
+        {allLists.length > 2 && (
+          <View style={styles.sortBar}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.sortBarContent}
+            >
+              {([
+                { key: "updated" as const, label: "⏰ Latest" },
+                { key: "name" as const, label: "🔤 A–Z" },
+                { key: "items" as const, label: "📦 Most Items" },
+              ]).map((opt) => (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => setSortBy(opt.key)}
+                  style={[
+                    styles.sortChip,
+                    {
+                      backgroundColor: sortBy === opt.key ? colors.primary : colors.surface,
+                      borderColor: sortBy === opt.key ? colors.primary : colors.borderLight,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.sortChipText,
+                      { color: sortBy === opt.key ? "#FFFFFF" : colors.textSecondary },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>My Wishlists</Text>
           {myLists.length > 0 && (
@@ -241,7 +292,7 @@ export default function HomeScreen() {
               </View>
               <Text style={[styles.createCardText, { color: colors.primary }]}>New</Text>
             </Pressable>
-            {myLists.map((item) => (
+            {sortedMyLists.map((item) => (
               <View key={item.id} style={{ marginLeft: 12 }}>
                 <WishlistCard
                   wishlist={item}
@@ -658,5 +709,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700" as const,
     marginTop: 2,
+  },
+  sortBar: {
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  sortBarContent: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  sortChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  sortChipText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
   },
 });

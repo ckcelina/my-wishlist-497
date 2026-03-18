@@ -25,6 +25,17 @@ const EMOJIS = [
   "💄", "🎨", "🧳", "🍳", "🪴", "🎵", "⌚", "🎯",
 ];
 
+const TEMPLATES = [
+  { name: "Birthday", emoji: "🎂", color: "#FF6B6B", desc: "Gift ideas" },
+  { name: "Wedding", emoji: "💍", color: "#DDA0DD", desc: "Registry" },
+  { name: "Travel", emoji: "✈️", color: "#45B7D1", desc: "Pack & prep" },
+  { name: "Tech", emoji: "💻", color: "#6C5CE7", desc: "Gadgets" },
+  { name: "Baby", emoji: "🍼", color: "#96CEB4", desc: "Essentials" },
+  { name: "Holiday", emoji: "🎄", color: "#00B894", desc: "Seasonal" },
+  { name: "Self-Care", emoji: "💆", color: "#FD79A8", desc: "Wellness" },
+  { name: "Gaming", emoji: "🎮", color: "#E17055", desc: "Games" },
+];
+
 const THEME_COLORS = [
   { color: "#FF6B6B", label: "Coral" },
   { color: "#4ECDC4", label: "Teal" },
@@ -52,6 +63,7 @@ export default function CreateListScreen() {
   const [selectedColor, setSelectedColor] = useState("#4ECDC4");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
 
   const buttonScale = useRef(new Animated.Value(1)).current;
   const emojiScale = useRef(new Animated.Value(1)).current;
@@ -144,6 +156,41 @@ export default function CreateListScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          <View style={styles.templateSection}>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>START FROM A TEMPLATE</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.templateRow}
+            >
+              {TEMPLATES.map((t) => (
+                <Pressable
+                  key={t.name}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSelectedTemplate(t.name);
+                    setSelectedEmoji(t.emoji);
+                    setSelectedColor(t.color);
+                    if (!title.trim()) setTitle(t.name);
+                  }}
+                  style={[
+                    styles.templateChip,
+                    {
+                      backgroundColor: selectedTemplate === t.name ? t.color + "25" : colors.surface,
+                      borderColor: selectedTemplate === t.name ? t.color : colors.borderLight,
+                    },
+                  ]}
+                >
+                  <Text style={styles.templateEmoji}>{t.emoji}</Text>
+                  <Text style={[styles.templateName, { color: selectedTemplate === t.name ? t.color : colors.text }]}>
+                    {t.name}
+                  </Text>
+                  <Text style={[styles.templateDesc, { color: colors.textTertiary }]}>{t.desc}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
           <Pressable
             onPress={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -446,6 +493,33 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
+  },
+  templateSection: {
+    marginBottom: 20,
+  },
+  templateRow: {
+    gap: 10,
+  },
+  templateChip: {
+    alignItems: "center" as const,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    gap: 6,
+    width: 100,
+  },
+  templateEmoji: {
+    fontSize: 28,
+  },
+  templateName: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    textAlign: "center" as const,
+  },
+  templateDesc: {
+    fontSize: 10,
+    textAlign: "center" as const,
   },
   createButton: {
     paddingVertical: 18,

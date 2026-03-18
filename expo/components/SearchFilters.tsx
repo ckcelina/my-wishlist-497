@@ -14,6 +14,8 @@ import {
   ArrowDownUp,
   DollarSign,
   Check,
+  Truck,
+  Store,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useAppColors } from "@/hooks/useColorScheme";
@@ -24,6 +26,8 @@ export interface FilterState {
   minPrice?: number;
   maxPrice?: number;
   sortBy: SortOption;
+  freeDeliveryOnly?: boolean;
+  storeFilter?: string;
 }
 
 interface SearchFiltersProps {
@@ -51,22 +55,30 @@ export default React.memo(function SearchFilters({
   const [localMin, setLocalMin] = useState(filters.minPrice?.toString() ?? "");
   const [localMax, setLocalMax] = useState(filters.maxPrice?.toString() ?? "");
   const [localSort, setLocalSort] = useState<SortOption>(filters.sortBy);
+  const [localFreeDelivery, setLocalFreeDelivery] = useState(filters.freeDeliveryOnly ?? false);
+  const [localStoreFilter, setLocalStoreFilter] = useState(filters.storeFilter ?? "");
 
   const hasActiveFilters =
     filters.minPrice !== undefined ||
     filters.maxPrice !== undefined ||
-    filters.sortBy !== "relevance";
+    filters.sortBy !== "relevance" ||
+    filters.freeDeliveryOnly === true ||
+    !!filters.storeFilter;
 
   const activeCount = [
     filters.minPrice !== undefined,
     filters.maxPrice !== undefined,
     filters.sortBy !== "relevance",
+    filters.freeDeliveryOnly === true,
+    !!filters.storeFilter,
   ].filter(Boolean).length;
 
   const handleOpen = useCallback(() => {
     setLocalMin(filters.minPrice?.toString() ?? "");
     setLocalMax(filters.maxPrice?.toString() ?? "");
     setLocalSort(filters.sortBy);
+    setLocalFreeDelivery(filters.freeDeliveryOnly ?? false);
+    setLocalStoreFilter(filters.storeFilter ?? "");
     setShowModal(true);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [filters]);
@@ -74,15 +86,23 @@ export default React.memo(function SearchFilters({
   const handleApply = useCallback(() => {
     const min = localMin ? parseFloat(localMin) : undefined;
     const max = localMax ? parseFloat(localMax) : undefined;
-    onApply({ minPrice: min, maxPrice: max, sortBy: localSort });
+    onApply({
+      minPrice: min,
+      maxPrice: max,
+      sortBy: localSort,
+      freeDeliveryOnly: localFreeDelivery || undefined,
+      storeFilter: localStoreFilter.trim() || undefined,
+    });
     setShowModal(false);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  }, [localMin, localMax, localSort, onApply]);
+  }, [localMin, localMax, localSort, localFreeDelivery, localStoreFilter, onApply]);
 
   const handleReset = useCallback(() => {
     setLocalMin("");
     setLocalMax("");
     setLocalSort("relevance");
+    setLocalFreeDelivery(false);
+    setLocalStoreFilter("");
     onReset();
     setShowModal(false);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -231,6 +251,53 @@ export default React.memo(function SearchFilters({
                   );
                 })}
               </View>
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Store size={16} color={colors.primary} />
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Store Filter</Text>
+                </View>
+                <View style={[styles.storeInput, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderLight }]}>
+                  <TextInput
+                    value={localStoreFilter}
+                    onChangeText={setLocalStoreFilter}
+                    placeholder="Filter by store name..."
+                    placeholderTextColor={colors.textTertiary}
+                    style={[styles.storeInputField, { color: colors.text }]}
+                    testID="filter-store"
+                  />
+                  {localStoreFilter.length > 0 && (
+                    <Pressable onPress={() => setLocalStoreFilter("")} hitSlop={8}>
+                      <X size={16} color={colors.textTertiary} />
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Truck size={16} color={colors.primary} />
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Delivery</Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setLocalFreeDelivery(!localFreeDelivery);
+                  }}
+                  style={[
+                    styles.toggleRow,
+                    {
+                      backgroundColor: localFreeDelivery ? colors.primaryFaded : colors.surfaceSecondary,
+                      borderColor: localFreeDelivery ? colors.primary : colors.borderLight,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.toggleLabel, { color: colors.text }]}>Free delivery only</Text>
+                  <View style={[styles.toggleSwitch, { backgroundColor: localFreeDelivery ? colors.primary : colors.border }]}>
+                    <View style={[styles.toggleKnob, { transform: [{ translateX: localFreeDelivery ? 18 : 2 }] }]} />
+                  </View>
+                </Pressable>
+              </View>
+
             </ScrollView>
 
             <View style={styles.modalFooter}>
@@ -410,5 +477,45 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "700" as const,
+  },
+  storeInput: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  storeInputField: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+  },
+  toggleRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  toggleLabel: {
+    fontSize: 15,
+    fontWeight: "500" as const,
+  },
+  toggleSwitch: {
+    width: 42,
+    height: 24,
+    borderRadius: 12,
+    paddingVertical: 2,
+    justifyContent: "center" as const,
+  },
+  toggleKnob: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#FFFFFF",
+    position: "absolute" as const,
   },
 });
