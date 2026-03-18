@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
+  Animated,
+  RefreshControl,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,6 +25,9 @@ import {
   Tag,
   Flame,
   Star,
+  Sparkles,
+  ArrowRight,
+  Zap,
 } from "lucide-react-native";
 import { useMutation } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
@@ -31,11 +36,20 @@ import { useWishlistContext } from "@/providers/WishlistProvider";
 import { useLocation } from "@/providers/LocationProvider";
 import { useSearchHistory } from "@/providers/SearchHistoryProvider";
 import { usePriceAlerts } from "@/providers/PriceAlertProvider";
-import { mockCategories } from "@/mocks/data";
 import { searchProducts, fetchDeals, SerpApiResult } from "@/lib/api";
-import ProductCard from "@/components/ProductCard";
-import SectionHeader from "@/components/SectionHeader";
+import SearchFilters, { FilterState, SortOption } from "@/components/SearchFilters";
 import { Product } from "@/types";
+
+const POPULAR_SEARCHES = [
+  { label: "AirPods Pro", emoji: "🎧" },
+  { label: "iPhone 16", emoji: "📱" },
+  { label: "Nike Dunks", emoji: "👟" },
+  { label: "PS5", emoji: "🎮" },
+  { label: "Dyson V15", emoji: "🧹" },
+  { label: "Samsung TV", emoji: "📺" },
+  { label: "MacBook Air", emoji: "💻" },
+  { label: "Perfume", emoji: "🌸" },
+];
 
 const DEAL_CATEGORIES = [
   { id: "deals", label: "All Deals", emoji: "🔥" },
@@ -46,29 +60,58 @@ const DEAL_CATEGORIES = [
   { id: "tech", label: "Tech", emoji: "💻" },
 ];
 
-const FOOD_CATEGORIES = [
-  { id: "fc1", name: "Food Delivery", emoji: "🍔", productCount: 0 },
-  { id: "fc2", name: "Groceries", emoji: "🛒", productCount: 0 },
-  { id: "fc3", name: "Restaurant", emoji: "🍽️", productCount: 0 },
+const BROWSE_CATEGORIES = [
+  { id: "bc1", name: "Food Delivery", emoji: "🍔" },
+  { id: "bc2", name: "Groceries", emoji: "🛒" },
+  { id: "bc3", name: "Electronics", emoji: "📱" },
+  { id: "bc4", name: "Fashion", emoji: "👟" },
+  { id: "bc5", name: "Home & Decor", emoji: "🏡" },
+  { id: "bc6", name: "Beauty", emoji: "✨" },
+  { id: "bc7", name: "Technology", emoji: "💻" },
+  { id: "bc8", name: "Sports", emoji: "⚽" },
+  { id: "bc9", name: "Books", emoji: "📚" },
+  { id: "bc10", name: "Toys & Games", emoji: "🧸" },
+  { id: "bc11", name: "Restaurant", emoji: "🍽️" },
+  { id: "bc12", name: "Garden", emoji: "🌱" },
 ];
 
-const SHOPPING_CATEGORIES = [
-  { id: "sc1", name: "Electronics", emoji: "📱", productCount: 0 },
-  { id: "sc2", name: "Fashion", emoji: "👟", productCount: 0 },
-  { id: "sc3", name: "Home & Decor", emoji: "🏡", productCount: 0 },
-  { id: "sc4", name: "Beauty", emoji: "✨", productCount: 0 },
-  { id: "sc5", name: "Technology", emoji: "💻", productCount: 0 },
-  { id: "sc6", name: "Sports", emoji: "⚽", productCount: 0 },
-  { id: "sc7", name: "Books", emoji: "📚", productCount: 0 },
-  { id: "sc8", name: "Toys & Games", emoji: "🧸", productCount: 0 },
-];
+function SkeletonCard({ colors }: { colors: ReturnType<typeof useAppColors> }) {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.skeletonCard,
+        { backgroundColor: colors.surface, borderColor: colors.borderLight, opacity: pulseAnim },
+      ]}
+    >
+      <View style={[styles.skeletonImage, { backgroundColor: colors.surfaceSecondary }]} />
+      <View style={styles.skeletonContent}>
+        <View style={[styles.skeletonLine, { backgroundColor: colors.surfaceSecondary, width: "80%" }]} />
+        <View style={[styles.skeletonLine, { backgroundColor: colors.surfaceSecondary, width: "50%" }]} />
+        <View style={[styles.skeletonLine, { backgroundColor: colors.surfaceSecondary, width: "30%" }]} />
+      </View>
+    </Animated.View>
+  );
+}
 
 export default function ExploreScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { allProducts, trendingProducts } = useWishlistContext();
-  const { country, serpApiCountryCode, availableStores, format } = useLocation();
+  const { country, serpApiCountryCode, availableStores, format, getCurrencySymbol, currencyCode } = useLocation();
   const { getRecentSearches, getSuggestions, addSearch, removeSearch, clearHistory } = useSearchHistory();
   const { activeAlertCount } = usePriceAlerts();
 
@@ -78,6 +121,10 @@ export default function ExploreScreen() {
   const [dealResults, setDealResults] = useState<SerpApiResult[]>([]);
   const [selectedDealCategory, setSelectedDealCategory] = useState<string | null>(null);
   const [showSearchHistory, setShowSearchHistory] = useState(false);
+  const [filters, setFilters] = useState<FilterState>({ sortBy: "relevance" as SortOption });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const searchInputRef = useRef<TextInput>(null);
 
   const recentSearches = useMemo(() => getRecentSearches(8), [getRecentSearches]);
   const suggestions = useMemo(
@@ -86,9 +133,14 @@ export default function ExploreScreen() {
   );
 
   const searchMutation = useMutation({
-    mutationFn: async (query: string) => {
-      console.log(`[Explore] Searching SerpAPI for: "${query}" in ${serpApiCountryCode}`);
-      const { results, error } = await searchProducts(query, serpApiCountryCode);
+    mutationFn: async ({ query, appliedFilters }: { query: string; appliedFilters?: FilterState }) => {
+      const f = appliedFilters ?? filters;
+      console.log(`[Explore] Searching SerpAPI for: "${query}" in ${serpApiCountryCode}`, f);
+      const { results, error } = await searchProducts(query, serpApiCountryCode, {
+        minPrice: f.minPrice,
+        maxPrice: f.maxPrice,
+        sortBy: f.sortBy !== "relevance" ? f.sortBy : undefined,
+      });
       if (error) {
         console.log("[Explore] Search error:", error);
       }
@@ -133,14 +185,23 @@ export default function ExploreScreen() {
     const q = searchQuery.trim();
     if (q.length < 2) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    searchMutation.mutate(q);
+    searchMutation.mutate({ query: q });
   }, [searchQuery, searchMutation]);
 
   const handleHistorySearch = useCallback(
     (query: string) => {
       setSearchQuery(query);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      searchMutation.mutate(query);
+      searchMutation.mutate({ query });
+    },
+    [searchMutation]
+  );
+
+  const handlePopularSearch = useCallback(
+    (label: string) => {
+      setSearchQuery(label);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      searchMutation.mutate({ query: label });
     },
     [searchMutation]
   );
@@ -150,6 +211,7 @@ export default function ExploreScreen() {
     setSerpResults([]);
     setHasSearched(false);
     setShowSearchHistory(false);
+    setFilters({ sortBy: "relevance" as SortOption });
   }, []);
 
   const handleCategoryPress = useCallback(
@@ -160,7 +222,7 @@ export default function ExploreScreen() {
         ? `${categoryName} ${storeNames} ${countryName}`
         : `${categoryName} delivery ${countryName}`;
       setSearchQuery(storeQuery);
-      searchMutation.mutate(storeQuery);
+      searchMutation.mutate({ query: storeQuery });
     },
     [searchMutation, country, availableStores]
   );
@@ -168,10 +230,10 @@ export default function ExploreScreen() {
   const handleStorePress = useCallback(
     (storeName: string) => {
       const countryName = country?.name ?? "";
-      const q = `site:${storeName.toLowerCase().replace(/\s+/g, "")}.com OR ${storeName} ${countryName}`;
+      const q = `${storeName} ${countryName} delivery`;
       setSearchQuery(q);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      searchMutation.mutate(q);
+      searchMutation.mutate({ query: q });
     },
     [searchMutation, country]
   );
@@ -184,6 +246,32 @@ export default function ExploreScreen() {
     },
     [dealsMutation]
   );
+
+  const handleFilterApply = useCallback(
+    (newFilters: FilterState) => {
+      setFilters(newFilters);
+      if (hasSearched && searchQuery.trim().length >= 2) {
+        searchMutation.mutate({ query: searchQuery.trim(), appliedFilters: newFilters });
+      }
+    },
+    [hasSearched, searchQuery, searchMutation]
+  );
+
+  const handleFilterReset = useCallback(() => {
+    const resetFilters: FilterState = { sortBy: "relevance" as SortOption };
+    setFilters(resetFilters);
+    if (hasSearched && searchQuery.trim().length >= 2) {
+      searchMutation.mutate({ query: searchQuery.trim(), appliedFilters: resetFilters });
+    }
+  }, [hasSearched, searchQuery, searchMutation]);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    if (hasSearched && searchQuery.trim().length >= 2) {
+      searchMutation.mutate({ query: searchQuery.trim() });
+    }
+    setTimeout(() => setIsRefreshing(false), 1000);
+  }, [hasSearched, searchQuery, searchMutation]);
 
   const serpToProduct = useCallback(
     (result: SerpApiResult, index: number): Product => ({
@@ -206,15 +294,16 @@ export default function ExploreScreen() {
 
   const isSearchActive = searchQuery.length > 0 || hasSearched;
 
-  const allCategories = useMemo(() => {
-    return [...FOOD_CATEGORIES, ...SHOPPING_CATEGORIES, ...mockCategories];
-  }, []);
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerTop}>
-          <Text style={[styles.title, { color: colors.text }]}>Explore</Text>
+          <View>
+            <Text style={[styles.title, { color: colors.text }]}>Explore</Text>
+            <Text style={[styles.subtitle, { color: colors.textTertiary }]}>
+              Find the best deals worldwide
+            </Text>
+          </View>
           <View style={styles.headerRight}>
             {activeAlertCount > 0 && (
               <View style={[styles.alertBadge, { backgroundColor: colors.error }]}>
@@ -226,7 +315,7 @@ export default function ExploreScreen() {
               style={[styles.locationChip, { backgroundColor: colors.primaryFaded }]}
             >
               <MapPin size={12} color={colors.primary} />
-              <Text style={[styles.locationChipText, { color: colors.primary }]}>
+              <Text style={[styles.locationChipText, { color: colors.primary }]} numberOfLines={1}>
                 {country?.flag} {country?.name ?? "Set location"}
               </Text>
             </Pressable>
@@ -235,7 +324,8 @@ export default function ExploreScreen() {
         <View style={[styles.searchBar, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
           <Search size={18} color={colors.textTertiary} />
           <TextInput
-            placeholder={`Search in ${country?.name ?? "your country"}...`}
+            ref={searchInputRef}
+            placeholder={`Search products in ${country?.name ?? "your country"}...`}
             placeholderTextColor={colors.textTertiary}
             style={[styles.searchInput, { color: colors.text }]}
             value={searchQuery}
@@ -259,7 +349,7 @@ export default function ExploreScreen() {
             testID="explore-search-input"
           />
           {searchQuery.length > 0 && (
-            <Pressable onPress={handleClear}>
+            <Pressable onPress={handleClear} hitSlop={8}>
               <X size={18} color={colors.textTertiary} />
             </Pressable>
           )}
@@ -305,9 +395,7 @@ export default function ExploreScreen() {
                 )}
               </View>
               <Pressable
-                onPress={() => {
-                  void removeSearch(item.query);
-                }}
+                onPress={() => { void removeSearch(item.query); }}
                 hitSlop={8}
               >
                 <Trash2 size={14} color={colors.textTertiary} />
@@ -333,119 +421,217 @@ export default function ExploreScreen() {
               <View style={styles.historyItemContent}>
                 <Text style={[styles.historyQuery, { color: colors.text }]}>{item.query}</Text>
               </View>
+              <ArrowRight size={14} color={colors.textTertiary} />
             </Pressable>
           ))}
         </ScrollView>
       ) : isSearchActive && hasSearched ? (
-        <ScrollView contentContainerStyle={styles.searchResults} showsVerticalScrollIndicator={false}>
-          {searchMutation.isPending && (
-            <View style={styles.loadingState}>
-              <ActivityIndicator color={colors.primary} size="large" />
-              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-                Searching stores in {country?.name ?? "your area"}...
-              </Text>
-            </View>
-          )}
-
-          {serpResults.length > 0 && !searchMutation.isPending && (
-            <View style={styles.resultSection}>
-              <View style={styles.resultSectionHeader}>
-                <ShoppingBag size={16} color={colors.primary} />
-                <Text style={[styles.resultSectionTitle, { color: colors.text }]}>
-                  Results in {country?.name} ({serpResults.length})
-                </Text>
+        <View style={{ flex: 1 }}>
+          <SearchFilters
+            filters={filters}
+            onApply={handleFilterApply}
+            onReset={handleFilterReset}
+            currencySymbol={getCurrencySymbol(currencyCode)}
+          />
+          <ScrollView
+            contentContainerStyle={styles.searchResults}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+            }
+          >
+            {searchMutation.isPending && (
+              <View style={styles.skeletonContainer}>
+                <View style={styles.loadingHeader}>
+                  <ActivityIndicator color={colors.primary} size="small" />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                    Searching stores in {country?.name ?? "your area"}...
+                  </Text>
+                </View>
+                {[0, 1, 2].map((i) => (
+                  <SkeletonCard key={`skeleton-${i}`} colors={colors} />
+                ))}
               </View>
-              {serpResults.map((result, idx) => {
-                const product = serpToProduct(result, idx);
-                const displayPrice = format(product.price, product.currency);
-                return (
+            )}
+
+            {serpResults.length > 0 && !searchMutation.isPending && (
+              <View style={styles.resultSection}>
+                <View style={styles.resultSectionHeader}>
+                  <View style={[styles.resultBadge, { backgroundColor: colors.primaryFaded }]}>
+                    <ShoppingBag size={14} color={colors.primary} />
+                  </View>
+                  <View>
+                    <Text style={[styles.resultSectionTitle, { color: colors.text }]}>
+                      {serpResults.length} Results Found
+                    </Text>
+                    <Text style={[styles.resultSectionSub, { color: colors.textTertiary }]}>
+                      in {country?.name} · prices in {currencyCode}
+                    </Text>
+                  </View>
+                </View>
+                {serpResults.map((result, idx) => {
+                  const product = serpToProduct(result, idx);
+                  const displayPrice = format(product.price, product.currency);
+                  return (
+                    <Pressable
+                      key={`serp-${idx}`}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/product-detail",
+                          params: { id: product.id, serpData: JSON.stringify(result) },
+                        })
+                      }
+                      style={[styles.resultCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                    >
+                      <View style={styles.resultCardContent}>
+                        {result.image ? (
+                          <Image source={{ uri: result.image }} style={styles.resultImage} contentFit="cover" />
+                        ) : (
+                          <View style={[styles.resultImagePlaceholder, { backgroundColor: colors.surfaceSecondary }]}>
+                            <ShoppingBag size={20} color={colors.textTertiary} />
+                          </View>
+                        )}
+                        <View style={styles.resultInfo}>
+                          <Text style={[styles.resultTitle, { color: colors.text }]} numberOfLines={2}>
+                            {product.title}
+                          </Text>
+                          <View style={styles.resultMeta}>
+                            <View style={[styles.storeTag, { backgroundColor: colors.surfaceSecondary }]}>
+                              <Store size={10} color={colors.textTertiary} />
+                              <Text style={[styles.resultStore, { color: colors.textSecondary }]}>
+                                {product.store}
+                              </Text>
+                            </View>
+                            {result.rating !== undefined && (
+                              <View style={styles.ratingRow}>
+                                <Star size={10} color="#FFB300" fill="#FFB300" />
+                                <Text style={[styles.ratingText, { color: colors.textSecondary }]}>
+                                  {result.rating}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <View style={styles.resultBottom}>
+                            <Text style={[styles.resultPrice, { color: colors.primary }]}>
+                              {displayPrice}
+                            </Text>
+                            {result.delivery && (
+                              <View style={[styles.deliveryTag, { backgroundColor: colors.success + "12" }]}>
+                                <Text style={[styles.resultDelivery, { color: colors.success }]}>
+                                  {result.delivery}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+
+            {localResults.length > 0 && (
+              <View style={styles.resultSection}>
+                <View style={styles.resultSectionHeader}>
+                  <View style={[styles.resultBadge, { backgroundColor: colors.surfaceSecondary }]}>
+                    <Search size={14} color={colors.textSecondary} />
+                  </View>
+                  <Text style={[styles.resultSectionTitle, { color: colors.text }]}>
+                    In Your Wishlists ({localResults.length})
+                  </Text>
+                </View>
+                {localResults.map((product) => (
                   <Pressable
-                    key={`serp-${idx}`}
+                    key={product.id}
                     onPress={() =>
-                      router.push({
-                        pathname: "/product-detail",
-                        params: { id: product.id, serpData: JSON.stringify(result) },
-                      })
+                      router.push({ pathname: "/product-detail", params: { id: product.id } })
                     }
                     style={[styles.resultCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
                   >
                     <View style={styles.resultCardContent}>
-                      {result.image ? (
-                        <Image source={{ uri: result.image }} style={styles.resultImage} contentFit="cover" />
-                      ) : null}
+                      <Image source={{ uri: product.image }} style={styles.resultImage} contentFit="cover" />
                       <View style={styles.resultInfo}>
                         <Text style={[styles.resultTitle, { color: colors.text }]} numberOfLines={2}>
                           {product.title}
                         </Text>
                         <View style={styles.resultMeta}>
-                          <Store size={12} color={colors.textTertiary} />
-                          <Text style={[styles.resultStore, { color: colors.textTertiary }]}>
-                            {product.store}
-                          </Text>
-                          {result.rating !== undefined && (
-                            <View style={styles.ratingRow}>
-                              <Star size={10} color="#FFB300" fill="#FFB300" />
-                              <Text style={[styles.ratingText, { color: colors.textTertiary }]}>
-                                {result.rating}
-                              </Text>
-                            </View>
-                          )}
+                          <View style={[styles.storeTag, { backgroundColor: colors.surfaceSecondary }]}>
+                            <Store size={10} color={colors.textTertiary} />
+                            <Text style={[styles.resultStore, { color: colors.textSecondary }]}>
+                              {product.store}
+                            </Text>
+                          </View>
                         </View>
                         <Text style={[styles.resultPrice, { color: colors.primary }]}>
-                          {displayPrice}
+                          {format(product.price, product.currency)}
                         </Text>
-                        {result.delivery && (
-                          <Text style={[styles.resultDelivery, { color: colors.success }]}>
-                            {result.delivery}
-                          </Text>
-                        )}
                       </View>
                     </View>
                   </Pressable>
-                );
-              })}
-            </View>
-          )}
-
-          {localResults.length > 0 && (
-            <View style={styles.resultSection}>
-              <View style={styles.resultSectionHeader}>
-                <Search size={16} color={colors.textSecondary} />
-                <Text style={[styles.resultSectionTitle, { color: colors.text }]}>
-                  In Your Wishlists ({localResults.length})
-                </Text>
-              </View>
-              {localResults.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  variant="horizontal"
-                  onPress={() =>
-                    router.push({ pathname: "/product-detail", params: { id: product.id } })
-                  }
-                />
-              ))}
-            </View>
-          )}
-
-          {hasSearched &&
-            serpResults.length === 0 &&
-            localResults.length === 0 &&
-            !searchMutation.isPending && (
-              <View style={styles.emptySearch}>
-                <Text style={styles.emptyEmoji}>🔍</Text>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>No results found</Text>
-                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                  Try searching with different keywords or change your country
-                </Text>
+                ))}
               </View>
             )}
-        </ScrollView>
+
+            {hasSearched &&
+              serpResults.length === 0 &&
+              localResults.length === 0 &&
+              !searchMutation.isPending && (
+                <View style={styles.emptySearch}>
+                  <Text style={styles.emptyEmoji}>🔍</Text>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>No results found</Text>
+                  <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                    Try different keywords or change your country in settings
+                  </Text>
+                  <Pressable
+                    onPress={handleClear}
+                    style={[styles.emptyBtn, { backgroundColor: colors.primaryFaded }]}
+                  >
+                    <Text style={[styles.emptyBtnText, { color: colors.primary }]}>Clear Search</Text>
+                  </Pressable>
+                </View>
+              )}
+          </ScrollView>
+        </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 30 }}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+          }
+        >
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionRow}>
+              <Sparkles size={16} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Popular Searches</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.popularRow}
+            >
+              {POPULAR_SEARCHES.map((item, idx) => (
+                <Pressable
+                  key={`pop-${idx}`}
+                  onPress={() => handlePopularSearch(item.label)}
+                  style={[styles.popularChip, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                >
+                  <Text style={styles.popularEmoji}>{item.emoji}</Text>
+                  <Text style={[styles.popularLabel, { color: colors.text }]}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
           {availableStores.length > 0 && (
-            <>
-              <SectionHeader title={`Trusted Stores in ${country?.name ?? "your area"}`} />
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionRow}>
+                <Store size={16} color={colors.primary} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Trusted Stores in {country?.name ?? "your area"}
+                </Text>
+              </View>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -461,151 +647,170 @@ export default function ExploreScreen() {
                       <Store size={14} color={colors.primary} />
                     </View>
                     <Text style={[styles.storeChipText, { color: colors.text }]}>{store}</Text>
+                    <ArrowRight size={12} color={colors.textTertiary} />
                   </Pressable>
                 ))}
               </ScrollView>
-            </>
+            </View>
           )}
 
-          <SectionHeader title="Deals & Sales" />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.dealCategoryRow}
-          >
-            {DEAL_CATEGORIES.map((cat) => (
-              <Pressable
-                key={cat.id}
-                onPress={() => handleDealCategoryPress(cat.id)}
-                style={[
-                  styles.dealCategoryChip,
-                  {
-                    backgroundColor: selectedDealCategory === cat.id ? colors.primary : colors.surface,
-                    borderColor: selectedDealCategory === cat.id ? colors.primary : colors.borderLight,
-                  },
-                ]}
-              >
-                <Text style={styles.dealCategoryEmoji}>{cat.emoji}</Text>
-                <Text
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionRow}>
+              <Zap size={16} color={colors.error} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Deals & Sales</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.dealCategoryRow}
+            >
+              {DEAL_CATEGORIES.map((cat) => (
+                <Pressable
+                  key={cat.id}
+                  onPress={() => handleDealCategoryPress(cat.id)}
                   style={[
-                    styles.dealCategoryLabel,
-                    { color: selectedDealCategory === cat.id ? "#FFFFFF" : colors.text },
+                    styles.dealCategoryChip,
+                    {
+                      backgroundColor: selectedDealCategory === cat.id ? colors.primary : colors.surface,
+                      borderColor: selectedDealCategory === cat.id ? colors.primary : colors.borderLight,
+                    },
                   ]}
                 >
-                  {cat.label}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
-          {dealsMutation.isPending && (
-            <View style={styles.dealsLoading}>
-              <ActivityIndicator color={colors.primary} size="small" />
-              <Text style={[styles.dealsLoadingText, { color: colors.textSecondary }]}>
-                Finding deals...
-              </Text>
-            </View>
-          )}
-
-          {dealResults.length > 0 && !dealsMutation.isPending && (
-            <View style={styles.dealsGrid}>
-              {dealResults.slice(0, 6).map((deal, idx) => {
-                const displayPrice = format(deal.price, deal.currency);
-                return (
-                  <Pressable
-                    key={`deal-${idx}`}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/product-detail",
-                        params: { id: `deal_${idx}`, serpData: JSON.stringify(deal) },
-                      })
-                    }
-                    style={[styles.dealCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                  <Text style={styles.dealCategoryEmoji}>{cat.emoji}</Text>
+                  <Text
+                    style={[
+                      styles.dealCategoryLabel,
+                      { color: selectedDealCategory === cat.id ? "#FFFFFF" : colors.text },
+                    ]}
                   >
-                    {deal.image ? (
-                      <Image source={{ uri: deal.image }} style={styles.dealImage} contentFit="cover" />
-                    ) : (
-                      <View style={[styles.dealImagePlaceholder, { backgroundColor: colors.surfaceSecondary }]}>
-                        <Tag size={20} color={colors.textTertiary} />
-                      </View>
-                    )}
-                    <View style={styles.dealInfo}>
-                      <Text style={[styles.dealTitle, { color: colors.text }]} numberOfLines={2}>
-                        {deal.title}
-                      </Text>
-                      <Text style={[styles.dealStore, { color: colors.textTertiary }]}>{deal.store}</Text>
-                      <Text style={[styles.dealPrice, { color: colors.primary }]}>{displayPrice}</Text>
-                    </View>
-                    <View style={[styles.dealBadge, { backgroundColor: colors.error + "15" }]}>
-                      <Flame size={10} color={colors.error} />
-                      <Text style={[styles.dealBadgeText, { color: colors.error }]}>Deal</Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
+                    {cat.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
 
-          <SectionHeader title="Browse Categories" />
-          <View style={styles.categoriesGrid}>
-            {allCategories.map((category) => (
-              <Pressable
-                key={category.id}
-                onPress={() => handleCategoryPress(category.name)}
-                style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
-              >
-                <Text style={styles.categoryEmoji}>{category.emoji}</Text>
-                <Text style={[styles.categoryName, { color: colors.text }]}>{category.name}</Text>
-              </Pressable>
-            ))}
+            {dealsMutation.isPending && (
+              <View style={styles.dealsLoading}>
+                <ActivityIndicator color={colors.primary} size="small" />
+                <Text style={[styles.dealsLoadingText, { color: colors.textSecondary }]}>
+                  Finding deals...
+                </Text>
+              </View>
+            )}
+
+            {dealResults.length > 0 && !dealsMutation.isPending && (
+              <View style={styles.dealsGrid}>
+                {dealResults.slice(0, 6).map((deal, idx) => {
+                  const displayPrice = format(deal.price, deal.currency);
+                  return (
+                    <Pressable
+                      key={`deal-${idx}`}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/product-detail",
+                          params: { id: `deal_${idx}`, serpData: JSON.stringify(deal) },
+                        })
+                      }
+                      style={[styles.dealCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                    >
+                      {deal.image ? (
+                        <Image source={{ uri: deal.image }} style={styles.dealImage} contentFit="cover" />
+                      ) : (
+                        <View style={[styles.dealImagePlaceholder, { backgroundColor: colors.surfaceSecondary }]}>
+                          <Tag size={20} color={colors.textTertiary} />
+                        </View>
+                      )}
+                      <View style={styles.dealInfo}>
+                        <Text style={[styles.dealTitle, { color: colors.text }]} numberOfLines={2}>
+                          {deal.title}
+                        </Text>
+                        <Text style={[styles.dealStore, { color: colors.textTertiary }]}>{deal.store}</Text>
+                        <Text style={[styles.dealPrice, { color: colors.primary }]}>{displayPrice}</Text>
+                      </View>
+                      <View style={[styles.dealBadge, { backgroundColor: colors.error + "15" }]}>
+                        <Flame size={10} color={colors.error} />
+                        <Text style={[styles.dealBadgeText, { color: colors.error }]}>Deal</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionRow}>
+              <ShoppingBag size={16} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Browse Categories</Text>
+            </View>
+            <View style={styles.categoriesGrid}>
+              {BROWSE_CATEGORIES.map((category) => (
+                <Pressable
+                  key={category.id}
+                  onPress={() => handleCategoryPress(category.name)}
+                  style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                >
+                  <Text style={styles.categoryEmoji}>{category.emoji}</Text>
+                  <Text style={[styles.categoryName, { color: colors.text }]}>{category.name}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
 
           {trendingProducts.length > 0 && (
-            <>
-              <SectionHeader title="Trending Now" />
-              <View style={styles.trendingBanner}>
-                <View style={[styles.trendingCard, { backgroundColor: colors.primaryFaded }]}>
-                  <TrendingUp size={20} color={colors.primary} />
-                  <Text style={[styles.trendingTitle, { color: colors.primary }]}>
-                    Most wishlisted this week
-                  </Text>
-                </View>
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionRow}>
+                <TrendingUp size={16} color={colors.primary} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Trending Now</Text>
+              </View>
+              <View style={[styles.trendingBanner, { backgroundColor: colors.primaryFaded }]}>
+                <TrendingUp size={18} color={colors.primary} />
+                <Text style={[styles.trendingBannerText, { color: colors.primary }]}>
+                  Most wishlisted this week
+                </Text>
               </View>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.horizontalList}
               >
-                {trendingProducts.map((item, index) => (
-                  <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
-                    <ProductCard
-                      product={item}
+                {trendingProducts.map((item, index) => {
+                  const displayPrice = format(item.price, item.currency);
+                  return (
+                    <Pressable
+                      key={item.id}
                       onPress={() =>
                         router.push({ pathname: "/product-detail", params: { id: item.id } })
                       }
-                    />
-                  </View>
-                ))}
+                      style={[
+                        styles.trendingCard,
+                        { backgroundColor: colors.surface, borderColor: colors.borderLight },
+                        index > 0 ? { marginLeft: 12 } : undefined,
+                      ]}
+                    >
+                      <Image source={{ uri: item.image }} style={styles.trendingImage} contentFit="cover" />
+                      <View style={styles.trendingInfo}>
+                        <Text style={[styles.trendingTitle, { color: colors.text }]} numberOfLines={2}>
+                          {item.title}
+                        </Text>
+                        <Text style={[styles.trendingStore, { color: colors.textTertiary }]}>{item.store}</Text>
+                        <View style={styles.trendingBottom}>
+                          <Text style={[styles.trendingPrice, { color: colors.primary }]}>{displayPrice}</Text>
+                          {item.rating !== undefined && (
+                            <View style={styles.ratingRow}>
+                              <Star size={10} color="#FFB300" fill="#FFB300" />
+                              <Text style={[styles.ratingText, { color: colors.textSecondary }]}>
+                                {item.rating}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
-            </>
-          )}
-
-          {allProducts.length > 0 && (
-            <>
-              <SectionHeader title="Featured Products" />
-              <View style={styles.featuredList}>
-                {allProducts.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    variant="horizontal"
-                    onPress={() =>
-                      router.push({ pathname: "/product-detail", params: { id: product.id } })
-                    }
-                  />
-                ))}
-              </View>
-            </>
+            </View>
           )}
         </ScrollView>
       )}
@@ -624,7 +829,7 @@ const styles = StyleSheet.create({
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: 16,
   },
   headerRight: {
@@ -647,6 +852,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "800" as const,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 13,
+    marginTop: 2,
   },
   locationChip: {
     flexDirection: "row",
@@ -655,6 +865,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     gap: 4,
+    maxWidth: 150,
   },
   locationChipText: {
     fontSize: 12,
@@ -678,7 +889,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 12,
     gap: 8,
     marginTop: 10,
@@ -728,6 +939,40 @@ const styles = StyleSheet.create({
   },
   historyMeta: {
     fontSize: 12,
+  },
+  sectionContainer: {
+    marginTop: 24,
+  },
+  sectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700" as const,
+  },
+  popularRow: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  popularChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  popularEmoji: {
+    fontSize: 16,
+  },
+  popularLabel: {
+    fontSize: 13,
+    fontWeight: "600" as const,
   },
   storesRow: {
     paddingHorizontal: 20,
@@ -789,7 +1034,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     paddingHorizontal: 20,
     gap: 10,
-    marginBottom: 8,
   },
   dealCard: {
     width: "47%" as unknown as number,
@@ -858,47 +1102,119 @@ const styles = StyleSheet.create({
     fontSize: 28,
   },
   categoryName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600" as const,
   },
   trendingBanner: {
-    paddingHorizontal: 20,
-    marginBottom: 14,
-  },
-  trendingCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 14,
-    borderRadius: 14,
-    gap: 10,
+    marginHorizontal: 20,
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+    marginBottom: 14,
   },
-  trendingTitle: {
-    fontSize: 14,
+  trendingBannerText: {
+    fontSize: 13,
     fontWeight: "600" as const,
   },
   horizontalList: {
     paddingHorizontal: 20,
   },
-  featuredList: {
-    paddingHorizontal: 20,
+  trendingCard: {
+    width: 160,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  trendingImage: {
+    width: "100%",
+    height: 120,
+  },
+  trendingInfo: {
+    padding: 10,
+    gap: 3,
+  },
+  trendingTitle: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    lineHeight: 17,
+  },
+  trendingStore: {
+    fontSize: 11,
+  },
+  trendingBottom: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  trendingPrice: {
+    fontSize: 15,
+    fontWeight: "700" as const,
   },
   searchResults: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 4,
     paddingBottom: 40,
+  },
+  skeletonContainer: {
+    paddingHorizontal: 20,
+  },
+  loadingHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+  },
+  skeletonCard: {
+    flexDirection: "row",
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 10,
+    gap: 12,
+  },
+  skeletonImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+  },
+  skeletonContent: {
+    flex: 1,
+    gap: 8,
+    justifyContent: "center",
+  },
+  skeletonLine: {
+    height: 12,
+    borderRadius: 6,
   },
   resultSection: {
     marginBottom: 20,
+    paddingHorizontal: 20,
   },
   resultSectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 14,
+  },
+  resultBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
   resultSectionTitle: {
     fontSize: 16,
     fontWeight: "700" as const,
+  },
+  resultSectionSub: {
+    fontSize: 12,
+    marginTop: 1,
   },
   resultCard: {
     borderRadius: 14,
@@ -915,52 +1231,72 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 10,
   },
+  resultImagePlaceholder: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   resultInfo: {
     flex: 1,
-    gap: 4,
+    gap: 6,
   },
   resultTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600" as const,
-    lineHeight: 20,
+    lineHeight: 19,
   },
   resultMeta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  storeTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 4,
   },
   resultStore: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: "500" as const,
   },
   ratingRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    gap: 3,
   },
   ratingText: {
     fontSize: 11,
-  },
-  resultPrice: {
-    fontSize: 18,
-    fontWeight: "800" as const,
-    marginTop: 4,
-  },
-  resultDelivery: {
-    fontSize: 12,
     fontWeight: "500" as const,
   },
-  loadingState: {
+  resultBottom: {
+    flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 60,
-    gap: 16,
+    justifyContent: "space-between",
   },
-  loadingText: {
-    fontSize: 15,
+  resultPrice: {
+    fontSize: 17,
+    fontWeight: "800" as const,
+  },
+  deliveryTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  resultDelivery: {
+    fontSize: 10,
+    fontWeight: "600" as const,
   },
   emptySearch: {
     alignItems: "center",
     paddingVertical: 60,
-    gap: 8,
+    paddingHorizontal: 40,
+    gap: 10,
   },
   emptyEmoji: {
     fontSize: 48,
@@ -973,6 +1309,16 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 14,
     textAlign: "center",
+    lineHeight: 20,
+  },
+  emptyBtn: {
     paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  emptyBtnText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
   },
 });
