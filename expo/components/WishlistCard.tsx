@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
 import { View, Text, StyleSheet, Pressable, Animated } from "react-native";
 import { Image } from "expo-image";
-import { Users, Lock } from "lucide-react-native";
+import { Users, Lock, ShoppingBag } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { Wishlist } from "@/types";
 
@@ -18,6 +18,7 @@ export default React.memo(function WishlistCard({
 }: WishlistCardProps) {
   const colors = useAppColors();
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const themeColor = wishlist.color || colors.primary;
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true }).start();
@@ -26,6 +27,9 @@ export default React.memo(function WishlistCard({
   const handlePressOut = () => {
     Animated.spring(scaleAnim, { toValue: 1, friction: 3, useNativeDriver: true }).start();
   };
+
+  const purchasedCount = wishlist.items.filter((i) => i.isPurchased).length;
+  const progress = wishlist.items.length > 0 ? purchasedCount / wishlist.items.length : 0;
 
   if (variant === "row") {
     return (
@@ -36,16 +40,31 @@ export default React.memo(function WishlistCard({
             { backgroundColor: colors.surface, borderColor: colors.borderLight, transform: [{ scale: scaleAnim }] },
           ]}
         >
-          <View style={[styles.rowEmoji, { backgroundColor: wishlist.color + "18" }]}>
-            <Text style={styles.emojiText}>{wishlist.emoji}</Text>
+          <View style={[styles.rowEmoji, { backgroundColor: themeColor + "18" }]}>
+            <Text style={styles.rowEmojiText}>{wishlist.emoji}</Text>
           </View>
           <View style={styles.rowContent}>
             <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
               {wishlist.title}
             </Text>
-            <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>
-              {wishlist.itemCount} items
-            </Text>
+            <View style={styles.rowMeta}>
+              <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>
+                {wishlist.items.length} {wishlist.items.length === 1 ? "item" : "items"}
+              </Text>
+              {wishlist.isShared && (
+                <View style={styles.rowSharedDot}>
+                  <Users size={10} color={colors.textTertiary} />
+                  <Text style={[styles.rowSharedText, { color: colors.textTertiary }]}>
+                    {wishlist.collaborators.length}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {wishlist.items.length > 0 && (
+              <View style={[styles.rowProgress, { backgroundColor: colors.surfaceSecondary }]}>
+                <View style={[styles.rowProgressFill, { width: `${progress * 100}%`, backgroundColor: themeColor }]} />
+              </View>
+            )}
           </View>
           <View style={styles.rowRight}>
             {wishlist.isShared ? (
@@ -53,13 +72,13 @@ export default React.memo(function WishlistCard({
                 {wishlist.collaborators.slice(0, 3).map((c, i) => (
                   <Image
                     key={c.id}
-                    source={{ uri: c.avatar }}
+                    source={c.avatar ? { uri: c.avatar } : require("@/assets/images/icon.png")}
                     style={[styles.miniAvatar, { marginLeft: i > 0 ? -8 : 0, borderColor: colors.surface }]}
                   />
                 ))}
               </View>
             ) : (
-              <Lock size={16} color={colors.textTertiary} />
+              <Lock size={14} color={colors.textTertiary} />
             )}
           </View>
         </Animated.View>
@@ -75,25 +94,30 @@ export default React.memo(function WishlistCard({
           { backgroundColor: colors.surface, borderColor: colors.borderLight, transform: [{ scale: scaleAnim }] },
         ]}
       >
-        <View style={[styles.emojiContainer, { backgroundColor: wishlist.color + "18" }]}>
-          <Text style={styles.gridEmoji}>{wishlist.emoji}</Text>
-        </View>
-        <Text style={[styles.gridTitle, { color: colors.text }]} numberOfLines={1}>
-          {wishlist.title}
-        </Text>
-        <Text style={[styles.gridSubtitle, { color: colors.textSecondary }]}>
-          {wishlist.itemCount} {wishlist.itemCount === 1 ? "item" : "items"}
-        </Text>
-        <View style={styles.gridFooter}>
-          {wishlist.isShared ? (
-            <View style={styles.sharedIndicator}>
-              <Users size={12} color={colors.primary} />
-              <Text style={[styles.sharedText, { color: colors.primary }]}>
-                {wishlist.collaborators.length}
-              </Text>
+        <View style={[styles.gridHeader, { backgroundColor: themeColor + "10" }]}>
+          <View style={[styles.emojiContainer, { backgroundColor: themeColor + "20" }]}>
+            <Text style={styles.gridEmoji}>{wishlist.emoji}</Text>
+          </View>
+          {wishlist.isShared && (
+            <View style={[styles.sharedBadge, { backgroundColor: "#00B89420" }]}>
+              <Users size={10} color="#00B894" />
             </View>
-          ) : (
-            <Lock size={12} color={colors.textTertiary} />
+          )}
+        </View>
+        <View style={styles.gridBody}>
+          <Text style={[styles.gridTitle, { color: colors.text }]} numberOfLines={1}>
+            {wishlist.title}
+          </Text>
+          <View style={styles.gridMetaRow}>
+            <ShoppingBag size={11} color={colors.textTertiary} />
+            <Text style={[styles.gridSubtitle, { color: colors.textSecondary }]}>
+              {wishlist.items.length} {wishlist.items.length === 1 ? "item" : "items"}
+            </Text>
+          </View>
+          {wishlist.items.length > 0 && (
+            <View style={[styles.gridProgress, { backgroundColor: colors.surfaceSecondary }]}>
+              <View style={[styles.gridProgressFill, { width: `${progress * 100}%`, backgroundColor: themeColor }]} />
+            </View>
           )}
         </View>
       </Animated.View>
@@ -103,71 +127,116 @@ export default React.memo(function WishlistCard({
 
 const styles = StyleSheet.create({
   gridCard: {
-    width: 155,
-    padding: 16,
+    width: 160,
     borderRadius: 20,
     borderWidth: 1,
-    gap: 6,
+    overflow: "hidden",
+  },
+  gridHeader: {
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    alignItems: "flex-start",
+    position: "relative",
   },
   emojiContainer: {
     width: 48,
     height: 48,
-    borderRadius: 14,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 4,
   },
   gridEmoji: {
     fontSize: 24,
+  },
+  sharedBadge: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  gridBody: {
+    padding: 14,
+    paddingTop: 10,
+    gap: 4,
   },
   gridTitle: {
     fontSize: 15,
     fontWeight: "600" as const,
   },
-  gridSubtitle: {
-    fontSize: 12,
-  },
-  gridFooter: {
-    marginTop: 4,
-  },
-  sharedIndicator: {
+  gridMetaRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
   },
-  sharedText: {
+  gridSubtitle: {
     fontSize: 12,
-    fontWeight: "500" as const,
+  },
+  gridProgress: {
+    height: 4,
+    borderRadius: 2,
+    overflow: "hidden",
+    marginTop: 6,
+  },
+  gridProgressFill: {
+    height: "100%",
+    borderRadius: 2,
   },
   rowCard: {
     flexDirection: "row",
     alignItems: "center",
     padding: 14,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     marginBottom: 10,
     gap: 12,
   },
   rowEmoji: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
   },
-  emojiText: {
+  rowEmojiText: {
     fontSize: 22,
   },
   rowContent: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   rowTitle: {
     fontSize: 15,
     fontWeight: "600" as const,
   },
+  rowMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   rowSubtitle: {
     fontSize: 13,
+  },
+  rowSharedDot: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  rowSharedText: {
+    fontSize: 11,
+  },
+  rowProgress: {
+    height: 3,
+    borderRadius: 1.5,
+    overflow: "hidden",
+    marginTop: 4,
+  },
+  rowProgressFill: {
+    height: "100%",
+    borderRadius: 1.5,
   },
   rowRight: {
     alignItems: "flex-end",

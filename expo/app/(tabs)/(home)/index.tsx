@@ -6,18 +6,16 @@ import {
   ScrollView,
   Pressable,
   Animated,
-  TextInput,
   RefreshControl,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Search, Gift, Sparkles, Plus } from "lucide-react-native";
+import { Plus, ChevronRight, Sparkles } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import WishlistCard from "@/components/WishlistCard";
 import ProductCard from "@/components/ProductCard";
-import SectionHeader from "@/components/SectionHeader";
 
 const appLogo = require("@/assets/images/logo.png");
 
@@ -25,7 +23,7 @@ export default function HomeScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, myLists, sharedLists, allProducts, trendingProducts, refreshWishlists } = useWishlistContext();
+  const { user, myLists, sharedLists, trendingProducts, refreshWishlists } = useWishlistContext();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(() => {
@@ -33,6 +31,7 @@ export default function HomeScreen() {
     refreshWishlists();
     setTimeout(() => setRefreshing(false), 1000);
   }, [refreshWishlists]);
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -40,12 +39,12 @@ export default function HomeScreen() {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 500,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 600,
+        duration: 500,
         useNativeDriver: true,
       }),
     ]).start();
@@ -60,7 +59,11 @@ export default function HomeScreen() {
     return "Good night";
   }, []);
 
-  const recentProducts = allProducts.slice(0, 4);
+  const totalItems = useMemo(() => {
+    return [...myLists, ...sharedLists].reduce((sum, l) => sum + l.items.length, 0);
+  }, [myLists, sharedLists]);
+
+  const allLists = useMemo(() => [...myLists, ...sharedLists], [myLists, sharedLists]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -89,8 +92,8 @@ export default function HomeScreen() {
                 <Text style={[styles.greeting, { color: colors.textSecondary }]}>
                   {greeting}
                 </Text>
-                <Text style={[styles.userName, { color: colors.text }]}>
-                  {user.name} <Text style={styles.wave}>{"👋"}</Text>
+                <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
+                  {user.name}
                 </Text>
               </View>
             </View>
@@ -102,64 +105,64 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View style={[styles.searchBar, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
-            <Search size={18} color={colors.textTertiary} />
-            <TextInput
-              placeholder="Search products, lists..."
-              placeholderTextColor={colors.textTertiary}
-              style={[styles.searchInput, { color: colors.text }]}
-              editable={false}
-              onPressIn={() => router.push("/(tabs)/explore")}
-            />
-          </View>
-
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
-              <Gift size={18} color={colors.primary} />
-              <Text style={[styles.statNumber, { color: colors.primary }]}>
-                {myLists.length + sharedLists.length}
-              </Text>
+          <View style={styles.quickStats}>
+            <View style={[styles.statPill, { backgroundColor: colors.primaryFaded }]}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>{allLists.length}</Text>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Lists</Text>
             </View>
-            <View style={[styles.statCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
-              <Sparkles size={18} color={colors.primary} />
-              <Text style={[styles.statNumber, { color: colors.primary }]}>
-                {allProducts.length}
-              </Text>
+            <View style={[styles.statPill, { backgroundColor: colors.primaryFaded }]}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>{totalItems}</Text>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Items</Text>
             </View>
-            <View style={[styles.statCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
-              <Text style={styles.statEmoji}>{"🤝"}</Text>
-              <Text style={[styles.statNumber, { color: colors.primary }]}>
-                {sharedLists.length}
-              </Text>
+            <View style={[styles.statPill, { backgroundColor: colors.primaryFaded }]}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>{sharedLists.length}</Text>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Shared</Text>
             </View>
           </View>
         </Animated.View>
 
-        <SectionHeader title="My Lists" onSeeAll={() => router.push("/create-list")} />
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>My Wishlists</Text>
+          {myLists.length > 0 && (
+            <Pressable
+              onPress={() => router.push("/create-list")}
+              style={[styles.sectionAction, { backgroundColor: colors.primaryFaded }]}
+            >
+              <Plus size={14} color={colors.primary} />
+              <Text style={[styles.sectionActionText, { color: colors.primary }]}>New</Text>
+            </Pressable>
+          )}
+        </View>
+
         {myLists.length === 0 ? (
           <Pressable
             onPress={() => router.push("/create-list")}
-            style={[styles.emptyListCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "30" }]}
+            style={[styles.emptyListCard, { borderColor: colors.border }]}
+            testID="create-first-wishlist"
           >
-            <View style={[styles.emptyListIcon, { backgroundColor: colors.primary + "20" }]}>
-              <Plus size={24} color={colors.primary} />
+            <View style={[styles.emptyIconWrap, { backgroundColor: colors.primaryFaded }]}>
+              <Plus size={28} color={colors.primary} />
             </View>
-            <Text style={[styles.emptyListTitle, { color: colors.text }]}>Create your first wishlist</Text>
-            <Text style={[styles.emptyListDesc, { color: colors.textSecondary }]}>Start saving products you love</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>Create your first wishlist</Text>
+            <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
+              Start saving products and gift ideas
+            </Text>
           </Pressable>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalList}
+          >
             <Pressable
               onPress={() => router.push("/create-list")}
-              style={[styles.createListCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "30" }]}
+              style={[styles.createCard, { borderColor: colors.primary + "30" }]}
+              testID="create-new-wishlist"
             >
-              <View style={[styles.createListIconWrap, { backgroundColor: colors.primary + "20" }]}>
-                <Plus size={22} color={colors.primary} />
+              <View style={[styles.createIconCircle, { backgroundColor: colors.primaryFaded }]}>
+                <Plus size={24} color={colors.primary} />
               </View>
-              <Text style={[styles.createListText, { color: colors.primary }]}>New List</Text>
+              <Text style={[styles.createCardText, { color: colors.primary }]}>New</Text>
             </Pressable>
             {myLists.map((item) => (
               <View key={item.id} style={{ marginLeft: 12 }}>
@@ -174,8 +177,17 @@ export default function HomeScreen() {
 
         {sharedLists.length > 0 && (
           <>
-            <SectionHeader title="Shared With Me" />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Shared With Me</Text>
+              <View style={[styles.countBadge, { backgroundColor: colors.primaryFaded }]}>
+                <Text style={[styles.countBadgeText, { color: colors.primary }]}>{sharedLists.length}</Text>
+              </View>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            >
               {sharedLists.map((item, index) => (
                 <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
                   <WishlistCard
@@ -188,29 +200,37 @@ export default function HomeScreen() {
           </>
         )}
 
-        <SectionHeader title="Recently Added" onSeeAll={() => router.push("/(tabs)/explore")} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-          {recentProducts.map((item, index) => (
-            <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
-              <ProductCard
-                product={item}
-                onPress={() => router.push({ pathname: "/product-detail", params: { id: item.id } })}
-              />
+        {trendingProducts.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <Sparkles size={18} color={colors.primary} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Trending</Text>
+              </View>
+              <Pressable
+                onPress={() => router.push("/(tabs)/explore")}
+                style={styles.seeAllBtn}
+              >
+                <Text style={[styles.seeAllText, { color: colors.primary }]}>See All</Text>
+                <ChevronRight size={16} color={colors.primary} />
+              </Pressable>
             </View>
-          ))}
-        </ScrollView>
-
-        <SectionHeader title="Trending Wishes" onSeeAll={() => router.push("/(tabs)/explore")} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-          {trendingProducts.map((item, index) => (
-            <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
-              <ProductCard
-                product={item}
-                onPress={() => router.push({ pathname: "/product-detail", params: { id: item.id } })}
-              />
-            </View>
-          ))}
-        </ScrollView>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            >
+              {trendingProducts.slice(0, 6).map((item, index) => (
+                <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
+                  <ProductCard
+                    product={item}
+                    onPress={() => router.push({ pathname: "/product-detail", params: { id: item.id } })}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -234,6 +254,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flex: 1,
   },
   logo: {
     width: 42,
@@ -242,52 +263,35 @@ const styles = StyleSheet.create({
   },
   greetingContent: {
     gap: 2,
+    flex: 1,
   },
   greeting: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500" as const,
   },
   userName: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "800" as const,
   },
-  wave: {
-    fontSize: 24,
-  },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 3,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    marginLeft: 12,
   },
-  searchBar: {
+  quickStats: {
     flexDirection: "row",
+    gap: 10,
+  },
+  statPill: {
+    flex: 1,
     alignItems: "center",
-    paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 14,
-    gap: 10,
-    borderWidth: 1,
-    marginBottom: 20,
+    gap: 2,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    padding: 0,
-  },
-  statsRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 14,
-    borderRadius: 16,
-    gap: 4,
-    borderWidth: 1,
-  },
-  statNumber: {
+  statValue: {
     fontSize: 20,
     fontWeight: "800" as const,
   },
@@ -295,54 +299,99 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "500" as const,
   },
-  statEmoji: {
-    fontSize: 18,
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 14,
+    marginTop: 24,
+  },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700" as const,
+  },
+  sectionAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    gap: 4,
+  },
+  sectionActionText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+  },
+  countBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  countBadgeText: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+  },
+  seeAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: "500" as const,
   },
   horizontalList: {
     paddingHorizontal: 20,
   },
   emptyListCard: {
     marginHorizontal: 20,
-    padding: 28,
-    borderRadius: 20,
+    padding: 32,
+    borderRadius: 24,
     borderWidth: 1.5,
     borderStyle: "dashed" as const,
     alignItems: "center" as const,
     gap: 10,
   },
-  emptyListIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+  emptyIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: "center" as const,
     alignItems: "center" as const,
     marginBottom: 4,
   },
-  emptyListTitle: {
-    fontSize: 16,
+  emptyTitle: {
+    fontSize: 17,
     fontWeight: "700" as const,
   },
-  emptyListDesc: {
+  emptyDesc: {
     fontSize: 13,
+    textAlign: "center" as const,
   },
-  createListCard: {
-    width: 120,
-    padding: 16,
+  createCard: {
+    width: 90,
     borderRadius: 20,
     borderWidth: 1.5,
     borderStyle: "dashed" as const,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    gap: 10,
+    gap: 8,
+    paddingVertical: 20,
   },
-  createListIconWrap: {
+  createIconCircle: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: 22,
     justifyContent: "center" as const,
     alignItems: "center" as const,
   },
-  createListText: {
+  createCardText: {
     fontSize: 13,
     fontWeight: "600" as const,
   },
