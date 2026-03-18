@@ -25,14 +25,17 @@ import {
   Search,
   X,
   Check,
+  ScanBarcode,
+  Type,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
+import { useLocation } from "@/providers/LocationProvider";
 import { Product } from "@/types";
 import { generateObject } from "@rork-ai/toolkit-sdk";
-import { searchProducts, scrapeProductUrl, SerpApiResult } from "@/lib/api";
+import { searchProducts, scrapeProductUrl, searchByBarcode, SerpApiResult } from "@/lib/api";
 import { z } from "zod";
 
 const productSchema = z.object({
@@ -44,17 +47,38 @@ const productSchema = z.object({
   searchQuery: z.string().describe("Best search query to find this product online"),
 });
 
+const barcodeSchema = z.object({
+  barcodeValue: z.string().describe("The barcode number (UPC, EAN, ISBN, QR code content, or any other barcode value). Return ONLY the numeric or alphanumeric code."),
+  barcodeType: z.string().describe("Type of barcode detected: UPC-A, UPC-E, EAN-13, EAN-8, ISBN, QR, Code128, Code39, or Unknown"),
+  productHint: z.string().optional().describe("If the barcode area has any visible product name or brand text near it, include it here"),
+  confidence: z.enum(["high", "medium", "low"]).describe("Confidence level that a barcode was detected and correctly read"),
+});
+
+const textExtractSchema = z.object({
+  extractedTexts: z.array(z.object({
+    text: z.string().describe("The extracted text content"),
+    type: z.enum(["product_name", "brand", "price", "description", "barcode", "url", "other"]).describe("What type of text this appears to be"),
+  })).describe("All text found in the image, categorized by type"),
+  suggestedSearchQuery: z.string().describe("Best search query to find this product based on all extracted text"),
+  productName: z.string().optional().describe("The most likely product name from all extracted text"),
+  brand: z.string().optional().describe("Brand name if found in text"),
+  price: z.string().optional().describe("Price if found in text"),
+});
+
 type DetectedProduct = z.infer<typeof productSchema>;
+type BarcodeResult = z.infer<typeof barcodeSchema>;
+type TextExtractResult = z.infer<typeof textExtractSchema>;
 
 export default function AddScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { serpApiCountryCode } = useLocation();
 
   const { wishlists, addProductToWishlist } = useWishlistContext();
   const hasWishlists = wishlists.length > 0;
 
-  const [mode, setMode] = useState<"menu" | "link" | "manual" | "image">("menu");
+  const [mode, setMode] = useState<"menu" | "link" | "manual" | "image" | "barcode" | "text">("menu");
   const [productUrl, setProductUrl] = useState("");
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
@@ -74,9 +98,28 @@ export default function AddScreen() {
   const [selectedLinkResult, setSelectedLinkResult] = useState<SerpApiResult | null>(null);
   const [linkSelectedList, setLinkSelectedList] = useState<string>("");
 
+  const [barcodeImage, setBarcodeImage] = useState<string | null>(null);
+  const [isReadingBarcode, setIsReadingBarcode] = useState(false);
+  const [barcodeResult, setBarcodeResult] = useState<BarcodeResult | null>(null);
+  const [barcodeSearchResults, setBarcodeSearchResults] = useState<SerpApiResult[]>([]);
+  const [selectedBarcodeResult, setSelectedBarcodeResult] = useState<SerpApiResult | null>(null);
+  const [barcodeSelectedList, setBarcodeSelectedList] = useState<string>("");
+  const [isBarcodeSearching, setIsBarcodeSearching] = useState(false);
+  const [manualBarcode, setManualBarcode] = useState("");
+
+  const [textImage, setTextImage] = useState<string | null>(null);
+  const [isExtractingText, setIsExtractingText] = useState(false);
+  const [textExtractResult, setTextExtractResult] = useState<TextExtractResult | null>(null);
+  const [textSearchResults, setTextSearchResults] = useState<SerpApiResult[]>([]);
+  const [selectedTextResult, setSelectedTextResult] = useState<SerpApiResult | null>(null);
+  const [textSelectedList, setTextSelectedList] = useState<string>("");
+  const [isTextSearching, setIsTextSearching] = useState(false);
+
   const scaleAnim1 = useRef(new Animated.Value(1)).current;
   const scaleAnim2 = useRef(new Animated.Value(1)).current;
   const scaleAnim3 = useRef(new Animated.Value(1)).current;
+  const scaleAnim4 = useRef(new Animated.Value(1)).current;
+  const scaleAnim5 = useRef(new Animated.Value(1)).current;
 
   const createPressHandlers = (anim: Animated.Value) => ({
     onPressIn: () => {
@@ -95,6 +138,27 @@ export default function AddScreen() {
     setIsDetecting(false);
     setIsSearching(false);
     setSelectedList("");
+  };
+
+  const resetBarcodeState = () => {
+    setBarcodeImage(null);
+    setBarcodeResult(null);
+    setBarcodeSearchResults([]);
+    setSelectedBarcodeResult(null);
+    setBarcodeSelectedList("");
+    setIsReadingBarcode(false);
+    setIsBarcodeSearching(false);
+    setManualBarcode("");
+  };
+
+  const resetTextState = () => {
+    setTextImage(null);
+    setTextExtractResult(null);
+    setTextSearchResults([]);
+    setSelectedTextResult(null);
+    setTextSelectedList("");
+    setIsExtractingText(false);
+    setIsTextSearching(false);
   };
 
   const handlePickImage = async () => {
@@ -204,7 +268,7 @@ export default function AddScreen() {
     setIsSearching(true);
     try {
       console.log("[Search] Searching for:", query);
-      const { results, error } = await searchProducts(query);
+      const { results, error } = await searchProducts(query, serpApiCountryCode);
 
       if (error) {
         console.log("[Search] Error:", error);
@@ -243,7 +307,7 @@ export default function AddScreen() {
       category: detectedProduct?.category || "Other",
       isPurchased: false,
       addedAt: new Date().toISOString().split("T")[0],
-      country: "US",
+      country: serpApiCountryCode.toUpperCase(),
       rating: selectedResult?.rating,
     };
 
@@ -296,7 +360,7 @@ export default function AddScreen() {
 
       if (result.title) {
         console.log("[Link] Searching for scraped product:", result.title);
-        const { results } = await searchProducts(result.title);
+        const { results } = await searchProducts(result.title, serpApiCountryCode);
         setLinkSearchResults(results);
       }
     } catch (err) {
@@ -331,7 +395,7 @@ export default function AddScreen() {
       category: "Other",
       isPurchased: false,
       addedAt: new Date().toISOString().split("T")[0],
-      country: "US",
+      country: serpApiCountryCode.toUpperCase(),
       rating: selectedLinkResult?.rating,
     };
 
@@ -364,7 +428,7 @@ export default function AddScreen() {
       category: "Other",
       isPurchased: false,
       addedAt: new Date().toISOString().split("T")[0],
-      country: "US",
+      country: serpApiCountryCode.toUpperCase(),
     };
 
     addProductToWishlist(selectedList, newProduct);
@@ -377,6 +441,724 @@ export default function AddScreen() {
     setSelectedList("");
     setMode("menu");
   };
+
+  const pickImageForBarcode = async (useCamera: boolean) => {
+    try {
+      let result: ImagePicker.ImagePickerResult;
+
+      if (useCamera) {
+        const permResult = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permResult.granted) {
+          Alert.alert("Permission Needed", "Please allow camera access.");
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          quality: 0.8,
+          base64: true,
+        });
+      } else {
+        const permResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permResult.granted) {
+          Alert.alert("Permission Needed", "Please allow access to your photo library.");
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          quality: 0.8,
+          base64: true,
+        });
+      }
+
+      if (result.canceled || !result.assets[0]) return;
+
+      const asset = result.assets[0];
+      setBarcodeImage(asset.uri);
+      setBarcodeResult(null);
+      setBarcodeSearchResults([]);
+      setSelectedBarcodeResult(null);
+
+      if (asset.base64) {
+        await readBarcodeFromImage(asset.base64, asset.mimeType || "image/jpeg");
+      } else {
+        Alert.alert("Error", "Could not read image data.");
+      }
+    } catch (err) {
+      console.error("[Barcode] Image pick error:", err);
+      Alert.alert("Error", "Failed to pick image.");
+    }
+  };
+
+  const readBarcodeFromImage = async (base64: string, mimeType: string) => {
+    setIsReadingBarcode(true);
+    try {
+      console.log("[AI] Reading barcode from image...");
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const result = await generateObject({
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Look at this image carefully. Find any barcode, QR code, UPC code, EAN code, ISBN, or similar machine-readable code. Read the numeric or alphanumeric value from the barcode. Also note any product name or brand text visible near the barcode. If no barcode is found, set confidence to 'low' and try to read any numbers that look like product codes.",
+              },
+              {
+                type: "image",
+                image: `data:${mimeType};base64,${base64}`,
+              },
+            ],
+          },
+        ],
+        schema: barcodeSchema,
+      });
+
+      console.log("[AI] Barcode result:", JSON.stringify(result));
+      setBarcodeResult(result);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      if (result.confidence !== "low" && result.barcodeValue) {
+        await searchBarcode(result.barcodeValue, result.productHint);
+      } else if (result.productHint) {
+        await searchBarcode(result.productHint);
+      }
+    } catch (err) {
+      console.error("[AI] Barcode reading failed:", err);
+      Alert.alert("Scan Failed", "Could not read barcode. Try entering it manually or take a clearer photo.");
+    } finally {
+      setIsReadingBarcode(false);
+    }
+  };
+
+  const searchBarcode = async (code: string, hint?: string) => {
+    setIsBarcodeSearching(true);
+    try {
+      const searchQuery = hint ? `${code} ${hint}` : code;
+      console.log("[Barcode] Searching for:", searchQuery);
+
+      const { results, error } = await searchByBarcode(searchQuery, serpApiCountryCode);
+
+      if (error) {
+        console.log("[Barcode] Search error:", error);
+      }
+
+      if (results.length === 0 && hint) {
+        console.log("[Barcode] No results with code, trying hint only:", hint);
+        const fallback = await searchProducts(hint, serpApiCountryCode);
+        setBarcodeSearchResults(fallback.results);
+      } else {
+        setBarcodeSearchResults(results);
+      }
+
+      console.log(`[Barcode] Got ${results.length} results`);
+    } catch (err) {
+      console.error("[Barcode] Search failed:", err);
+    } finally {
+      setIsBarcodeSearching(false);
+    }
+  };
+
+  const handleManualBarcodeSearch = async () => {
+    if (!manualBarcode.trim()) {
+      Alert.alert("Enter Barcode", "Please type a barcode number.");
+      return;
+    }
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setBarcodeResult({
+      barcodeValue: manualBarcode.trim(),
+      barcodeType: "Manual",
+      confidence: "high",
+    });
+    await searchBarcode(manualBarcode.trim());
+  };
+
+  const handleAddFromBarcode = () => {
+    if (!barcodeSelectedList) {
+      Alert.alert("Select a List", "Please choose a wishlist to add to.");
+      return;
+    }
+
+    const src = selectedBarcodeResult;
+    const productTitle = src?.title || barcodeResult?.productHint || "Scanned Product";
+    const productPrice = src?.price || 0;
+    const productStore = src?.store || "Unknown Store";
+    const productImage = src?.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop";
+
+    const newProduct: Product = {
+      id: `barcode_${Date.now()}`,
+      title: productTitle,
+      image: productImage,
+      price: productPrice,
+      currency: src?.currency || "USD",
+      store: productStore,
+      storeUrl: src?.link || "",
+      description: src?.snippet || `Barcode: ${barcodeResult?.barcodeValue || ""}`,
+      category: "Other",
+      isPurchased: false,
+      addedAt: new Date().toISOString().split("T")[0],
+      country: serpApiCountryCode.toUpperCase(),
+      rating: src?.rating,
+    };
+
+    addProductToWishlist(barcodeSelectedList, newProduct);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert("Added!", `"${productTitle}" has been added to your wishlist.`);
+    resetBarcodeState();
+    setMode("menu");
+  };
+
+  const pickImageForText = async (useCamera: boolean) => {
+    try {
+      let result: ImagePicker.ImagePickerResult;
+
+      if (useCamera) {
+        const permResult = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permResult.granted) {
+          Alert.alert("Permission Needed", "Please allow camera access.");
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          quality: 0.8,
+          base64: true,
+        });
+      } else {
+        const permResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permResult.granted) {
+          Alert.alert("Permission Needed", "Please allow access to your photo library.");
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          quality: 0.8,
+          base64: true,
+        });
+      }
+
+      if (result.canceled || !result.assets[0]) return;
+
+      const asset = result.assets[0];
+      setTextImage(asset.uri);
+      setTextExtractResult(null);
+      setTextSearchResults([]);
+      setSelectedTextResult(null);
+
+      if (asset.base64) {
+        await extractTextFromImage(asset.base64, asset.mimeType || "image/jpeg");
+      } else {
+        Alert.alert("Error", "Could not read image data.");
+      }
+    } catch (err) {
+      console.error("[TextScan] Image pick error:", err);
+      Alert.alert("Error", "Failed to pick image.");
+    }
+  };
+
+  const extractTextFromImage = async (base64: string, mimeType: string) => {
+    setIsExtractingText(true);
+    try {
+      console.log("[AI] Extracting text from image...");
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const result = await generateObject({
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Extract ALL text visible in this image. Categorize each piece of text as: product_name, brand, price, description, barcode, url, or other. Then suggest the best search query to find this product online based on all the text you found. Identify the product name and brand if visible.",
+              },
+              {
+                type: "image",
+                image: `data:${mimeType};base64,${base64}`,
+              },
+            ],
+          },
+        ],
+        schema: textExtractSchema,
+      });
+
+      console.log("[AI] Text extraction result:", JSON.stringify(result));
+      setTextExtractResult(result);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      if (result.suggestedSearchQuery) {
+        await searchFromExtractedText(result.suggestedSearchQuery);
+      }
+    } catch (err) {
+      console.error("[AI] Text extraction failed:", err);
+      Alert.alert("Extraction Failed", "Could not read text from image. Try a clearer photo.");
+    } finally {
+      setIsExtractingText(false);
+    }
+  };
+
+  const searchFromExtractedText = async (query: string) => {
+    setIsTextSearching(true);
+    try {
+      console.log("[TextScan] Searching for:", query);
+      const { results, error } = await searchProducts(query, serpApiCountryCode);
+
+      if (error) {
+        console.log("[TextScan] Search error:", error);
+      }
+
+      setTextSearchResults(results);
+      console.log(`[TextScan] Got ${results.length} results`);
+    } catch (err) {
+      console.error("[TextScan] Search failed:", err);
+    } finally {
+      setIsTextSearching(false);
+    }
+  };
+
+  const handleAddFromText = () => {
+    if (!textSelectedList) {
+      Alert.alert("Select a List", "Please choose a wishlist to add to.");
+      return;
+    }
+
+    const src = selectedTextResult;
+    const productTitle = src?.title || textExtractResult?.productName || "Product from Text";
+    const productPrice = src?.price || 0;
+    const productStore = src?.store || "Unknown Store";
+    const productImage = src?.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop";
+
+    const newProduct: Product = {
+      id: `text_${Date.now()}`,
+      title: productTitle,
+      image: productImage,
+      price: productPrice,
+      currency: src?.currency || "USD",
+      store: productStore,
+      storeUrl: src?.link || "",
+      description: src?.snippet || "",
+      category: "Other",
+      isPurchased: false,
+      addedAt: new Date().toISOString().split("T")[0],
+      country: serpApiCountryCode.toUpperCase(),
+      rating: src?.rating,
+    };
+
+    addProductToWishlist(textSelectedList, newProduct);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert("Added!", `"${productTitle}" has been added to your wishlist.`);
+    resetTextState();
+    setMode("menu");
+  };
+
+  const renderSearchResults = (
+    results: SerpApiResult[],
+    selected: SerpApiResult | null,
+    onSelect: (r: SerpApiResult | null) => void,
+    isLoading: boolean,
+    loadingLabel: string
+  ) => (
+    <>
+      {isLoading && (
+        <View style={[styles.statusCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
+          <ActivityIndicator color={colors.primary} size="small" />
+          <Text style={[styles.statusText, { color: colors.primary }]}>{loadingLabel}</Text>
+        </View>
+      )}
+
+      {results.length > 0 && !isLoading && (
+        <View style={styles.resultsSection}>
+          <View style={styles.resultsSectionHeader}>
+            <Search size={16} color={colors.textSecondary} />
+            <Text style={[styles.resultsSectionTitle, { color: colors.text }]}>
+              Found in Stores ({results.length})
+            </Text>
+          </View>
+          {results.map((result, idx) => (
+            <Pressable
+              key={`result-${idx}`}
+              onPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onSelect(selected === result ? null : result);
+              }}
+              style={[
+                styles.resultCard,
+                {
+                  backgroundColor: selected === result ? colors.primaryFaded : colors.surface,
+                  borderColor: selected === result ? colors.primary : colors.borderLight,
+                },
+              ]}
+            >
+              {result.image ? (
+                <Image source={{ uri: result.image }} style={styles.resultImage} contentFit="cover" />
+              ) : (
+                <View style={[styles.resultImagePlaceholder, { backgroundColor: colors.surfaceSecondary }]}>
+                  <Search size={16} color={colors.textTertiary} />
+                </View>
+              )}
+              <View style={styles.resultInfo}>
+                <Text style={[styles.resultTitle, { color: colors.text }]} numberOfLines={2}>
+                  {result.title}
+                </Text>
+                <View style={styles.resultMeta}>
+                  <Text style={[styles.resultPrice, { color: colors.primary }]}>
+                    {result.price > 0 ? `$${result.price.toFixed(2)}` : "Price N/A"}
+                  </Text>
+                  <Text style={[styles.resultStore, { color: colors.textSecondary }]}>
+                    {result.store}
+                  </Text>
+                </View>
+              </View>
+              {selected === result && (
+                <View style={[styles.checkBadge, { backgroundColor: colors.primary }]}>
+                  <Check size={14} color="#FFFFFF" />
+                </View>
+              )}
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </>
+  );
+
+  const renderWishlistSelector = (
+    selectedListId: string,
+    onSelectList: (id: string) => void,
+    onAdd: () => void,
+    addLabel: string
+  ) => (
+    <>
+      <View style={styles.formGroup}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>ADD TO WISHLIST *</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.listChips}>
+            {wishlists.map((list) => (
+              <Pressable
+                key={list.id}
+                onPress={() => onSelectList(list.id)}
+                style={[
+                  styles.listChip,
+                  {
+                    backgroundColor: selectedListId === list.id ? colors.primary : colors.surface,
+                    borderColor: selectedListId === list.id ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Text style={{ fontSize: 16 }}>{list.emoji}</Text>
+                <Text
+                  style={[
+                    styles.chipText,
+                    { color: selectedListId === list.id ? "#FFFFFF" : colors.text },
+                  ]}
+                >
+                  {list.title}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+
+      <Pressable
+        onPress={onAdd}
+        style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+      >
+        <Plus size={18} color="#FFFFFF" />
+        <Text style={styles.primaryButtonText}>{addLabel}</Text>
+      </Pressable>
+    </>
+  );
+
+  if (mode === "barcode") {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView
+          contentContainerStyle={[styles.formContent, { paddingTop: insets.top + 16 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Pressable onPress={() => { resetBarcodeState(); setMode("menu"); }} style={styles.backButton}>
+            <Text style={[styles.backText, { color: colors.primary }]}>← Back</Text>
+          </Pressable>
+          <Text style={[styles.formTitle, { color: colors.text }]}>Scan Barcode</Text>
+          <Text style={[styles.formSubtitle, { color: colors.textSecondary }]}>
+            Photograph a barcode or enter it manually to find the product
+          </Text>
+
+          {!barcodeImage && !barcodeResult && (
+            <>
+              <View style={styles.imagePickerArea}>
+                <Pressable
+                  onPress={() => pickImageForBarcode(false)}
+                  style={[styles.imagePickerCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "30" }]}
+                >
+                  <ImagePlus size={32} color={colors.primary} />
+                  <Text style={[styles.imagePickerLabel, { color: colors.text }]}>Upload Photo</Text>
+                  <Text style={[styles.imagePickerHint, { color: colors.textSecondary }]}>
+                    From gallery
+                  </Text>
+                </Pressable>
+
+                {Platform.OS !== "web" && (
+                  <Pressable
+                    onPress={() => pickImageForBarcode(true)}
+                    style={[styles.imagePickerCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "30" }]}
+                  >
+                    <Camera size={32} color={colors.primary} />
+                    <Text style={[styles.imagePickerLabel, { color: colors.text }]}>Take Photo</Text>
+                    <Text style={[styles.imagePickerHint, { color: colors.textSecondary }]}>
+                      Use camera
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+
+              <View style={[styles.dividerRow, { borderColor: colors.borderLight }]}>
+                <View style={[styles.dividerLine, { backgroundColor: colors.borderLight }]} />
+                <Text style={[styles.dividerText, { color: colors.textTertiary }]}>or enter manually</Text>
+                <View style={[styles.dividerLine, { backgroundColor: colors.borderLight }]} />
+              </View>
+
+              <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <ScanBarcode size={18} color={colors.textTertiary} />
+                <TextInput
+                  placeholder="Enter barcode number (UPC, EAN, ISBN)..."
+                  placeholderTextColor={colors.textTertiary}
+                  style={[styles.input, { color: colors.text }]}
+                  value={manualBarcode}
+                  onChangeText={setManualBarcode}
+                  keyboardType="default"
+                  onSubmitEditing={handleManualBarcodeSearch}
+                  returnKeyType="search"
+                />
+                {manualBarcode.length > 0 && (
+                  <Pressable onPress={() => setManualBarcode("")}>
+                    <X size={16} color={colors.textTertiary} />
+                  </Pressable>
+                )}
+              </View>
+
+              <Pressable
+                onPress={handleManualBarcodeSearch}
+                style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: manualBarcode.length === 0 ? 0.5 : 1 }]}
+                disabled={manualBarcode.length === 0}
+              >
+                <Search size={18} color="#FFFFFF" />
+                <Text style={styles.primaryButtonText}>Search Barcode</Text>
+              </Pressable>
+            </>
+          )}
+
+          {barcodeImage && (
+            <View style={styles.detectionArea}>
+              <View style={styles.imagePreviewRow}>
+                <Image source={{ uri: barcodeImage }} style={styles.previewImage} contentFit="cover" />
+                <Pressable
+                  onPress={() => { setBarcodeImage(null); setBarcodeResult(null); setBarcodeSearchResults([]); }}
+                  style={[styles.removeImageBtn, { backgroundColor: colors.error + "20" }]}
+                >
+                  <X size={16} color={colors.error} />
+                </Pressable>
+              </View>
+
+              {isReadingBarcode && (
+                <View style={[styles.statusCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
+                  <ActivityIndicator color={colors.primary} size="small" />
+                  <Text style={[styles.statusText, { color: colors.primary }]}>
+                    Reading barcode with AI...
+                  </Text>
+                </View>
+              )}
+
+              {barcodeResult && !isReadingBarcode && (
+                <View style={[styles.detectedCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+                  <View style={styles.detectedHeader}>
+                    <ScanBarcode size={18} color={colors.primary} />
+                    <Text style={[styles.detectedTitle, { color: colors.primary }]}>Barcode Detected</Text>
+                  </View>
+                  <Text style={[styles.detectedName, { color: colors.text }]}>{barcodeResult.barcodeValue}</Text>
+                  <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>
+                    Type: {barcodeResult.barcodeType} · Confidence: {barcodeResult.confidence}
+                  </Text>
+                  {barcodeResult.productHint ? (
+                    <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>
+                      Product hint: {barcodeResult.productHint}
+                    </Text>
+                  ) : null}
+                </View>
+              )}
+            </View>
+          )}
+
+          {(barcodeResult || isBarcodeSearching || barcodeSearchResults.length > 0) && (
+            <View style={styles.detectionArea}>
+              {renderSearchResults(
+                barcodeSearchResults,
+                selectedBarcodeResult,
+                setSelectedBarcodeResult,
+                isBarcodeSearching,
+                "Searching stores for barcode..."
+              )}
+
+              {barcodeResult && !isReadingBarcode && !isBarcodeSearching && (
+                renderWishlistSelector(
+                  barcodeSelectedList,
+                  setBarcodeSelectedList,
+                  handleAddFromBarcode,
+                  selectedBarcodeResult ? "Add Selected Product" : "Add Scanned Product"
+                )
+              )}
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (mode === "text") {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView
+          contentContainerStyle={[styles.formContent, { paddingTop: insets.top + 16 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Pressable onPress={() => { resetTextState(); setMode("menu"); }} style={styles.backButton}>
+            <Text style={[styles.backText, { color: colors.primary }]}>← Back</Text>
+          </Pressable>
+          <Text style={[styles.formTitle, { color: colors.text }]}>Read Text from Photo</Text>
+          <Text style={[styles.formSubtitle, { color: colors.textSecondary }]}>
+            Photograph product labels, packaging, or price tags to extract text and search
+          </Text>
+
+          {!textImage && (
+            <View style={styles.imagePickerArea}>
+              <Pressable
+                onPress={() => pickImageForText(false)}
+                style={[styles.imagePickerCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "30" }]}
+              >
+                <ImagePlus size={32} color={colors.primary} />
+                <Text style={[styles.imagePickerLabel, { color: colors.text }]}>Upload Photo</Text>
+                <Text style={[styles.imagePickerHint, { color: colors.textSecondary }]}>
+                  From gallery
+                </Text>
+              </Pressable>
+
+              {Platform.OS !== "web" && (
+                <Pressable
+                  onPress={() => pickImageForText(true)}
+                  style={[styles.imagePickerCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "30" }]}
+                >
+                  <Camera size={32} color={colors.primary} />
+                  <Text style={[styles.imagePickerLabel, { color: colors.text }]}>Take Photo</Text>
+                  <Text style={[styles.imagePickerHint, { color: colors.textSecondary }]}>
+                    Use camera
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+
+          {textImage && (
+            <View style={styles.detectionArea}>
+              <View style={styles.imagePreviewRow}>
+                <Image source={{ uri: textImage }} style={styles.previewImage} contentFit="cover" />
+                <Pressable
+                  onPress={() => resetTextState()}
+                  style={[styles.removeImageBtn, { backgroundColor: colors.error + "20" }]}
+                >
+                  <X size={16} color={colors.error} />
+                </Pressable>
+              </View>
+
+              {isExtractingText && (
+                <View style={[styles.statusCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
+                  <ActivityIndicator color={colors.primary} size="small" />
+                  <Text style={[styles.statusText, { color: colors.primary }]}>
+                    Extracting text with AI...
+                  </Text>
+                </View>
+              )}
+
+              {textExtractResult && !isExtractingText && (
+                <View style={[styles.detectedCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+                  <View style={styles.detectedHeader}>
+                    <Type size={18} color={colors.primary} />
+                    <Text style={[styles.detectedTitle, { color: colors.primary }]}>Text Extracted</Text>
+                  </View>
+                  {textExtractResult.productName ? (
+                    <Text style={[styles.detectedName, { color: colors.text }]}>
+                      {textExtractResult.productName}
+                    </Text>
+                  ) : null}
+                  {textExtractResult.brand ? (
+                    <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>
+                      Brand: {textExtractResult.brand}
+                    </Text>
+                  ) : null}
+                  {textExtractResult.price ? (
+                    <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>
+                      Price: {textExtractResult.price}
+                    </Text>
+                  ) : null}
+
+                  {textExtractResult.extractedTexts.length > 0 && (
+                    <View style={styles.extractedTextList}>
+                      {textExtractResult.extractedTexts.slice(0, 8).map((item, idx) => (
+                        <View
+                          key={`text-${idx}`}
+                          style={[styles.extractedTextChip, { backgroundColor: colors.surfaceSecondary }]}
+                        >
+                          <View style={[styles.textTypeBadge, {
+                            backgroundColor:
+                              item.type === "product_name" ? colors.primary + "20" :
+                              item.type === "brand" ? colors.success + "20" :
+                              item.type === "price" ? colors.warning + "20" :
+                              colors.surfaceSecondary,
+                          }]}>
+                            <Text style={[styles.textTypeLabel, {
+                              color:
+                                item.type === "product_name" ? colors.primary :
+                                item.type === "brand" ? colors.success :
+                                item.type === "price" ? colors.warning :
+                                colors.textTertiary,
+                            }]}>
+                              {item.type.replace("_", " ")}
+                            </Text>
+                          </View>
+                          <Text style={[styles.extractedTextValue, { color: colors.text }]} numberOfLines={2}>
+                            {item.text}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  <View style={[styles.searchQueryTag, { backgroundColor: colors.primaryFaded }]}>
+                    <Search size={12} color={colors.primary} />
+                    <Text style={[styles.searchQueryText, { color: colors.primary }]} numberOfLines={1}>
+                      Searching: "{textExtractResult.suggestedSearchQuery}"
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {renderSearchResults(
+                textSearchResults,
+                selectedTextResult,
+                setSelectedTextResult,
+                isTextSearching,
+                "Searching stores..."
+              )}
+
+              {textExtractResult && !isExtractingText && !isTextSearching && (
+                renderWishlistSelector(
+                  textSelectedList,
+                  setTextSelectedList,
+                  handleAddFromText,
+                  selectedTextResult ? "Add Selected Product" : "Add Detected Product"
+                )
+              )}
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    );
+  }
 
   if (mode === "image") {
     return (
@@ -466,111 +1248,21 @@ export default function AddScreen() {
                 </View>
               )}
 
-              {isSearching && (
-                <View style={[styles.statusCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
-                  <ActivityIndicator color={colors.primary} size="small" />
-                  <Text style={[styles.statusText, { color: colors.primary }]}>
-                    Searching stores...
-                  </Text>
-                </View>
-              )}
-
-              {searchResults.length > 0 && !isSearching && (
-                <View style={styles.resultsSection}>
-                  <View style={styles.resultsSectionHeader}>
-                    <Search size={16} color={colors.textSecondary} />
-                    <Text style={[styles.resultsSectionTitle, { color: colors.text }]}>
-                      Found in Stores ({searchResults.length})
-                    </Text>
-                  </View>
-                  {searchResults.map((result, idx) => (
-                    <Pressable
-                      key={`result-${idx}`}
-                      onPress={() => {
-                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedResult(selectedResult === result ? null : result);
-                      }}
-                      style={[
-                        styles.resultCard,
-                        {
-                          backgroundColor: selectedResult === result ? colors.primaryFaded : colors.surface,
-                          borderColor: selectedResult === result ? colors.primary : colors.borderLight,
-                        },
-                      ]}
-                    >
-                      {result.image ? (
-                        <Image source={{ uri: result.image }} style={styles.resultImage} contentFit="cover" />
-                      ) : (
-                        <View style={[styles.resultImagePlaceholder, { backgroundColor: colors.surfaceSecondary }]}>
-                          <Search size={16} color={colors.textTertiary} />
-                        </View>
-                      )}
-                      <View style={styles.resultInfo}>
-                        <Text style={[styles.resultTitle, { color: colors.text }]} numberOfLines={2}>
-                          {result.title}
-                        </Text>
-                        <View style={styles.resultMeta}>
-                          <Text style={[styles.resultPrice, { color: colors.primary }]}>
-                            {result.price > 0 ? `$${result.price.toFixed(2)}` : "Price N/A"}
-                          </Text>
-                          <Text style={[styles.resultStore, { color: colors.textSecondary }]}>
-                            {result.store}
-                          </Text>
-                        </View>
-                      </View>
-                      {selectedResult === result && (
-                        <View style={[styles.checkBadge, { backgroundColor: colors.primary }]}>
-                          <Check size={14} color="#FFFFFF" />
-                        </View>
-                      )}
-                    </Pressable>
-                  ))}
-                </View>
+              {renderSearchResults(
+                searchResults,
+                selectedResult,
+                setSelectedResult,
+                isSearching,
+                "Searching stores..."
               )}
 
               {detectedProduct && !isDetecting && !isSearching && (
-                <>
-                  <View style={styles.formGroup}>
-                    <Text style={[styles.label, { color: colors.textSecondary }]}>ADD TO WISHLIST *</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      <View style={styles.listChips}>
-                        {wishlists.map((list) => (
-                          <Pressable
-                            key={list.id}
-                            onPress={() => setSelectedList(list.id)}
-                            style={[
-                              styles.listChip,
-                              {
-                                backgroundColor: selectedList === list.id ? colors.primary : colors.surface,
-                                borderColor: selectedList === list.id ? colors.primary : colors.border,
-                              },
-                            ]}
-                          >
-                            <Text style={{ fontSize: 16 }}>{list.emoji}</Text>
-                            <Text
-                              style={[
-                                styles.chipText,
-                                { color: selectedList === list.id ? "#FFFFFF" : colors.text },
-                              ]}
-                            >
-                              {list.title}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </ScrollView>
-                  </View>
-
-                  <Pressable
-                    onPress={handleAddDetectedProduct}
-                    style={[styles.primaryButton, { backgroundColor: colors.primary }]}
-                  >
-                    <Plus size={18} color="#FFFFFF" />
-                    <Text style={styles.primaryButtonText}>
-                      {selectedResult ? "Add Selected Product" : "Add Detected Product"}
-                    </Text>
-                  </Pressable>
-                </>
+                renderWishlistSelector(
+                  selectedList,
+                  setSelectedList,
+                  handleAddDetectedProduct,
+                  selectedResult ? "Add Selected Product" : "Add Detected Product"
+                )
               )}
             </View>
           )}
@@ -651,99 +1343,20 @@ export default function AddScreen() {
                 ) : null}
               </View>
 
-              {linkSearchResults.length > 0 && (
-                <View style={styles.resultsSection}>
-                  <View style={styles.resultsSectionHeader}>
-                    <Search size={16} color={colors.textSecondary} />
-                    <Text style={[styles.resultsSectionTitle, { color: colors.text }]}>
-                      Also Found ({linkSearchResults.length})
-                    </Text>
-                  </View>
-                  {linkSearchResults.map((result, idx) => (
-                    <Pressable
-                      key={`link-result-${idx}`}
-                      onPress={() => {
-                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedLinkResult(selectedLinkResult === result ? null : result);
-                      }}
-                      style={[
-                        styles.resultCard,
-                        {
-                          backgroundColor: selectedLinkResult === result ? colors.primaryFaded : colors.surface,
-                          borderColor: selectedLinkResult === result ? colors.primary : colors.borderLight,
-                        },
-                      ]}
-                    >
-                      {result.image ? (
-                        <Image source={{ uri: result.image }} style={styles.resultImage} contentFit="cover" />
-                      ) : (
-                        <View style={[styles.resultImagePlaceholder, { backgroundColor: colors.surfaceSecondary }]}>
-                          <Search size={16} color={colors.textTertiary} />
-                        </View>
-                      )}
-                      <View style={styles.resultInfo}>
-                        <Text style={[styles.resultTitle, { color: colors.text }]} numberOfLines={2}>
-                          {result.title}
-                        </Text>
-                        <View style={styles.resultMeta}>
-                          <Text style={[styles.resultPrice, { color: colors.primary }]}>
-                            {result.price > 0 ? `${result.price.toFixed(2)}` : "Price N/A"}
-                          </Text>
-                          <Text style={[styles.resultStore, { color: colors.textSecondary }]}>
-                            {result.store}
-                          </Text>
-                        </View>
-                      </View>
-                      {selectedLinkResult === result && (
-                        <View style={[styles.checkBadge, { backgroundColor: colors.primary }]}>
-                          <Check size={14} color="#FFFFFF" />
-                        </View>
-                      )}
-                    </Pressable>
-                  ))}
-                </View>
+              {renderSearchResults(
+                linkSearchResults,
+                selectedLinkResult,
+                setSelectedLinkResult,
+                false,
+                ""
               )}
 
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>ADD TO WISHLIST *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.listChips}>
-                    {wishlists.map((list) => (
-                      <Pressable
-                        key={list.id}
-                        onPress={() => setLinkSelectedList(list.id)}
-                        style={[
-                          styles.listChip,
-                          {
-                            backgroundColor: linkSelectedList === list.id ? colors.primary : colors.surface,
-                            borderColor: linkSelectedList === list.id ? colors.primary : colors.border,
-                          },
-                        ]}
-                      >
-                        <Text style={{ fontSize: 16 }}>{list.emoji}</Text>
-                        <Text
-                          style={[
-                            styles.chipText,
-                            { color: linkSelectedList === list.id ? "#FFFFFF" : colors.text },
-                          ]}
-                        >
-                          {list.title}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </ScrollView>
-              </View>
-
-              <Pressable
-                onPress={handleAddFromLinkResult}
-                style={[styles.primaryButton, { backgroundColor: colors.primary }]}
-              >
-                <Plus size={18} color="#FFFFFF" />
-                <Text style={styles.primaryButtonText}>
-                  {selectedLinkResult ? "Add Selected Product" : "Add Detected Product"}
-                </Text>
-              </Pressable>
+              {renderWishlistSelector(
+                linkSelectedList,
+                setLinkSelectedList,
+                handleAddFromLinkResult,
+                selectedLinkResult ? "Add Selected Product" : "Add Detected Product"
+              )}
             </View>
           )}
         </ScrollView>
@@ -899,6 +1512,52 @@ export default function AddScreen() {
                 <Text style={[styles.menuCardTitle, { color: colors.text }]}>Scan from Image</Text>
                 <Text style={[styles.menuCardDesc, { color: colors.textSecondary }]}>
                   Upload a photo to auto-detect products
+                </Text>
+              </View>
+              <ChevronRight size={20} color={colors.textTertiary} />
+            </Animated.View>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setMode("barcode")}
+            {...createPressHandlers(scaleAnim4)}
+          >
+            <Animated.View
+              style={[
+                styles.menuCard,
+                { backgroundColor: colors.surface, borderColor: colors.borderLight, transform: [{ scale: scaleAnim4 }] },
+              ]}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: "#FFF3E0" }]}>
+                <ScanBarcode size={28} color="#EF6C00" />
+              </View>
+              <View style={styles.menuCardContent}>
+                <Text style={[styles.menuCardTitle, { color: colors.text }]}>Scan Barcode</Text>
+                <Text style={[styles.menuCardDesc, { color: colors.textSecondary }]}>
+                  Read UPC, EAN, or ISBN from a photo
+                </Text>
+              </View>
+              <ChevronRight size={20} color={colors.textTertiary} />
+            </Animated.View>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setMode("text")}
+            {...createPressHandlers(scaleAnim5)}
+          >
+            <Animated.View
+              style={[
+                styles.menuCard,
+                { backgroundColor: colors.surface, borderColor: colors.borderLight, transform: [{ scale: scaleAnim5 }] },
+              ]}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: "#E3F2FD" }]}>
+                <Type size={28} color="#1565C0" />
+              </View>
+              <View style={styles.menuCardContent}>
+                <Text style={[styles.menuCardTitle, { color: colors.text }]}>Read Text from Photo</Text>
+                <Text style={[styles.menuCardDesc, { color: colors.textSecondary }]}>
+                  Extract product info from labels & tags
                 </Text>
               </View>
               <ChevronRight size={20} color={colors.textTertiary} />
@@ -1253,5 +1912,59 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: "center" as const,
     alignItems: "center" as const,
+  },
+  dividerRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    marginVertical: 24,
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: 13,
+    fontWeight: "500" as const,
+  },
+  extractedTextList: {
+    marginTop: 10,
+    gap: 8,
+  },
+  extractedTextChip: {
+    padding: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  textTypeBadge: {
+    alignSelf: "flex-start" as const,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  textTypeLabel: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.3,
+  },
+  extractedTextValue: {
+    fontSize: 14,
+    fontWeight: "500" as const,
+    lineHeight: 19,
+  },
+  searchQueryTag: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  searchQueryText: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    flex: 1,
   },
 });

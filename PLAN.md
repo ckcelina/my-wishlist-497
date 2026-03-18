@@ -101,10 +101,16 @@ This plan covers every function in the app that uses or should use SerpAPI for p
 - **Built:** Enhanced PriceHistoryChart with trend indicators, average, min/max stats
 - **Built:** Up to 30 price points stored per product
 
-### G. Barcode / Text Search from Camera
-- **Current state:** Image detection uses AI to identify products, then searches SerpAPI
-- **Enhancement:** Could add barcode scanning that extracts a UPC/EAN and searches SerpAPI with it
-- **Status:** Pending (Phase 5)
+### G. Barcode / Text Search from Camera ✅
+- **Current state:** Fully implemented with AI-powered barcode reading and text extraction
+- **Built:** Backend `/search/barcode` endpoint that searches SerpAPI with barcode values
+- **Built:** AI barcode reader that detects UPC, EAN, ISBN, QR codes from photos
+- **Built:** Manual barcode entry with direct search
+- **Built:** AI text extraction (OCR) from product labels, packaging, and price tags
+- **Built:** Categorized text extraction (product name, brand, price, description, etc.)
+- **Built:** Auto-search from extracted barcode or text data
+- **Built:** Fallback search using product hints when barcode yields no results
+- **Status:** Complete (Phase 5)
 
 ### H. Notification System for Price Drops ✅
 - **Current state:** Fully implemented with in-app notifications
@@ -132,6 +138,12 @@ User scans image → AI detects "Nike Air Max" →
 User pastes Amazon link → scrape HTML → title extracted →
   Backend: SerpAPI Google Shopping → alternative listings
 
+User scans barcode → AI reads UPC "012345678901" →
+  Backend: SerpAPI Google Shopping (barcode) → matching products
+
+User photographs product label → AI extracts text →
+  Backend: SerpAPI Google Shopping (extracted query) → matching products
+
 User changes country from UAE to UK →
   All cached searches invalidated
   Next search uses gl=uk
@@ -148,6 +160,7 @@ User changes country from UAE to UK →
 | `/search/product-detail` | `google_product` | product_id, gl, hl | Seller details for a specific product |
 | `/search/compare-prices` | `google_shopping` × N | q, gl (per country), num=5 | Multi-country price comparison |
 | `/scrape/url` | None (direct fetch) | URL | Extract product info from any store page |
+| `/search/barcode` | `google_shopping` | barcode, gl | Search by UPC/EAN/ISBN barcode |
 | `/exchange-rates` | None (static) | — | Currency conversion rates |
 | `/convert` | None (static) | amount, from, to | Convert between currencies |
 

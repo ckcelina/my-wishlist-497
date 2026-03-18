@@ -847,6 +847,88 @@ app.post("/price-history/record", async (c) => {
   }
 });
 
+app.post("/search/barcode", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { barcode, country = "us" } = body as {
+      barcode: string;
+      country?: string;
+    };
+
+    if (!barcode) {
+      return c.json({ results: [], error: "Barcode is required" }, 400);
+    }
+
+    const apiKey = process.env.SERPAPI_KEY;
+    if (!apiKey) {
+      return c.json({ results: [], error: "SerpAPI key not configured" }, 500);
+    }
+
+    const params = new URLSearchParams({
+      engine: "google_shopping",
+      q: barcode,
+      api_key: apiKey,
+      gl: country,
+      hl: "en",
+      num: "15",
+    });
+
+    console.log(`[SerpAPI] Barcode search: "${barcode}" in ${country}`);
+    const response = await fetch(
+      `https://serpapi.com/search.json?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log(
+        `[SerpAPI] Barcode search error ${response.status}: ${errorText.substring(0, 200)}`
+      );
+      return c.json(
+        { results: [], error: `SerpAPI returned ${response.status}` },
+        502
+      );
+    }
+
+    const data = (await response.json()) as Record<string, unknown>;
+
+    if (data.error) {
+      console.log(`[SerpAPI] Barcode search API error: ${data.error}`);
+      return c.json(
+        { results: [], error: `SerpAPI error: ${data.error}` },
+        502
+      );
+    }
+
+    const shoppingResults =
+      (data.shopping_results as Record<string, unknown>[]) || [];
+
+    const results = shoppingResults.slice(0, 15).map(
+      (item: Record<string, unknown>) => ({
+        title: (item.title as string) || "",
+        price:
+          typeof item.extracted_price === "number" ? item.extracted_price : 0,
+        currency: (item.currency as string) || "USD",
+        store: (item.source as string) || "Unknown",
+        link: (item.link as string) || (item.product_link as string) || "",
+        image: (item.thumbnail as string) || "",
+        rating: typeof item.rating === "number" ? item.rating : undefined,
+        reviews: typeof item.reviews === "number" ? item.reviews : undefined,
+        snippet: (item.snippet as string) || "",
+        productId: (item.product_id as string) || "",
+        delivery: (item.delivery as string) || "",
+      })
+    );
+
+    console.log(
+      `[SerpAPI] Barcode search found ${results.length} results for "${barcode}"`
+    );
+    return c.json({ results, barcode, error: null });
+  } catch (err) {
+    console.error("[SerpAPI] Barcode search failed:", err);
+    return c.json({ results: [], error: "Barcode search failed" }, 500);
+  }
+});
+
 app.get("/db/health", async (c) => {
   const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;

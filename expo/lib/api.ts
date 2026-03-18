@@ -456,6 +456,48 @@ export async function loadPriceAlertsFromBackend(
   }
 }
 
+export interface BarcodeSearchResult {
+  results: SerpApiResult[];
+  barcode: string;
+  error: string | null;
+}
+
+export async function searchByBarcode(
+  barcode: string,
+  country: string = "us"
+): Promise<BarcodeSearchResult> {
+  try {
+    const baseUrl = getBaseUrl();
+    if (!baseUrl) {
+      return { results: [], barcode, error: "API URL not configured" };
+    }
+
+    console.log(`[API] Barcode search: "${barcode}" in ${country}`);
+    const response = await fetch(`${baseUrl}/api/search/barcode`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ barcode, country }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        results: [],
+        barcode,
+        error: (errorData as Record<string, string>).error || `Request failed: ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    const result = data as BarcodeSearchResult;
+    console.log(`[API] Barcode search returned ${result.results.length} results`);
+    return result;
+  } catch (err) {
+    console.error("[API] Barcode search failed:", err);
+    return { results: [], barcode, error: "Network error" };
+  }
+}
+
 export async function checkDatabaseHealth(): Promise<DbHealthResult> {
   try {
     const baseUrl = getBaseUrl();
