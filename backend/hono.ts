@@ -388,6 +388,50 @@ app.post("/search/compare-prices", async (c) => {
   }
 });
 
+app.get("/exchange-rates", async (c) => {
+  const rates: Record<string, number> = {
+    USD: 1, EUR: 0.92, GBP: 0.79, JPY: 149.5, AUD: 1.53, CAD: 1.36,
+    CHF: 0.88, CNY: 7.24, SEK: 10.45, NZD: 1.67, MXN: 17.15, SGD: 1.34,
+    HKD: 7.82, NOK: 10.55, KRW: 1320, TRY: 32.5, INR: 83.4, RUB: 92,
+    BRL: 4.97, ZAR: 18.6, TWD: 31.5, DKK: 6.88, PLN: 4.02, THB: 35.8,
+    IDR: 15700, HUF: 358, CZK: 23.2, ILS: 3.65, CLP: 940, PHP: 56.5,
+    AED: 3.67, COP: 3950, SAR: 3.75, MYR: 4.72, RON: 4.58, ARS: 870,
+    PKR: 278, EGP: 30.9, NGN: 1550, BDT: 110, VND: 24500, UAH: 38.5,
+    KES: 155, QAR: 3.64, KWD: 0.31, BHD: 0.376, OMR: 0.385, JOD: 0.709,
+    LBP: 89500, MAD: 10.1, TND: 3.12, GHS: 15.2, TZS: 2510, UGX: 3800,
+    ETB: 56.8, RWF: 1270, XOF: 605, XAF: 605, LKR: 320, NPR: 133,
+    GEL: 2.68, KZT: 460, ISK: 137,
+  };
+  return c.json({ rates, base: "USD", updated: new Date().toISOString() });
+});
+
+app.post("/convert", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { amount, from, to } = body as { amount: number; from: string; to: string };
+
+    const rates: Record<string, number> = {
+      USD: 1, EUR: 0.92, GBP: 0.79, JPY: 149.5, AUD: 1.53, CAD: 1.36,
+      CHF: 0.88, CNY: 7.24, AED: 3.67, SAR: 3.75, KWD: 0.31, BHD: 0.376,
+      QAR: 3.64, OMR: 0.385, JOD: 0.709, EGP: 30.9, INR: 83.4, PKR: 278,
+      BRL: 4.97, MXN: 17.15, KRW: 1320, SGD: 1.34, MYR: 4.72, THB: 35.8,
+      IDR: 15700, PHP: 56.5, VND: 24500, NGN: 1550, KES: 155, ZAR: 18.6,
+      TRY: 32.5, PLN: 4.02, CZK: 23.2, HUF: 358, RON: 4.58, SEK: 10.45,
+      NOK: 10.55, DKK: 6.88, HKD: 7.82, TWD: 31.5, NZD: 1.67, CLP: 940,
+      COP: 3950, ARS: 870, PEN: 3.72, ILS: 3.65, MAD: 10.1,
+    };
+
+    const fromRate = rates[from] ?? 1;
+    const toRate = rates[to] ?? 1;
+    const converted = (amount / fromRate) * toRate;
+
+    return c.json({ amount, from, to, converted, rate: toRate / fromRate });
+  } catch (err) {
+    console.error("[Convert] Error:", err);
+    return c.json({ error: "Conversion failed" }, 500);
+  }
+});
+
 app.get("/db/health", async (c) => {
   const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;

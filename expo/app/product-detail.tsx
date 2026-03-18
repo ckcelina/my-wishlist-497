@@ -24,11 +24,15 @@ import {
   Globe,
   TrendingDown,
   ShoppingBag,
+  Bell,
+  BellOff,
+  ArrowLeftRight,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
+import { useLocation } from "@/providers/LocationProvider";
 import { mockProducts, trendingProducts } from "@/mocks/data";
 import { Product } from "@/types";
 import { comparePrices, getProductDetail, ProductSeller } from "@/lib/api";
@@ -39,9 +43,11 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const { id, serpData } = useLocalSearchParams<{ id: string; serpData?: string }>();
   const { wishlists, addProductToWishlist } = useWishlistContext();
+  const { country, serpApiCountryCode, format, convert, currencyCode, getCurrencySymbol } = useLocation();
 
   const [savedToList, setSavedToList] = useState<string | null>(null);
   const [sellers, setSellers] = useState<ProductSeller[]>([]);
+  const [priceAlertEnabled, setPriceAlertEnabled] = useState(false);
   const [priceComparison, setPriceComparison] = useState<
     { country: string; results: { title: string; price: number; currency: string; store: string; link: string }[] }[]
   >([]);
@@ -68,7 +74,7 @@ export default function ProductDetailScreen() {
         category: "Search Result",
         isPurchased: false,
         addedAt: new Date().toISOString().split("T")[0],
-        country: "US",
+        country: serpApiCountryCode.toUpperCase(),
         rating: parsed.rating,
       };
     } catch {
@@ -83,7 +89,7 @@ export default function ProductDetailScreen() {
   const productDetailMutation = useMutation({
     mutationFn: async (productIdParam: string) => {
       console.log("[ProductDetail] Fetching product detail for:", productIdParam);
-      return getProductDetail(productIdParam);
+      return getProductDetail(productIdParam, serpApiCountryCode);
     },
     onSuccess: (data) => {
       if (data.sellers && data.sellers.length > 0) {
@@ -99,7 +105,7 @@ export default function ProductDetailScreen() {
   const priceComparisonMutation = useMutation({
     mutationFn: async (query: string) => {
       console.log("[ProductDetail] Comparing prices for:", query);
-      return comparePrices(query, ["us", "uk", "ca", "au"]);
+      return comparePrices(query, [serpApiCountryCode, "us", "uk", "ae", "sa"]);
     },
     onSuccess: (data) => {
       if (data.comparison && data.comparison.length > 0) {
@@ -148,6 +154,12 @@ export default function ProductDetailScreen() {
     );
   }
 
+  const displayPrice = format(product.price, product.currency);
+  const isConverted = product.currency !== currencyCode;
+  const originalPrice = isConverted
+    ? `${getCurrencySymbol(product.currency)}${product.price.toFixed(2)}`
+    : null;
+
   const handleOpenStore = () => {
     if (product?.storeUrl) {
       void Linking.openURL(product.storeUrl);
@@ -163,6 +175,19 @@ export default function ProductDetailScreen() {
     Alert.alert("Saved!", `"${product.title}" added to ${listName}`);
   };
 
+  const handleTogglePriceAlert = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPriceAlertEnabled(!priceAlertEnabled);
+    if (!priceAlertEnabled) {
+      Alert.alert(
+        "Price Alert Set",
+        `We'll notify you when the price of "${product?.title}" drops in ${country?.name ?? "your country"}.`
+      );
+    } else {
+      Alert.alert("Price Alert Removed", "You won't receive price drop notifications for this item.");
+    }
+  };
+
   const isInList = (listId: string) => {
     const list = wishlists.find((w) => w.id === listId);
     if (!list) return false;
@@ -170,25 +195,18 @@ export default function ProductDetailScreen() {
   };
 
   const countryNames: Record<string, string> = {
-    us: "United States",
-    uk: "United Kingdom",
-    ca: "Canada",
-    au: "Australia",
-    de: "Germany",
-    fr: "France",
-    jp: "Japan",
-    in: "India",
+    us: "United States", uk: "United Kingdom", ca: "Canada", au: "Australia",
+    de: "Germany", fr: "France", jp: "Japan", in: "India", ae: "UAE",
+    sa: "Saudi Arabia", eg: "Egypt", kw: "Kuwait", qa: "Qatar", bh: "Bahrain",
+    om: "Oman", jo: "Jordan", lb: "Lebanon", sg: "Singapore", my: "Malaysia",
+    th: "Thailand", kr: "South Korea", br: "Brazil", mx: "Mexico",
   };
 
   const countryFlags: Record<string, string> = {
-    us: "🇺🇸",
-    uk: "🇬🇧",
-    ca: "🇨🇦",
-    au: "🇦🇺",
-    de: "🇩🇪",
-    fr: "🇫🇷",
-    jp: "🇯🇵",
-    in: "🇮🇳",
+    us: "🇺🇸", uk: "🇬🇧", ca: "🇨🇦", au: "🇦🇺", de: "🇩🇪", fr: "🇫🇷",
+    jp: "🇯🇵", in: "🇮🇳", ae: "🇦🇪", sa: "🇸🇦", eg: "🇪🇬", kw: "🇰🇼",
+    qa: "🇶🇦", bh: "🇧🇭", om: "🇴🇲", jo: "🇯🇴", lb: "🇱🇧", sg: "🇸🇬",
+    my: "🇲🇾", th: "🇹🇭", kr: "🇰🇷", br: "🇧🇷", mx: "🇲🇽",
   };
 
   return (
@@ -198,6 +216,16 @@ export default function ProductDetailScreen() {
           <ArrowLeft size={22} color={colors.text} />
         </Pressable>
         <View style={styles.topBarRight}>
+          <Pressable
+            onPress={handleTogglePriceAlert}
+            style={[styles.iconBtn, { backgroundColor: priceAlertEnabled ? colors.primary : colors.surface + "E6" }]}
+          >
+            {priceAlertEnabled ? (
+              <Bell size={18} color="#FFFFFF" />
+            ) : (
+              <BellOff size={18} color={colors.text} />
+            )}
+          </Pressable>
           <Pressable style={[styles.iconBtn, { backgroundColor: colors.surface + "E6" }]}>
             <Share2 size={18} color={colors.text} />
           </Pressable>
@@ -221,9 +249,7 @@ export default function ProductDetailScreen() {
               {product.rating !== undefined && (
                 <View style={styles.ratingRow}>
                   <Star size={16} color="#FFB300" fill="#FFB300" />
-                  <Text style={[styles.rating, { color: colors.text }]}>
-                    {product.rating}
-                  </Text>
+                  <Text style={[styles.rating, { color: colors.text }]}>{product.rating}</Text>
                 </View>
               )}
               <View style={styles.storeRow}>
@@ -232,27 +258,65 @@ export default function ProductDetailScreen() {
               </View>
               <View style={styles.storeRow}>
                 <MapPin size={14} color={colors.textSecondary} />
-                <Text style={[styles.storeName, { color: colors.textSecondary }]}>{product.country}</Text>
+                <Text style={[styles.storeName, { color: colors.textSecondary }]}>
+                  {country?.name ?? product.country}
+                </Text>
               </View>
             </View>
 
             <View style={[styles.priceCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
               <View>
-                <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>Price</Text>
-                <Text style={[styles.priceValue, { color: colors.primary }]}>
-                  ${product.price.toFixed(2)}
+                <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>
+                  Price in {getCurrencySymbol(currencyCode)} {currencyCode}
+                </Text>
+                <Text style={[styles.priceValue, { color: colors.primary }]}>{displayPrice}</Text>
+                {isConverted && originalPrice && (
+                  <View style={styles.originalPriceRow}>
+                    <ArrowLeftRight size={10} color={colors.textTertiary} />
+                    <Text style={[styles.originalPrice, { color: colors.textTertiary }]}>
+                      Originally {originalPrice} {product.currency}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.priceActions}>
+                {product.storeUrl ? (
+                  <Pressable onPress={handleOpenStore} style={[styles.visitBtn, { backgroundColor: colors.primary }]}>
+                    <ExternalLink size={16} color="#FFFFFF" />
+                    <Text style={styles.visitBtnText}>Visit Store</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+
+            <Pressable
+              onPress={handleTogglePriceAlert}
+              style={[
+                styles.alertCard,
+                {
+                  backgroundColor: priceAlertEnabled ? colors.success + "12" : colors.surfaceSecondary,
+                  borderColor: priceAlertEnabled ? colors.success + "40" : colors.borderLight,
+                },
+              ]}
+            >
+              <View style={[styles.alertIcon, { backgroundColor: priceAlertEnabled ? colors.success + "20" : colors.primaryFaded }]}>
+                {priceAlertEnabled ? (
+                  <Bell size={18} color={colors.success} />
+                ) : (
+                  <BellOff size={18} color={colors.primary} />
+                )}
+              </View>
+              <View style={styles.alertInfo}>
+                <Text style={[styles.alertTitle, { color: priceAlertEnabled ? colors.success : colors.text }]}>
+                  {priceAlertEnabled ? "Price Alert Active" : "Set Price Alert"}
+                </Text>
+                <Text style={[styles.alertSub, { color: colors.textTertiary }]}>
+                  {priceAlertEnabled
+                    ? "We'll notify you when the price drops"
+                    : "Get notified when this item goes on sale"}
                 </Text>
               </View>
-              {product.storeUrl ? (
-                <Pressable
-                  onPress={handleOpenStore}
-                  style={[styles.visitBtn, { backgroundColor: colors.primary }]}
-                >
-                  <ExternalLink size={16} color="#FFFFFF" />
-                  <Text style={styles.visitBtnText}>Visit Store</Text>
-                </Pressable>
-              ) : null}
-            </View>
+            </Pressable>
 
             {product.description ? (
               <View style={styles.descSection}>
@@ -271,67 +335,67 @@ export default function ProductDetailScreen() {
                     Online Sellers ({sellers.length})
                   </Text>
                 </View>
-                {sellers.slice(0, 8).map((seller, index) => (
-                  <Pressable
-                    key={`seller-${index}`}
-                    onPress={() => {
-                      if (seller.link) void Linking.openURL(seller.link);
-                    }}
-                    style={[styles.sellerCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
-                  >
-                    <View style={styles.sellerLeft}>
-                      <Text style={[styles.sellerName, { color: colors.text }]}>{seller.name}</Text>
-                      {seller.delivery ? (
-                        <Text style={[styles.sellerDelivery, { color: colors.textTertiary }]}>
-                          {seller.delivery}
-                        </Text>
-                      ) : null}
-                    </View>
-                    <View style={styles.sellerRight}>
-                      <Text style={[styles.sellerPrice, { color: colors.primary }]}>
-                        {seller.totalPrice || seller.basePrice || `$${seller.price.toFixed(2)}`}
-                      </Text>
-                      <ExternalLink size={14} color={colors.textTertiary} />
-                    </View>
-                  </Pressable>
-                ))}
+                {sellers.slice(0, 8).map((seller, index) => {
+                  const sellerPrice = seller.price > 0 ? format(seller.price, "USD") : seller.totalPrice || seller.basePrice;
+                  return (
+                    <Pressable
+                      key={`seller-${index}`}
+                      onPress={() => {
+                        if (seller.link) void Linking.openURL(seller.link);
+                      }}
+                      style={[styles.sellerCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                    >
+                      <View style={styles.sellerLeft}>
+                        <Text style={[styles.sellerName, { color: colors.text }]}>{seller.name}</Text>
+                        {seller.delivery ? (
+                          <Text style={[styles.sellerDelivery, { color: colors.textTertiary }]}>
+                            {seller.delivery}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View style={styles.sellerRight}>
+                        <Text style={[styles.sellerPrice, { color: colors.primary }]}>{sellerPrice}</Text>
+                        <ExternalLink size={14} color={colors.textTertiary} />
+                      </View>
+                    </Pressable>
+                  );
+                })}
               </View>
             )}
 
             {productDetailMutation.isPending && (
               <View style={[styles.loadingCard, { backgroundColor: colors.primaryFaded }]}>
                 <ActivityIndicator color={colors.primary} size="small" />
-                <Text style={[styles.loadingText, { color: colors.primary }]}>
-                  Finding more sellers...
-                </Text>
+                <Text style={[styles.loadingText, { color: colors.primary }]}>Finding more sellers...</Text>
               </View>
             )}
 
             {product.alternatives && product.alternatives.length > 0 && (
               <View style={styles.alternativesSection}>
                 <Text style={[styles.sectionLabel, { color: colors.text }]}>Store Comparison</Text>
-                {product.alternatives.map((alt, index) => (
-                  <View
-                    key={`${alt.store}-${index}`}
-                    style={[styles.altCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
-                  >
-                    <View style={styles.altLeft}>
-                      <Text style={[styles.altStore, { color: colors.text }]}>{alt.store}</Text>
-                      <View style={styles.altMeta}>
-                        <MapPin size={12} color={colors.textTertiary} />
-                        <Text style={[styles.altCountry, { color: colors.textTertiary }]}>{alt.country}</Text>
-                        {alt.shippingAvailable && (
-                          <Text style={[styles.shippingBadge, { color: colors.success, backgroundColor: colors.success + "15" }]}>
-                            Ships here
-                          </Text>
-                        )}
+                {product.alternatives.map((alt, index) => {
+                  const altPrice = format(alt.price, alt.currency);
+                  return (
+                    <View
+                      key={`${alt.store}-${index}`}
+                      style={[styles.altCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                    >
+                      <View style={styles.altLeft}>
+                        <Text style={[styles.altStore, { color: colors.text }]}>{alt.store}</Text>
+                        <View style={styles.altMeta}>
+                          <MapPin size={12} color={colors.textTertiary} />
+                          <Text style={[styles.altCountry, { color: colors.textTertiary }]}>{alt.country}</Text>
+                          {alt.shippingAvailable && (
+                            <Text style={[styles.shippingBadge, { color: colors.success, backgroundColor: colors.success + "15" }]}>
+                              Ships here
+                            </Text>
+                          )}
+                        </View>
                       </View>
+                      <Text style={[styles.altPrice, { color: colors.primary }]}>{altPrice}</Text>
                     </View>
-                    <Text style={[styles.altPrice, { color: colors.primary }]}>
-                      {alt.currency === "GBP" ? "£" : "$"}{alt.price.toFixed(2)}
-                    </Text>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
 
@@ -340,12 +404,17 @@ export default function ProductDetailScreen() {
                 <View style={styles.sectionHeaderRow}>
                   <Globe size={18} color={colors.primary} />
                   <Text style={[styles.sectionLabel, { color: colors.text, marginBottom: 0 }]}>
-                    Price by Country
+                    Price by Country (in {currencyCode})
                   </Text>
                 </View>
                 {priceComparison.map((countryData) => {
                   const bestResult = countryData.results[0];
                   if (!bestResult) return null;
+                  const convertedPrice = format(bestResult.price, bestResult.currency);
+                  const convertedOriginal = convert(product.price, product.currency);
+                  const convertedBest = convert(bestResult.price, bestResult.currency);
+                  const savings = convertedOriginal - convertedBest;
+
                   return (
                     <View
                       key={countryData.country}
@@ -365,28 +434,25 @@ export default function ProductDetailScreen() {
                         </View>
                         <View style={styles.countryPriceCol}>
                           <Text style={[styles.countryPrice, { color: colors.primary }]}>
-                            {bestResult.currency === "GBP" ? "£" : bestResult.currency === "EUR" ? "€" : "$"}
-                            {bestResult.price.toFixed(2)}
+                            {convertedPrice}
                           </Text>
-                          {bestResult.price < product.price && bestResult.price > 0 && (
+                          {savings > 1 && (
                             <View style={[styles.savingsBadge, { backgroundColor: colors.success + "15" }]}>
                               <TrendingDown size={10} color={colors.success} />
                               <Text style={[styles.savingsText, { color: colors.success }]}>
-                                Save ${(product.price - bestResult.price).toFixed(0)}
+                                Save {format(savings, currencyCode)}
                               </Text>
                             </View>
                           )}
                         </View>
                       </View>
                       {countryData.results.length > 1 && (
-                        <View style={styles.moreStores}>
+                        <View style={[styles.moreStores, { borderTopColor: colors.borderLight }]}>
                           {countryData.results.slice(1, 3).map((r, ri) => (
                             <View key={`more-${ri}`} style={styles.moreStoreRow}>
-                              <Text style={[styles.moreStoreName, { color: colors.textSecondary }]}>
-                                {r.store}
-                              </Text>
+                              <Text style={[styles.moreStoreName, { color: colors.textSecondary }]}>{r.store}</Text>
                               <Text style={[styles.moreStorePrice, { color: colors.textSecondary }]}>
-                                ${r.price.toFixed(2)}
+                                {format(r.price, r.currency)}
                               </Text>
                             </View>
                           ))}
@@ -417,9 +483,7 @@ export default function ProductDetailScreen() {
                       <Pressable
                         key={list.id}
                         onPress={() => {
-                          if (!alreadyIn) {
-                            handleSaveToWishlist(list.id);
-                          }
+                          if (!alreadyIn) handleSaveToWishlist(list.id);
                         }}
                         style={[
                           styles.saveChip,
@@ -434,12 +498,7 @@ export default function ProductDetailScreen() {
                         ) : (
                           <Text style={{ fontSize: 18 }}>{list.emoji}</Text>
                         )}
-                        <Text
-                          style={[
-                            styles.saveChipText,
-                            { color: alreadyIn ? colors.success : colors.text },
-                          ]}
-                        >
+                        <Text style={[styles.saveChipText, { color: alreadyIn ? colors.success : colors.text }]}>
                           {alreadyIn ? "Saved" : list.title}
                         </Text>
                       </Pressable>
@@ -546,7 +605,7 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 18,
     borderWidth: 1,
-    marginBottom: 24,
+    marginBottom: 14,
   },
   priceLabel: {
     fontSize: 12,
@@ -555,6 +614,18 @@ const styles = StyleSheet.create({
   priceValue: {
     fontSize: 28,
     fontWeight: "800" as const,
+  },
+  originalPriceRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    marginTop: 4,
+  },
+  originalPrice: {
+    fontSize: 12,
+  },
+  priceActions: {
+    gap: 8,
   },
   visitBtn: {
     flexDirection: "row" as const,
@@ -568,6 +639,34 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "700" as const,
+  },
+  alertCard: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 14,
+    marginBottom: 24,
+  },
+  alertIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  alertInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  alertTitle: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+  },
+  alertSub: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   descSection: {
     marginBottom: 24,
@@ -722,7 +821,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: "#00000010",
     gap: 6,
   },
   moreStoreRow: {

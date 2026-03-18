@@ -1,0 +1,192 @@
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import createContextHook from "@nkzw/create-context-hook";
+import {
+  COUNTRIES,
+  CURRENCIES,
+  CountryData,
+  CurrencyData,
+  getCountryByCode,
+  getCountryByName,
+  getCurrencyByCode,
+  getCurrencySymbol,
+  convertCurrency,
+  formatPrice,
+  EXCHANGE_RATES,
+} from "@/constants/countries";
+import { useAuth } from "@/providers/AuthProvider";
+
+const LOCATION_COUNTRY_KEY = "user_country_code";
+const LOCATION_CITY_KEY = "user_city";
+const LOCATION_CURRENCY_KEY = "user_currency_code";
+
+export const [LocationProvider, useLocation] = createContextHook(() => {
+  const queryClient = useQueryClient();
+  const { profile, updateProfile } = useAuth();
+
+  const [countryCode, setCountryCodeState] = useState<string>("US");
+  const [city, setCityState] = useState<string>("");
+  const [currencyCode, setCurrencyCodeState] = useState<string>("USD");
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [storedCountry, storedCity, storedCurrency] = await Promise.all([
+          AsyncStorage.getItem(LOCATION_COUNTRY_KEY),
+          AsyncStorage.getItem(LOCATION_CITY_KEY),
+          AsyncStorage.getItem(LOCATION_CURRENCY_KEY),
+        ]);
+
+        if (storedCountry) setCountryCodeState(storedCountry);
+        if (storedCity) setCityState(storedCity);
+        if (storedCurrency) setCurrencyCodeState(storedCurrency);
+
+        console.log("[Location] Loaded:", { storedCountry, storedCity, storedCurrency });
+      } catch (err) {
+        console.log("[Location] Error loading:", err);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    void load();
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded || !profile) return;
+
+    const profileCountry = getCountryByName(profile.country);
+    if (profileCountry) {
+      const storedCheck = async () => {
+        const storedCountry = await AsyncStorage.getItem(LOCATION_COUNTRY_KEY);
+        if (!storedCountry) {
+          setCountryCodeState(profileCountry.code);
+          setCurrencyCodeState(profileCountry.currency);
+          void AsyncStorage.setItem(LOCATION_COUNTRY_KEY, profileCountry.code);
+          void AsyncStorage.setItem(LOCATION_CURRENCY_KEY, profileCountry.currency);
+          console.log("[Location] Synced from profile:", profileCountry.name);
+        }
+      };
+      void storedCheck();
+    }
+  }, [profile, isLoaded]);
+
+  const country = useMemo<CountryData | undefined>(
+    () => getCountryByCode(countryCode),
+    [countryCode]
+  );
+
+  const currency = useMemo<CurrencyData | undefined>(
+    () => getCurrencyByCode(currencyCode),
+    [currencyCode]
+  );
+
+  const setCountry = useCallback(
+    async (code: string) => {
+      const c = getCountryByCode(code);
+      if (!c) return;
+
+      setCountryCodeState(code);
+      await AsyncStorage.setItem(LOCATION_COUNTRY_KEY, code);
+
+      if (c.currency !== currencyCode) {
+        setCurrencyCodeState(c.currency);
+        await AsyncStorage.setItem(LOCATION_CURRENCY_KEY, c.currency);
+      }
+
+      try {
+        await updateProfile({ country: c.name, currency: c.currency });
+      } catch {
+        console.log("[Location] Profile sync skipped");
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["search"] });
+      console.log("[Location] Country set to:", c.name, c.currency);
+    },
+    [currencyCode, updateProfile, queryClient]
+  );
+
+  const setCity = useCallback(async (newCity: string) => {
+    setCityState(newCity);
+    await AsyncStorage.setItem(LOCATION_CITY_KEY, newCity);
+    console.log("[Location] City set to:", newCity);
+  }, []);
+
+  const setCurrency = useCallback(
+    async (code: string) => {
+      setCurrencyCodeState(code);
+      await AsyncStorage.setItem(LOCATION_CURRENCY_KEY, code);
+
+      try {
+        await updateProfile({ currency: code });
+      } catch {
+        console.log("[Location] Currency profile sync skipped");
+      }
+
+      console.log("[Location] Currency set to:", code);
+    },
+    [updateProfile]
+  );
+
+  const convert = useCallback(
+    (amount: number, fromCurrency: string): number => {
+      return convertCurrency(amount, fromCurrency, currencyCode);
+    },
+    [currencyCode]
+  );
+
+  const format = useCallback(
+    (amount: number, fromCurrency?: string): string => {
+      if (fromCurrency && fromCurrency !== currencyCode) {
+        const converted = convertCurrency(amount, fromCurrency, currencyCode);
+        return formatPrice(converted, currencyCode);
+      }
+      return formatPrice(amount, currencyCode);
+    },
+    [currencyCode]
+  );
+
+  const serpApiCountryCode = useMemo(
+    () => country?.serpApiCode ?? "us",
+    [country]
+  );
+
+  const availableStores = useMemo(
+    () => country?.stores ?? [],
+    [country]
+  );
+
+  const availableCities = useMemo(
+    () => country?.cities ?? [],
+    [country]
+  );
+
+  return useMemo(
+    () => ({
+      countryCode,
+      country,
+      city,
+      currencyCode,
+      currency,
+      isLoaded,
+      serpApiCountryCode,
+      availableStores,
+      availableCities,
+      setCountry,
+      setCity,
+      setCurrency,
+      convert,
+      format,
+      allCountries: COUNTRIES,
+      allCurrencies: CURRENCIES,
+      exchangeRates: EXCHANGE_RATES,
+      getCurrencySymbol,
+    }),
+    [
+      countryCode, country, city, currencyCode, currency, isLoaded,
+      serpApiCountryCode, availableStores, availableCities,
+      setCountry, setCity, setCurrency, convert, format,
+    ]
+  );
+});

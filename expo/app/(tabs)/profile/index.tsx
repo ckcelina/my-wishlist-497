@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,11 +9,11 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  FlatList,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  Settings,
   Globe,
   DollarSign,
   Shield,
@@ -31,47 +31,43 @@ import {
   Moon,
   Monitor,
   Palette,
+  MapPin,
+  Search,
+  Store,
+  ArrowLeftRight,
 } from "lucide-react-native";
 import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTheme, ThemeMode } from "@/providers/ThemeProvider";
+import { useLocation } from "@/providers/LocationProvider";
 import { checkDatabaseHealth, DbHealthResult } from "@/lib/api";
-
-const COUNTRIES = [
-  "United States", "United Kingdom", "Canada", "Australia", "Germany",
-  "France", "Japan", "South Korea", "India", "Brazil",
-  "Mexico", "Saudi Arabia", "UAE", "Singapore", "Nigeria",
-];
-
-const CURRENCIES = [
-  { code: "USD", name: "US Dollar", symbol: "$" },
-  { code: "GBP", name: "British Pound", symbol: "£" },
-  { code: "CAD", name: "Canadian Dollar", symbol: "C$" },
-  { code: "AUD", name: "Australian Dollar", symbol: "A$" },
-  { code: "EUR", name: "Euro", symbol: "€" },
-  { code: "JPY", name: "Japanese Yen", symbol: "¥" },
-  { code: "KRW", name: "Korean Won", symbol: "₩" },
-  { code: "INR", name: "Indian Rupee", symbol: "₹" },
-  { code: "BRL", name: "Brazilian Real", symbol: "R$" },
-  { code: "SAR", name: "Saudi Riyal", symbol: "﷼" },
-  { code: "NGN", name: "Nigerian Naira", symbol: "₦" },
-];
+import { CountryData, CurrencyData } from "@/constants/countries";
 
 export default function ProfileScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const { user, wishlists, sharedLists, allProducts } = useWishlistContext();
   const { profile, signOut, isSigningOut, updateProfile, isUpdatingProfile } = useAuth();
-
   const { themeMode, setThemeMode } = useTheme();
+  const {
+    country, city, currency, countryCode, currencyCode,
+    availableStores, availableCities,
+    setCountry, setCity, setCurrency,
+    allCountries, allCurrencies,
+  } = useLocation();
+
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [showCityPicker, setShowCityPicker] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showNameEditor, setShowNameEditor] = useState(false);
+  const [showStores, setShowStores] = useState(false);
   const [editName, setEditName] = useState("");
   const [dbHealth, setDbHealth] = useState<DbHealthResult | null>(null);
+  const [countrySearch, setCountrySearch] = useState("");
+  const [currencySearch, setCurrencySearch] = useState("");
 
   const dbHealthMutation = useMutation({
     mutationFn: async () => {
@@ -87,73 +83,145 @@ export default function ProfileScreen() {
           .map(([name]) => name);
         Alert.alert(
           "Missing Tables",
-          `The following tables need to be created in Supabase:\n\n${missing.join(", ")}\n\nRun the SQL migration in your Supabase dashboard SQL editor.`
+          `The following tables need to be created:\n\n${missing.join(", ")}`
         );
       }
     },
-    onError: (err) => {
-      console.log("[Profile] DB health check error:", err);
+    onError: () => {
       Alert.alert("Error", "Failed to check database status.");
     },
   });
 
   const displayName = profile?.full_name || user.name;
   const displayEmail = profile?.email || user.email;
-  const displayCountry = profile?.country || user.country;
-  const displayCurrency = profile?.currency || user.currency;
 
-  const handleUpdateCountry = async (country: string) => {
-    setShowCountryPicker(false);
-    try {
-      await updateProfile({ country });
-      console.log("[Profile] Country updated to:", country);
-    } catch (err) {
-      console.log("[Profile] Failed to update country:", err);
-      Alert.alert("Error", "Failed to update country.");
-    }
-  };
+  const filteredCountries = useMemo(() => {
+    if (!countrySearch.trim()) return allCountries;
+    const q = countrySearch.toLowerCase();
+    return allCountries.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.code.toLowerCase().includes(q) ||
+        c.cities.some((city) => city.toLowerCase().includes(q))
+    );
+  }, [countrySearch, allCountries]);
 
-  const handleUpdateCurrency = async (currency: string) => {
-    setShowCurrencyPicker(false);
-    try {
-      await updateProfile({ currency });
-      console.log("[Profile] Currency updated to:", currency);
-    } catch (err) {
-      console.log("[Profile] Failed to update currency:", err);
-      Alert.alert("Error", "Failed to update currency.");
-    }
-  };
+  const filteredCurrencies = useMemo(() => {
+    if (!currencySearch.trim()) return allCurrencies;
+    const q = currencySearch.toLowerCase();
+    return allCurrencies.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.code.toLowerCase().includes(q) ||
+        c.symbol.toLowerCase().includes(q)
+    );
+  }, [currencySearch, allCurrencies]);
+
+  const handleSelectCountry = useCallback(
+    (c: CountryData) => {
+      setShowCountryPicker(false);
+      setCountrySearch("");
+      void setCountry(c.code);
+    },
+    [setCountry]
+  );
+
+  const handleSelectCurrency = useCallback(
+    (c: CurrencyData) => {
+      setShowCurrencyPicker(false);
+      setCurrencySearch("");
+      void setCurrency(c.code);
+    },
+    [setCurrency]
+  );
+
+  const handleSelectCity = useCallback(
+    (selectedCity: string) => {
+      setShowCityPicker(false);
+      void setCity(selectedCity);
+    },
+    [setCity]
+  );
 
   const handleUpdateName = async () => {
     if (!editName.trim()) return;
     setShowNameEditor(false);
     try {
       await updateProfile({ full_name: editName.trim() });
-      console.log("[Profile] Name updated to:", editName.trim());
-    } catch (err) {
-      console.log("[Profile] Failed to update name:", err);
+    } catch {
       Alert.alert("Error", "Failed to update name.");
     }
   };
 
   const handleSignOut = () => {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: isSigningOut ? "Signing Out..." : "Sign Out",
-          style: "destructive",
-          onPress: () => {
-            signOut().catch((err: unknown) => {
-              console.log("Sign out error:", err);
-            });
-          },
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: isSigningOut ? "Signing Out..." : "Sign Out",
+        style: "destructive",
+        onPress: () => {
+          signOut().catch(() => {});
         },
-      ]
-    );
+      },
+    ]);
   };
+
+  const renderCountryItem = useCallback(
+    ({ item }: { item: CountryData }) => {
+      const isSelected = item.code === countryCode;
+      return (
+        <Pressable
+          onPress={() => handleSelectCountry(item)}
+          style={[
+            styles.pickerItem,
+            { borderBottomColor: colors.borderLight },
+            isSelected && { backgroundColor: colors.primaryFaded },
+          ]}
+        >
+          <View style={styles.pickerItemLeft}>
+            <Text style={styles.pickerFlag}>{item.flag}</Text>
+            <View style={styles.pickerItemInfo}>
+              <Text style={[styles.pickerItemName, { color: colors.text }]}>{item.name}</Text>
+              <Text style={[styles.pickerItemSub, { color: colors.textTertiary }]}>
+                {item.currency} · {item.cities.slice(0, 3).join(", ")}
+                {item.cities.length > 3 ? ` +${item.cities.length - 3}` : ""}
+              </Text>
+            </View>
+          </View>
+          {isSelected && <Check size={18} color={colors.primary} />}
+        </Pressable>
+      );
+    },
+    [countryCode, colors, handleSelectCountry]
+  );
+
+  const renderCurrencyItem = useCallback(
+    ({ item }: { item: CurrencyData }) => {
+      const isSelected = item.code === currencyCode;
+      return (
+        <Pressable
+          onPress={() => handleSelectCurrency(item)}
+          style={[
+            styles.pickerItem,
+            { borderBottomColor: colors.borderLight },
+            isSelected && { backgroundColor: colors.primaryFaded },
+          ]}
+        >
+          <View style={styles.pickerItemLeft}>
+            <View style={[styles.currencySymbolBg, { backgroundColor: colors.primaryFaded }]}>
+              <Text style={[styles.currencySymbolText, { color: colors.primary }]}>{item.symbol}</Text>
+            </View>
+            <View style={styles.pickerItemInfo}>
+              <Text style={[styles.pickerItemName, { color: colors.text }]}>{item.code}</Text>
+              <Text style={[styles.pickerItemSub, { color: colors.textTertiary }]}>{item.name}</Text>
+            </View>
+          </View>
+          {isSelected && <Check size={18} color={colors.primary} />}
+        </Pressable>
+      );
+    },
+    [currencyCode, colors, handleSelectCurrency]
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -172,6 +240,16 @@ export default function ProfileScreen() {
             <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
           </Pressable>
           <Text style={[styles.email, { color: colors.textSecondary }]}>{displayEmail}</Text>
+
+          <View style={[styles.locationBadge, { backgroundColor: colors.primaryFaded }]}>
+            <MapPin size={14} color={colors.primary} />
+            <Text style={[styles.locationText, { color: colors.primary }]}>
+              {country?.flag} {country?.name ?? "Not set"}{city ? ` · ${city}` : ""}
+            </Text>
+            <Text style={[styles.locationCurrency, { color: colors.textSecondary }]}>
+              {currency?.symbol} {currencyCode}
+            </Text>
+          </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -201,46 +279,92 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>PREFERENCES</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>LOCATION & CURRENCY</Text>
           <View style={[styles.sectionCards, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
             <Pressable
               style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
-              onPress={() => setShowThemePicker(true)}
-            >
-              <View style={styles.settingLeft}>
-                <Palette size={20} color={colors.primary} />
-                <Text style={[styles.settingLabel, { color: colors.text }]}>Appearance</Text>
-              </View>
-              <View style={styles.settingRight}>
-                <Text style={[styles.settingValue, { color: colors.textTertiary }]}>
-                  {themeMode === "system" ? "System" : themeMode === "light" ? "Light" : "Dark"}
-                </Text>
-                <ChevronRight size={18} color={colors.textTertiary} />
-              </View>
-            </Pressable>
-            <Pressable
-              style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
-              onPress={() => setShowCountryPicker(true)}
+              onPress={() => {
+                setCountrySearch("");
+                setShowCountryPicker(true);
+              }}
             >
               <View style={styles.settingLeft}>
                 <Globe size={20} color={colors.primary} />
                 <Text style={[styles.settingLabel, { color: colors.text }]}>Country</Text>
               </View>
               <View style={styles.settingRight}>
-                <Text style={[styles.settingValue, { color: colors.textTertiary }]}>{displayCountry}</Text>
+                <Text style={[styles.settingValue, { color: colors.textTertiary }]}>
+                  {country?.flag} {country?.name ?? "Select"}
+                </Text>
                 <ChevronRight size={18} color={colors.textTertiary} />
               </View>
             </Pressable>
             <Pressable
-              style={styles.settingRow}
-              onPress={() => setShowCurrencyPicker(true)}
+              style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
+              onPress={() => setShowCityPicker(true)}
+            >
+              <View style={styles.settingLeft}>
+                <MapPin size={20} color={colors.primary} />
+                <Text style={[styles.settingLabel, { color: colors.text }]}>City</Text>
+              </View>
+              <View style={styles.settingRight}>
+                <Text style={[styles.settingValue, { color: colors.textTertiary }]}>
+                  {city || "Select city"}
+                </Text>
+                <ChevronRight size={18} color={colors.textTertiary} />
+              </View>
+            </Pressable>
+            <Pressable
+              style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
+              onPress={() => {
+                setCurrencySearch("");
+                setShowCurrencyPicker(true);
+              }}
             >
               <View style={styles.settingLeft}>
                 <DollarSign size={20} color={colors.primary} />
                 <Text style={[styles.settingLabel, { color: colors.text }]}>Currency</Text>
               </View>
               <View style={styles.settingRight}>
-                <Text style={[styles.settingValue, { color: colors.textTertiary }]}>{displayCurrency}</Text>
+                <Text style={[styles.settingValue, { color: colors.textTertiary }]}>
+                  {currency?.symbol} {currencyCode}
+                </Text>
+                <ChevronRight size={18} color={colors.textTertiary} />
+              </View>
+            </Pressable>
+            <Pressable
+              style={styles.settingRow}
+              onPress={() => setShowStores(true)}
+            >
+              <View style={styles.settingLeft}>
+                <Store size={20} color={colors.primary} />
+                <Text style={[styles.settingLabel, { color: colors.text }]}>Trusted Stores</Text>
+              </View>
+              <View style={styles.settingRight}>
+                <Text style={[styles.settingValue, { color: colors.textTertiary }]}>
+                  {availableStores.length} stores
+                </Text>
+                <ChevronRight size={18} color={colors.textTertiary} />
+              </View>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>APPEARANCE</Text>
+          <View style={[styles.sectionCards, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+            <Pressable
+              style={styles.settingRow}
+              onPress={() => setShowThemePicker(true)}
+            >
+              <View style={styles.settingLeft}>
+                <Palette size={20} color={colors.primary} />
+                <Text style={[styles.settingLabel, { color: colors.text }]}>Theme</Text>
+              </View>
+              <View style={styles.settingRight}>
+                <Text style={[styles.settingValue, { color: colors.textTertiary }]}>
+                  {themeMode === "system" ? "System" : themeMode === "light" ? "Light" : "Dark"}
+                </Text>
                 <ChevronRight size={18} color={colors.textTertiary} />
               </View>
             </Pressable>
@@ -257,18 +381,6 @@ export default function ProfileScreen() {
               <View style={styles.settingLeft}>
                 <Shield size={20} color={colors.primary} />
                 <Text style={[styles.settingLabel, { color: colors.text }]}>Privacy</Text>
-              </View>
-              <View style={styles.settingRight}>
-                <ChevronRight size={18} color={colors.textTertiary} />
-              </View>
-            </Pressable>
-            <Pressable
-              style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
-              onPress={() => Alert.alert("Settings", "App settings coming soon.")}
-            >
-              <View style={styles.settingLeft}>
-                <Settings size={20} color={colors.primary} />
-                <Text style={[styles.settingLabel, { color: colors.text }]}>Settings</Text>
               </View>
               <View style={styles.settingRight}>
                 <ChevronRight size={18} color={colors.textTertiary} />
@@ -297,10 +409,7 @@ export default function ProfileScreen() {
                 )}
               </View>
             </Pressable>
-            <Pressable
-              style={styles.settingRow}
-              onPress={handleSignOut}
-            >
+            <Pressable style={styles.settingRow} onPress={handleSignOut}>
               <View style={styles.settingLeft}>
                 <LogOut size={20} color={colors.error} />
                 <Text style={[styles.settingLabel, { color: colors.error }]}>Sign Out</Text>
@@ -322,22 +431,32 @@ export default function ProfileScreen() {
                 <X size={22} color={colors.text} />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
-              {COUNTRIES.map((country) => (
-                <Pressable
-                  key={country}
-                  onPress={() => void handleUpdateCountry(country)}
-                  style={[
-                    styles.modalOption,
-                    { borderBottomColor: colors.borderLight },
-                    displayCountry === country && { backgroundColor: colors.primaryFaded },
-                  ]}
-                >
-                  <Text style={[styles.modalOptionText, { color: colors.text }]}>{country}</Text>
-                  {displayCountry === country && <Check size={18} color={colors.primary} />}
+            <View style={[styles.searchBarModal, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+              <Search size={16} color={colors.textTertiary} />
+              <TextInput
+                placeholder="Search countries or cities..."
+                placeholderTextColor={colors.textTertiary}
+                style={[styles.searchInputModal, { color: colors.text }]}
+                value={countrySearch}
+                onChangeText={setCountrySearch}
+                autoFocus
+              />
+              {countrySearch.length > 0 && (
+                <Pressable onPress={() => setCountrySearch("")}>
+                  <X size={16} color={colors.textTertiary} />
                 </Pressable>
-              ))}
-            </ScrollView>
+              )}
+            </View>
+            <FlatList
+              data={filteredCountries}
+              keyExtractor={(item) => item.code}
+              renderItem={renderCountryItem}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              initialNumToRender={20}
+              maxToRenderPerBatch={30}
+              style={styles.modalList}
+            />
           </View>
         </View>
       </Modal>
@@ -346,32 +465,122 @@ export default function ProfileScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Currency</Text>
+              <View style={styles.modalHeaderLeft}>
+                <ArrowLeftRight size={18} color={colors.primary} />
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Select Currency</Text>
+              </View>
               <Pressable onPress={() => setShowCurrencyPicker(false)}>
                 <X size={22} color={colors.text} />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
-              {CURRENCIES.map((curr) => (
-                <Pressable
-                  key={curr.code}
-                  onPress={() => void handleUpdateCurrency(curr.code)}
-                  style={[
-                    styles.modalOption,
-                    { borderBottomColor: colors.borderLight },
-                    displayCurrency === curr.code && { backgroundColor: colors.primaryFaded },
-                  ]}
-                >
-                  <View style={styles.currencyRow}>
-                    <Text style={[styles.currencySymbol, { color: colors.primary }]}>{curr.symbol}</Text>
-                    <View>
-                      <Text style={[styles.modalOptionText, { color: colors.text }]}>{curr.code}</Text>
-                      <Text style={[styles.currencyName, { color: colors.textSecondary }]}>{curr.name}</Text>
-                    </View>
-                  </View>
-                  {displayCurrency === curr.code && <Check size={18} color={colors.primary} />}
+            <View style={[styles.searchBarModal, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+              <Search size={16} color={colors.textTertiary} />
+              <TextInput
+                placeholder="Search currencies..."
+                placeholderTextColor={colors.textTertiary}
+                style={[styles.searchInputModal, { color: colors.text }]}
+                value={currencySearch}
+                onChangeText={setCurrencySearch}
+                autoFocus
+              />
+              {currencySearch.length > 0 && (
+                <Pressable onPress={() => setCurrencySearch("")}>
+                  <X size={16} color={colors.textTertiary} />
                 </Pressable>
-              ))}
+              )}
+            </View>
+            <FlatList
+              data={filteredCurrencies}
+              keyExtractor={(item) => item.code}
+              renderItem={renderCurrencyItem}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              initialNumToRender={20}
+              maxToRenderPerBatch={30}
+              style={styles.modalList}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showCityPicker} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Select City in {country?.name ?? ""}
+              </Text>
+              <Pressable onPress={() => setShowCityPicker(false)}>
+                <X size={22} color={colors.text} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
+              {availableCities.length === 0 ? (
+                <View style={styles.emptyPicker}>
+                  <Text style={[styles.emptyPickerText, { color: colors.textSecondary }]}>
+                    No cities available for this country
+                  </Text>
+                </View>
+              ) : (
+                availableCities.map((c) => (
+                  <Pressable
+                    key={c}
+                    onPress={() => handleSelectCity(c)}
+                    style={[
+                      styles.pickerItem,
+                      { borderBottomColor: colors.borderLight },
+                      city === c && { backgroundColor: colors.primaryFaded },
+                    ]}
+                  >
+                    <View style={styles.pickerItemLeft}>
+                      <MapPin size={16} color={colors.textSecondary} />
+                      <Text style={[styles.pickerItemName, { color: colors.text }]}>{c}</Text>
+                    </View>
+                    {city === c && <Check size={18} color={colors.primary} />}
+                  </Pressable>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showStores} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Trusted Stores in {country?.name ?? ""}
+              </Text>
+              <Pressable onPress={() => setShowStores(false)}>
+                <X size={22} color={colors.text} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
+              {availableStores.length === 0 ? (
+                <View style={styles.emptyPicker}>
+                  <Text style={styles.emptyEmoji}>🏬</Text>
+                  <Text style={[styles.emptyPickerText, { color: colors.textSecondary }]}>
+                    No trusted stores configured for this country yet.{"\n"}Search results will use global stores.
+                  </Text>
+                </View>
+              ) : (
+                availableStores.map((store, idx) => (
+                  <View
+                    key={`${store}-${idx}`}
+                    style={[styles.storeItem, { borderBottomColor: colors.borderLight }]}
+                  >
+                    <View style={[styles.storeIcon, { backgroundColor: colors.primaryFaded }]}>
+                      <Store size={16} color={colors.primary} />
+                    </View>
+                    <View style={styles.storeInfo}>
+                      <Text style={[styles.storeName, { color: colors.text }]}>{store}</Text>
+                      <Text style={[styles.storeStatus, { color: colors.success }]}>Verified</Text>
+                    </View>
+                    <CheckCircle2 size={16} color={colors.success} />
+                  </View>
+                ))
+              )}
             </ScrollView>
           </View>
         </View>
@@ -493,7 +702,23 @@ const styles = StyleSheet.create({
   },
   email: {
     fontSize: 14,
-    marginBottom: 24,
+    marginBottom: 14,
+  },
+  locationBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+    marginBottom: 20,
+  },
+  locationText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+  },
+  locationCurrency: {
+    fontSize: 12,
   },
   statsRow: {
     flexDirection: "row",
@@ -558,9 +783,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    flexShrink: 1,
   },
   settingValue: {
     fontSize: 14,
+    maxWidth: 180,
   },
   modalOverlay: {
     flex: 1,
@@ -570,7 +797,7 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: "70%",
+    maxHeight: "80%",
     paddingBottom: 40,
   },
   modalHeader: {
@@ -579,43 +806,117 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 16,
+    paddingBottom: 12,
+  },
+  modalHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: "700" as const,
   },
-  modalList: {
-    paddingHorizontal: 20,
+  searchBarModal: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
   },
-  modalOption: {
+  searchInputModal: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+  },
+  modalList: {
+    paddingHorizontal: 12,
+  },
+  pickerItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderRadius: 10,
     marginBottom: 2,
   },
-  modalOptionText: {
-    fontSize: 16,
-    fontWeight: "500" as const,
-  },
-  currencyRow: {
+  pickerItemLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flex: 1,
   },
-  currencySymbol: {
-    fontSize: 20,
+  pickerFlag: {
+    fontSize: 26,
+  },
+  pickerItemInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  pickerItemName: {
+    fontSize: 16,
+    fontWeight: "500" as const,
+  },
+  pickerItemSub: {
+    fontSize: 12,
+  },
+  currencySymbolBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  currencySymbolText: {
+    fontSize: 16,
     fontWeight: "700" as const,
-    width: 30,
-    textAlign: "center" as const,
   },
-  currencyName: {
-    fontSize: 13,
-    marginTop: 1,
+  emptyPicker: {
+    alignItems: "center",
+    paddingVertical: 40,
+    gap: 10,
+  },
+  emptyEmoji: {
+    fontSize: 40,
+  },
+  emptyPickerText: {
+    fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 20,
+    lineHeight: 20,
+  },
+  storeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  storeIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  storeInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  storeName: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+  },
+  storeStatus: {
+    fontSize: 12,
+    fontWeight: "500" as const,
   },
   nameEditorContent: {
     margin: 20,

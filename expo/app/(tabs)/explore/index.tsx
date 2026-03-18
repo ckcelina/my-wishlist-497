@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,29 +10,48 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Search, X, TrendingUp, ShoppingBag } from "lucide-react-native";
+import { Search, X, TrendingUp, ShoppingBag, MapPin, Store } from "lucide-react-native";
 import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
+import { useLocation } from "@/providers/LocationProvider";
 import { mockCategories } from "@/mocks/data";
 import { searchProducts, SerpApiResult } from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
 import SectionHeader from "@/components/SectionHeader";
 import { Product } from "@/types";
 
+const FOOD_CATEGORIES = [
+  { id: "fc1", name: "Food Delivery", emoji: "🍔", productCount: 0 },
+  { id: "fc2", name: "Groceries", emoji: "🛒", productCount: 0 },
+  { id: "fc3", name: "Restaurant", emoji: "🍽️", productCount: 0 },
+];
+
+const SHOPPING_CATEGORIES = [
+  { id: "sc1", name: "Electronics", emoji: "📱", productCount: 0 },
+  { id: "sc2", name: "Fashion", emoji: "👟", productCount: 0 },
+  { id: "sc3", name: "Home & Decor", emoji: "🏡", productCount: 0 },
+  { id: "sc4", name: "Beauty", emoji: "✨", productCount: 0 },
+  { id: "sc5", name: "Technology", emoji: "💻", productCount: 0 },
+  { id: "sc6", name: "Sports", emoji: "⚽", productCount: 0 },
+  { id: "sc7", name: "Books", emoji: "📚", productCount: 0 },
+  { id: "sc8", name: "Toys & Games", emoji: "🧸", productCount: 0 },
+];
+
 export default function ExploreScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { allProducts, trendingProducts } = useWishlistContext();
+  const { country, serpApiCountryCode, availableStores, format } = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [serpResults, setSerpResults] = useState<SerpApiResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
   const searchMutation = useMutation({
     mutationFn: async (query: string) => {
-      console.log("[Explore] Searching SerpAPI for:", query);
-      const { results, error } = await searchProducts(query);
+      console.log(`[Explore] Searching SerpAPI for: "${query}" in ${serpApiCountryCode}`);
+      const { results, error } = await searchProducts(query, serpApiCountryCode);
       if (error) {
         console.log("[Explore] Search error:", error);
       }
@@ -43,19 +62,21 @@ export default function ExploreScreen() {
       setHasSearched(true);
       console.log(`[Explore] Got ${results.length} results from SerpAPI`);
     },
-    onError: (err) => {
-      console.log("[Explore] Search mutation error:", err);
+    onError: () => {
       setHasSearched(true);
     },
   });
 
-  const localResults = searchQuery.length > 0
-    ? [...allProducts, ...trendingProducts].filter((p) =>
-        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.store.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : [];
+  const localResults = useMemo(() => {
+    if (searchQuery.length === 0) return [];
+    const q = searchQuery.toLowerCase();
+    return [...allProducts, ...trendingProducts].filter(
+      (p) =>
+        p.title.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q) ||
+        p.store.toLowerCase().includes(q)
+    );
+  }, [searchQuery, allProducts, trendingProducts]);
 
   const handleSearch = useCallback(() => {
     const q = searchQuery.trim();
@@ -69,43 +90,66 @@ export default function ExploreScreen() {
     setHasSearched(false);
   }, []);
 
-  const handleCategoryPress = useCallback((categoryName: string) => {
-    setSearchQuery(categoryName);
-    searchMutation.mutate(categoryName);
-  }, [searchMutation]);
+  const handleCategoryPress = useCallback(
+    (categoryName: string) => {
+      const countryName = country?.name ?? "";
+      const storeQuery = availableStores.length > 0
+        ? `${categoryName} ${countryName}`
+        : `${categoryName} delivery ${countryName}`;
+      setSearchQuery(storeQuery);
+      searchMutation.mutate(storeQuery);
+    },
+    [searchMutation, country, availableStores]
+  );
 
-  const serpToProduct = useCallback((result: SerpApiResult, index: number): Product => ({
-    id: `serp_${index}_${Date.now()}`,
-    title: result.title,
-    image: result.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
-    price: result.price,
-    currency: result.currency || "USD",
-    store: result.store,
-    storeUrl: result.link,
-    description: result.snippet,
-    category: "Search Result",
-    isPurchased: false,
-    addedAt: new Date().toISOString().split("T")[0],
-    country: "US",
-    rating: result.rating,
-  }), []);
+  const serpToProduct = useCallback(
+    (result: SerpApiResult, index: number): Product => ({
+      id: `serp_${index}_${Date.now()}`,
+      title: result.title,
+      image: result.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
+      price: result.price,
+      currency: result.currency || "USD",
+      store: result.store,
+      storeUrl: result.link,
+      description: result.snippet,
+      category: "Search Result",
+      isPurchased: false,
+      addedAt: new Date().toISOString().split("T")[0],
+      country: serpApiCountryCode.toUpperCase(),
+      rating: result.rating,
+    }),
+    [serpApiCountryCode]
+  );
 
   const isSearchActive = searchQuery.length > 0;
+
+  const allCategories = useMemo(() => {
+    return [...FOOD_CATEGORIES, ...SHOPPING_CATEGORIES, ...mockCategories];
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Explore</Text>
+        <View style={styles.headerTop}>
+          <Text style={[styles.title, { color: colors.text }]}>Explore</Text>
+          <View style={[styles.locationChip, { backgroundColor: colors.primaryFaded }]}>
+            <MapPin size={12} color={colors.primary} />
+            <Text style={[styles.locationChipText, { color: colors.primary }]}>
+              {country?.flag} {country?.name ?? "Set location"}
+            </Text>
+          </View>
+        </View>
         <View style={[styles.searchBar, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
           <Search size={18} color={colors.textTertiary} />
           <TextInput
-            placeholder="Search products, stores, categories..."
+            placeholder={`Search in ${country?.name ?? "your country"}...`}
             placeholderTextColor={colors.textTertiary}
             style={[styles.searchInput, { color: colors.text }]}
             value={searchQuery}
             onChangeText={setSearchQuery}
             onSubmitEditing={handleSearch}
             returnKeyType="search"
+            testID="explore-search-input"
           />
           {searchQuery.length > 0 && (
             <Pressable onPress={handleClear}>
@@ -117,9 +161,12 @@ export default function ExploreScreen() {
           <Pressable
             onPress={handleSearch}
             style={[styles.searchBtn, { backgroundColor: colors.primary }]}
+            testID="explore-search-btn"
           >
             <Search size={16} color="#FFFFFF" />
-            <Text style={styles.searchBtnText}>Search Online</Text>
+            <Text style={styles.searchBtnText}>
+              Search in {country?.name ?? "All Countries"}
+            </Text>
           </Pressable>
         )}
       </View>
@@ -130,7 +177,7 @@ export default function ExploreScreen() {
             <View style={styles.loadingState}>
               <ActivityIndicator color={colors.primary} size="large" />
               <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-                Searching stores worldwide...
+                Searching stores in {country?.name ?? "your area"}...
               </Text>
             </View>
           )}
@@ -140,18 +187,45 @@ export default function ExploreScreen() {
               <View style={styles.resultSectionHeader}>
                 <ShoppingBag size={16} color={colors.primary} />
                 <Text style={[styles.resultSectionTitle, { color: colors.text }]}>
-                  Online Results ({serpResults.length})
+                  Results in {country?.name} ({serpResults.length})
                 </Text>
               </View>
               {serpResults.map((result, idx) => {
                 const product = serpToProduct(result, idx);
+                const displayPrice = format(product.price, product.currency);
                 return (
-                  <ProductCard
+                  <Pressable
                     key={`serp-${idx}`}
-                    product={product}
-                    variant="horizontal"
-                    onPress={() => router.push({ pathname: "/product-detail", params: { id: product.id, serpData: JSON.stringify(result) } })}
-                  />
+                    onPress={() =>
+                      router.push({
+                        pathname: "/product-detail",
+                        params: { id: product.id, serpData: JSON.stringify(result) },
+                      })
+                    }
+                    style={[styles.resultCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                  >
+                    <View style={styles.resultCardContent}>
+                      <View style={styles.resultInfo}>
+                        <Text style={[styles.resultTitle, { color: colors.text }]} numberOfLines={2}>
+                          {product.title}
+                        </Text>
+                        <View style={styles.resultMeta}>
+                          <Store size={12} color={colors.textTertiary} />
+                          <Text style={[styles.resultStore, { color: colors.textTertiary }]}>
+                            {product.store}
+                          </Text>
+                        </View>
+                        <Text style={[styles.resultPrice, { color: colors.primary }]}>
+                          {displayPrice}
+                        </Text>
+                        {result.delivery && (
+                          <Text style={[styles.resultDelivery, { color: colors.success }]}>
+                            {result.delivery}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </Pressable>
                 );
               })}
             </View>
@@ -170,37 +244,74 @@ export default function ExploreScreen() {
                   key={product.id}
                   product={product}
                   variant="horizontal"
-                  onPress={() => router.push({ pathname: "/product-detail", params: { id: product.id } })}
+                  onPress={() =>
+                    router.push({ pathname: "/product-detail", params: { id: product.id } })
+                  }
                 />
               ))}
             </View>
           )}
 
-          {hasSearched && serpResults.length === 0 && localResults.length === 0 && !searchMutation.isPending && (
-            <View style={styles.emptySearch}>
-              <Text style={styles.emptyEmoji}>🔍</Text>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No results found</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                Try searching with different keywords
-              </Text>
-            </View>
-          )}
+          {hasSearched &&
+            serpResults.length === 0 &&
+            localResults.length === 0 &&
+            !searchMutation.isPending && (
+              <View style={styles.emptySearch}>
+                <Text style={styles.emptyEmoji}>🔍</Text>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>No results found</Text>
+                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                  Try searching with different keywords or change your country
+                </Text>
+              </View>
+            )}
 
-          {!hasSearched && localResults.length === 0 && !searchMutation.isPending && (
-            <View style={styles.emptySearch}>
-              <Text style={styles.emptyEmoji}>🔎</Text>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>Tap "Search Online"</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                Or press enter to search stores worldwide
-              </Text>
-            </View>
-          )}
+          {!hasSearched &&
+            localResults.length === 0 &&
+            !searchMutation.isPending && (
+              <View style={styles.emptySearch}>
+                <Text style={styles.emptyEmoji}>🔎</Text>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                  Tap "Search in {country?.name}"
+                </Text>
+                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                  We'll find items from trusted stores that deliver to you
+                </Text>
+              </View>
+            )}
         </ScrollView>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-          <SectionHeader title="Categories" />
+          {availableStores.length > 0 && (
+            <>
+              <SectionHeader title={`Stores in ${country?.name ?? "your area"}`} />
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.storesRow}
+              >
+                {availableStores.map((store, idx) => (
+                  <Pressable
+                    key={`store-${idx}`}
+                    onPress={() => {
+                      const q = `${store} ${country?.name ?? ""}`;
+                      setSearchQuery(q);
+                      searchMutation.mutate(q);
+                    }}
+                    style={[styles.storeChip, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                  >
+                    <View style={[styles.storeChipIcon, { backgroundColor: colors.primaryFaded }]}>
+                      <Store size={14} color={colors.primary} />
+                    </View>
+                    <Text style={[styles.storeChipText, { color: colors.text }]}>{store}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </>
+          )}
+
+          <SectionHeader title="Browse Categories" />
           <View style={styles.categoriesGrid}>
-            {mockCategories.map((category) => (
+            {allCategories.map((category) => (
               <Pressable
                 key={category.id}
                 onPress={() => handleCategoryPress(category.name)}
@@ -208,9 +319,6 @@ export default function ExploreScreen() {
               >
                 <Text style={styles.categoryEmoji}>{category.emoji}</Text>
                 <Text style={[styles.categoryName, { color: colors.text }]}>{category.name}</Text>
-                <Text style={[styles.categoryCount, { color: colors.textTertiary }]}>
-                  {category.productCount} items
-                </Text>
               </Pressable>
             ))}
           </View>
@@ -224,12 +332,18 @@ export default function ExploreScreen() {
               </Text>
             </View>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalList}
+          >
             {trendingProducts.map((item, index) => (
               <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
                 <ProductCard
                   product={item}
-                  onPress={() => router.push({ pathname: "/product-detail", params: { id: item.id } })}
+                  onPress={() =>
+                    router.push({ pathname: "/product-detail", params: { id: item.id } })
+                  }
                 />
               </View>
             ))}
@@ -242,7 +356,9 @@ export default function ExploreScreen() {
                 key={product.id}
                 product={product}
                 variant="horizontal"
-                onPress={() => router.push({ pathname: "/product-detail", params: { id: product.id } })}
+                onPress={() =>
+                  router.push({ pathname: "/product-detail", params: { id: product.id } })
+                }
               />
             ))}
           </View>
@@ -260,10 +376,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 12,
   },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
   title: {
     fontSize: 28,
     fontWeight: "800" as const,
-    marginBottom: 16,
+  },
+  locationChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  locationChipText: {
+    fontSize: 12,
+    fontWeight: "600" as const,
   },
   searchBar: {
     flexDirection: "row",
@@ -293,6 +426,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600" as const,
   },
+  storesRow: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  storeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
+  },
+  storeChipIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  storeChipText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+  },
   categoriesGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -313,9 +470,6 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 15,
     fontWeight: "600" as const,
-  },
-  categoryCount: {
-    fontSize: 12,
   },
   trendingBanner: {
     paddingHorizontal: 20,
@@ -356,6 +510,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700" as const,
   },
+  resultCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 10,
+  },
+  resultCardContent: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  resultInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  resultTitle: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    lineHeight: 20,
+  },
+  resultMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  resultStore: {
+    fontSize: 12,
+  },
+  resultPrice: {
+    fontSize: 18,
+    fontWeight: "800" as const,
+    marginTop: 4,
+  },
+  resultDelivery: {
+    fontSize: 12,
+    fontWeight: "500" as const,
+  },
   loadingState: {
     alignItems: "center",
     paddingVertical: 60,
@@ -379,5 +569,7 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 20,
   },
 });

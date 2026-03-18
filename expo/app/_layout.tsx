@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { WishlistProvider } from "@/providers/WishlistProvider";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import { LocationProvider } from "@/providers/LocationProvider";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -114,9 +115,11 @@ export default function RootLayout() {
         <ErrorBoundary>
           <ThemeProvider>
             <AuthProvider>
-              <WishlistProvider>
-                <RootLayoutNav />
-              </WishlistProvider>
+              <LocationProvider>
+                <WishlistProvider>
+                  <RootLayoutNav />
+                </WishlistProvider>
+              </LocationProvider>
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>

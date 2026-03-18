@@ -11,9 +11,10 @@ import {
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Plus, ChevronRight, Sparkles } from "lucide-react-native";
+import { Plus, ChevronRight, Sparkles, MapPin } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
+import { useLocation } from "@/providers/LocationProvider";
 import WishlistCard from "@/components/WishlistCard";
 import ProductCard from "@/components/ProductCard";
 
@@ -24,6 +25,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, myLists, sharedLists, trendingProducts, refreshWishlists } = useWishlistContext();
+  const { country, city, currency } = useLocation();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(() => {
@@ -105,7 +107,21 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.quickStats}>
+          <Pressable
+            onPress={() => router.push("/(tabs)/profile")}
+            style={[styles.locationBar, { backgroundColor: colors.primaryFaded }]}
+          >
+            <MapPin size={14} color={colors.primary} />
+            <Text style={[styles.locationBarText, { color: colors.primary }]}>
+              {country?.flag} {country?.name ?? "Set your location"}{city ? ` · ${city}` : ""}
+            </Text>
+            <Text style={[styles.locationCurrency, { color: colors.textSecondary }]}>
+              {currency?.symbol} {currency?.code}
+            </Text>
+            <ChevronRight size={14} color={colors.primary} />
+          </View>
+
+          <View style={styles.quickStats} testID="home-quick-stats">
             <View style={[styles.statPill, { backgroundColor: colors.primaryFaded }]}>
               <Text style={[styles.statValue, { color: colors.primary }]}>{allLists.length}</Text>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Lists</Text>
@@ -279,6 +295,23 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 2,
     marginLeft: 12,
+  },
+  locationBar: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 6,
+    marginBottom: 16,
+  },
+  locationBarText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    flex: 1,
+  },
+  locationCurrency: {
+    fontSize: 12,
   },
   quickStats: {
     flexDirection: "row",
