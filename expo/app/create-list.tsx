@@ -15,7 +15,6 @@ import * as Haptics from "expo-haptics";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { Wishlist } from "@/types";
-import { mockUser } from "@/mocks/data";
 
 const EMOJIS = ["🎁", "💻", "👗", "🏠", "🎮", "📚", "✨", "🎂", "🏖️", "🎄", "💍", "🧸"];
 const COLORS = ["#8032ee", "#4c2090", "#36204e", "#E91E63", "#FF9800", "#4CAF50", "#2196F3", "#00BCD4"];
@@ -24,7 +23,7 @@ export default function CreateListScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { addWishlist } = useWishlistContext();
+  const { addWishlist, user } = useWishlistContext();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -46,9 +45,9 @@ export default function CreateListScreen() {
       itemCount: 0,
       collaborators: [
         {
-          id: mockUser.id,
-          name: mockUser.name,
-          avatar: mockUser.avatar,
+          id: user.id,
+          name: user.name,
+          avatar: user.avatar,
           role: "owner",
         },
       ],

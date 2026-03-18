@@ -6,12 +6,13 @@ import { Product, Wishlist, Notification, UserProfile, ChatMessage, ItemAssignme
 import {
   mockWishlists,
   mockNotifications,
-  mockUser,
   mockProducts,
   trendingProducts,
   mockChatMessages,
   mockAssignments,
 } from "@/mocks/data";
+import { useAuth } from "@/providers/AuthProvider";
+import * as db from "@/lib/database";
 
 const WISHLISTS_KEY = "wishlists_data";
 const NOTIFICATIONS_KEY = "notifications_data";
@@ -20,22 +21,84 @@ const ASSIGNMENTS_KEY = "item_assignments_v2";
 
 export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
   const queryClient = useQueryClient();
+  const { user: authUser, profile } = useAuth();
+
   const [wishlists, setWishlists] = useState<Wishlist[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [assignments, setAssignments] = useState<ItemAssignment[]>([]);
-  const [user] = useState<UserProfile>(mockUser);
+
+  const user = useMemo<UserProfile>(() => {
+    if (profile && authUser) {
+      return {
+        id: authUser.id,
+        name: profile.full_name || authUser.email?.split("@")[0] || "User",
+        email: profile.email || authUser.email || "",
+        avatar: profile.avatar_url || "",
+        country: profile.country || "United States",
+        currency: profile.currency || "USD",
+        wishlistCount: 0,
+        savedItems: 0,
+        sharedLists: 0,
+      };
+    }
+    if (authUser) {
+      return {
+        id: authUser.id,
+        name: authUser.user_metadata?.full_name as string || authUser.email?.split("@")[0] || "User",
+        email: authUser.email || "",
+        avatar: "",
+        country: "United States",
+        currency: "USD",
+        wishlistCount: 0,
+        savedItems: 0,
+        sharedLists: 0,
+      };
+    }
+    return {
+      id: "guest",
+      name: "Guest",
+      email: "",
+      avatar: "",
+      country: "United States",
+      currency: "USD",
+      wishlistCount: 0,
+      savedItems: 0,
+      sharedLists: 0,
+    };
+  }, [authUser, profile]);
 
   const wishlistsQuery = useQuery({
-    queryKey: ["wishlists"],
+    queryKey: ["wishlists", user.id],
     queryFn: async () => {
-      const stored = await AsyncStorage.getItem(WISHLISTS_KEY);
-      if (stored) {
-        return JSON.parse(stored) as Wishlist[];
+      if (user.id === "guest") {
+        const stored = await AsyncStorage.getItem(WISHLISTS_KEY);
+        if (stored) return JSON.parse(stored) as Wishlist[];
+        await AsyncStorage.setItem(WISHLISTS_KEY, JSON.stringify(mockWishlists));
+        return mockWishlists;
       }
-      await AsyncStorage.setItem(WISHLISTS_KEY, JSON.stringify(mockWishlists));
-      return mockWishlists;
+
+      try {
+        const supaWishlists = await db.fetchUserWishlists(user.id);
+        if (supaWishlists.length > 0) {
+          return supaWishlists;
+        }
+
+        const stored = await AsyncStorage.getItem(WISHLISTS_KEY);
+        if (stored) {
+          const local = JSON.parse(stored) as Wishlist[];
+          if (local.length > 0) return local;
+        }
+
+        return [];
+      } catch (err) {
+        console.log("[WishlistProvider] Supabase fetch failed, using local:", err);
+        const stored = await AsyncStorage.getItem(WISHLISTS_KEY);
+        if (stored) return JSON.parse(stored) as Wishlist[];
+        return [];
+      }
     },
+    enabled: user.id !== "",
   });
 
   const notificationsQuery = useQuery({
@@ -51,27 +114,61 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
   });
 
   const chatQuery = useQuery({
-    queryKey: ["chatMessages"],
+    queryKey: ["chatMessages", user.id],
     queryFn: async () => {
-      const stored = await AsyncStorage.getItem(CHAT_KEY);
-      if (stored) {
-        return JSON.parse(stored) as ChatMessage[];
+      if (user.id === "guest") {
+        const stored = await AsyncStorage.getItem(CHAT_KEY);
+        if (stored) return JSON.parse(stored) as ChatMessage[];
+        await AsyncStorage.setItem(CHAT_KEY, JSON.stringify(mockChatMessages));
+        return mockChatMessages;
       }
-      await AsyncStorage.setItem(CHAT_KEY, JSON.stringify(mockChatMessages));
-      return mockChatMessages;
+
+      try {
+        const sharedIds = wishlists.filter((w) => w.isShared).map((w) => w.id);
+        if (sharedIds.length > 0) {
+          const msgs = await db.fetchChatMessages(sharedIds);
+          if (msgs.length > 0) return msgs;
+        }
+
+        const stored = await AsyncStorage.getItem(CHAT_KEY);
+        if (stored) return JSON.parse(stored) as ChatMessage[];
+        return mockChatMessages;
+      } catch {
+        const stored = await AsyncStorage.getItem(CHAT_KEY);
+        if (stored) return JSON.parse(stored) as ChatMessage[];
+        return mockChatMessages;
+      }
     },
+    enabled: user.id !== "",
   });
 
   const assignmentsQuery = useQuery({
-    queryKey: ["assignments"],
+    queryKey: ["assignments", user.id],
     queryFn: async () => {
-      const stored = await AsyncStorage.getItem(ASSIGNMENTS_KEY);
-      if (stored) {
-        return JSON.parse(stored) as ItemAssignment[];
+      if (user.id === "guest") {
+        const stored = await AsyncStorage.getItem(ASSIGNMENTS_KEY);
+        if (stored) return JSON.parse(stored) as ItemAssignment[];
+        await AsyncStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(mockAssignments));
+        return mockAssignments;
       }
-      await AsyncStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(mockAssignments));
-      return mockAssignments;
+
+      try {
+        const sharedIds = wishlists.filter((w) => w.isShared).map((w) => w.id);
+        if (sharedIds.length > 0) {
+          const result = await db.fetchItemAssignments(sharedIds);
+          if (result.length > 0) return result;
+        }
+
+        const stored = await AsyncStorage.getItem(ASSIGNMENTS_KEY);
+        if (stored) return JSON.parse(stored) as ItemAssignment[];
+        return mockAssignments;
+      } catch {
+        const stored = await AsyncStorage.getItem(ASSIGNMENTS_KEY);
+        if (stored) return JSON.parse(stored) as ItemAssignment[];
+        return mockAssignments;
+      }
     },
+    enabled: user.id !== "",
   });
 
   useEffect(() => {
@@ -95,9 +192,6 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       await AsyncStorage.setItem(WISHLISTS_KEY, JSON.stringify(updated));
       return updated;
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["wishlists"] });
-    },
   });
 
   const syncChat = useMutation({
@@ -119,8 +213,18 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       const updated = [wishlist, ...wishlists];
       setWishlists(updated);
       syncWishlists.mutate(updated);
+
+      if (user.id !== "guest") {
+        db.createWishlist(user.id, wishlist).then((result) => {
+          if (result) {
+            console.log("[WishlistProvider] Wishlist saved to Supabase");
+          }
+        }).catch((err) => {
+          console.log("[WishlistProvider] Failed to save wishlist to Supabase:", err);
+        });
+      }
     },
-    [wishlists, syncWishlists]
+    [wishlists, syncWishlists, user.id]
   );
 
   const addProductToWishlist = useCallback(
@@ -140,8 +244,14 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       });
       setWishlists(updated);
       syncWishlists.mutate(updated);
+
+      if (user.id !== "guest") {
+        db.addItemToWishlist(wishlistId, product).catch((err) => {
+          console.log("[WishlistProvider] Failed to save item to Supabase:", err);
+        });
+      }
     },
-    [wishlists, syncWishlists]
+    [wishlists, syncWishlists, user.id]
   );
 
   const removeProductFromWishlist = useCallback(
@@ -159,27 +269,44 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       });
       setWishlists(updated);
       syncWishlists.mutate(updated);
+
+      if (user.id !== "guest") {
+        db.removeItemFromWishlist(wishlistId, productId).catch((err) => {
+          console.log("[WishlistProvider] Failed to remove item from Supabase:", err);
+        });
+      }
     },
-    [wishlists, syncWishlists]
+    [wishlists, syncWishlists, user.id]
   );
 
   const togglePurchased = useCallback(
     (wishlistId: string, productId: string) => {
+      let newState = false;
       const updated = wishlists.map((w) => {
         if (w.id === wishlistId) {
           return {
             ...w,
-            items: w.items.map((item) =>
-              item.id === productId ? { ...item, isPurchased: !item.isPurchased } : item
-            ),
+            items: w.items.map((item) => {
+              if (item.id === productId) {
+                newState = !item.isPurchased;
+                return { ...item, isPurchased: newState };
+              }
+              return item;
+            }),
           };
         }
         return w;
       });
       setWishlists(updated);
       syncWishlists.mutate(updated);
+
+      if (user.id !== "guest") {
+        db.toggleItemPurchased(wishlistId, productId, newState).catch((err) => {
+          console.log("[WishlistProvider] Failed to toggle purchased in Supabase:", err);
+        });
+      }
     },
-    [wishlists, syncWishlists]
+    [wishlists, syncWishlists, user.id]
   );
 
   const markNotificationRead = useCallback(
@@ -210,6 +337,22 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       const updated = [...chatMessages, newMsg];
       setChatMessages(updated);
       syncChat.mutate(updated);
+
+      if (user.id !== "guest") {
+        db.sendChatMessage({
+          wishlistId: newMsg.wishlistId,
+          senderId: newMsg.senderId,
+          senderName: newMsg.senderName,
+          senderAvatar: newMsg.senderAvatar,
+          text: newMsg.text,
+          timestamp: newMsg.timestamp,
+          type: newMsg.type,
+          assignedItemId: newMsg.assignedItemId,
+          assignedTo: newMsg.assignedTo,
+        }).catch((err) => {
+          console.log("[WishlistProvider] Failed to send message to Supabase:", err);
+        });
+      }
     },
     [chatMessages, user, syncChat]
   );
@@ -227,7 +370,13 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       const updatedAssignments = [...assignments, newAssignment];
       setAssignments(updatedAssignments);
       syncAssignments.mutate(updatedAssignments);
-      sendMessage(wishlistId, `I'll get "${productTitle}" \u{1F381}`, "assignment", productId);
+      sendMessage(wishlistId, `I'll get "${productTitle}" 🎁`, "assignment", productId);
+
+      if (user.id !== "guest") {
+        db.createItemAssignment(newAssignment).catch((err) => {
+          console.log("[WishlistProvider] Failed to create assignment in Supabase:", err);
+        });
+      }
     },
     [assignments, user, syncAssignments, sendMessage]
   );
@@ -239,23 +388,56 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       );
       setAssignments(updatedAssignments);
       syncAssignments.mutate(updatedAssignments);
+
+      if (user.id !== "guest") {
+        db.removeItemAssignment(wishlistId, productId, user.id).catch((err) => {
+          console.log("[WishlistProvider] Failed to remove assignment from Supabase:", err);
+        });
+      }
     },
     [assignments, user, syncAssignments]
   );
 
   const toggleShareWishlist = useCallback(
     (wishlistId: string) => {
+      let newShared = false;
       const updated = wishlists.map((w) => {
         if (w.id === wishlistId) {
-          return { ...w, isShared: !w.isShared };
+          newShared = !w.isShared;
+          return { ...w, isShared: newShared };
         }
         return w;
       });
       setWishlists(updated);
       syncWishlists.mutate(updated);
+
+      if (user.id !== "guest") {
+        db.toggleWishlistShared(wishlistId, newShared).catch((err) => {
+          console.log("[WishlistProvider] Failed to toggle share in Supabase:", err);
+        });
+      }
     },
-    [wishlists, syncWishlists]
+    [wishlists, syncWishlists, user.id]
   );
+
+  const deleteWishlistById = useCallback(
+    (wishlistId: string) => {
+      const updated = wishlists.filter((w) => w.id !== wishlistId);
+      setWishlists(updated);
+      syncWishlists.mutate(updated);
+
+      if (user.id !== "guest") {
+        db.deleteWishlist(wishlistId).catch((err) => {
+          console.log("[WishlistProvider] Failed to delete wishlist from Supabase:", err);
+        });
+      }
+    },
+    [wishlists, syncWishlists, user.id]
+  );
+
+  const refreshWishlists = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["wishlists", user.id] });
+  }, [queryClient, user.id]);
 
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.isRead).length,
@@ -306,6 +488,8 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       assignItem,
       unassignItem,
       toggleShareWishlist,
+      deleteWishlistById,
+      refreshWishlists,
     }),
     [
       wishlists, myLists, sharedLists, notifications, unreadCount, user,
@@ -314,6 +498,7 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       addWishlist, addProductToWishlist, removeProductFromWishlist,
       togglePurchased, markNotificationRead,
       sendMessage, assignItem, unassignItem, toggleShareWishlist,
+      deleteWishlistById, refreshWishlists,
     ]
   );
 });

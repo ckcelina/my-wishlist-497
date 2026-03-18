@@ -1,13 +1,13 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
-  FlatList,
   Animated,
   TextInput,
+  RefreshControl,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,7 +25,14 @@ export default function HomeScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, myLists, sharedLists, allProducts, trendingProducts } = useWishlistContext();
+  const { user, myLists, sharedLists, allProducts, trendingProducts, refreshWishlists } = useWishlistContext();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    refreshWishlists();
+    setTimeout(() => setRefreshing(false), 1000);
+  }, [refreshWishlists]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -44,6 +51,15 @@ export default function HomeScreen() {
     ]).start();
   }, [fadeAnim, slideAnim]);
 
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 6) return "Good night";
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    if (hour < 21) return "Good evening";
+    return "Good night";
+  }, []);
+
   const recentProducts = allProducts.slice(0, 4);
 
   return (
@@ -51,6 +67,14 @@ export default function HomeScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         <Animated.View
           style={[
@@ -63,7 +87,7 @@ export default function HomeScreen() {
               <Image source={appLogo} style={styles.logo} contentFit="contain" />
               <View style={styles.greetingContent}>
                 <Text style={[styles.greeting, { color: colors.textSecondary }]}>
-                  Good morning
+                  {greeting}
                 </Text>
                 <Text style={[styles.userName, { color: colors.text }]}>
                   {user.name} <Text style={styles.wave}>{"👋"}</Text>
@@ -72,7 +96,7 @@ export default function HomeScreen() {
             </View>
             <Pressable onPress={() => router.push("/(tabs)/profile")}>
               <Image
-                source={{ uri: user.avatar }}
+                source={user.avatar ? { uri: user.avatar } : require("@/assets/images/icon.png")}
                 style={[styles.avatar, { borderColor: colors.primary + "40" }]}
               />
             </Pressable>
@@ -114,73 +138,57 @@ export default function HomeScreen() {
           </View>
         </Animated.View>
 
-        <SectionHeader title="My Lists" onSeeAll={() => {}} />
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={myLists}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.horizontalList}
-          renderItem={({ item }) => (
-            <WishlistCard
-              wishlist={item}
-              onPress={() => router.push({ pathname: "/wishlist-detail", params: { id: item.id } })}
-            />
-          )}
-          ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
-        />
+        <SectionHeader title="My Lists" />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+          {myLists.map((item, index) => (
+            <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
+              <WishlistCard
+                wishlist={item}
+                onPress={() => router.push({ pathname: "/wishlist-detail", params: { id: item.id } })}
+              />
+            </View>
+          ))}
+        </ScrollView>
 
         {sharedLists.length > 0 && (
           <>
-            <SectionHeader title="Shared With Me" onSeeAll={() => {}} />
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={sharedLists}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.horizontalList}
-              renderItem={({ item }) => (
-                <WishlistCard
-                  wishlist={item}
-                  onPress={() => router.push({ pathname: "/wishlist-detail", params: { id: item.id } })}
-                />
-              )}
-              ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
-            />
+            <SectionHeader title="Shared With Me" />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+              {sharedLists.map((item, index) => (
+                <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
+                  <WishlistCard
+                    wishlist={item}
+                    onPress={() => router.push({ pathname: "/wishlist-detail", params: { id: item.id } })}
+                  />
+                </View>
+              ))}
+            </ScrollView>
           </>
         )}
 
-        <SectionHeader title="Recently Added" onSeeAll={() => {}} />
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={recentProducts}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.horizontalList}
-          renderItem={({ item }) => (
-            <ProductCard
-              product={item}
-              onPress={() => router.push({ pathname: "/product-detail", params: { id: item.id } })}
-            />
-          )}
-          ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
-        />
+        <SectionHeader title="Recently Added" onSeeAll={() => router.push("/(tabs)/explore")} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+          {recentProducts.map((item, index) => (
+            <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
+              <ProductCard
+                product={item}
+                onPress={() => router.push({ pathname: "/product-detail", params: { id: item.id } })}
+              />
+            </View>
+          ))}
+        </ScrollView>
 
         <SectionHeader title="Trending Wishes" onSeeAll={() => router.push("/(tabs)/explore")} />
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={trendingProducts}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.horizontalList}
-          renderItem={({ item }) => (
-            <ProductCard
-              product={item}
-              onPress={() => router.push({ pathname: "/product-detail", params: { id: item.id } })}
-            />
-          )}
-          ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
-        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+          {trendingProducts.map((item, index) => (
+            <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
+              <ProductCard
+                product={item}
+                onPress={() => router.push({ pathname: "/product-detail", params: { id: item.id } })}
+              />
+            </View>
+          ))}
+        </ScrollView>
       </ScrollView>
     </View>
   );

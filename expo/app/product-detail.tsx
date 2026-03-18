@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Pressable,
   Animated,
   Linking,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,26 +15,59 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowLeft,
   ExternalLink,
-  Heart,
   Star,
   MapPin,
   Store,
   Share2,
+  Check,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { mockProducts, trendingProducts } from "@/mocks/data";
+import { Product } from "@/types";
 
 export default function ProductDetailScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { wishlists } = useWishlistContext();
+  const { id, serpData } = useLocalSearchParams<{ id: string; serpData?: string }>();
+  const { wishlists, addProductToWishlist } = useWishlistContext();
 
-  const allProducts = [...mockProducts, ...trendingProducts];
-  const product = allProducts.find((p) => p.id === id);
+  const [savedToList, setSavedToList] = useState<string | null>(null);
+
+  const allLocalProducts = [...mockProducts, ...trendingProducts];
+
+  const wishlistItems = wishlists.flatMap((w) => w.items);
+
+  let product: Product | undefined;
+
+  if (serpData) {
+    try {
+      const parsed = JSON.parse(serpData);
+      product = {
+        id: id ?? `serp_${Date.now()}`,
+        title: parsed.title || "Unknown Product",
+        image: parsed.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
+        price: parsed.price || 0,
+        currency: parsed.currency || "USD",
+        store: parsed.store || "Unknown Store",
+        storeUrl: parsed.link || "",
+        description: parsed.snippet || "",
+        category: "Search Result",
+        isPurchased: false,
+        addedAt: new Date().toISOString().split("T")[0],
+        country: "US",
+        rating: parsed.rating,
+      };
+    } catch {
+      console.log("[ProductDetail] Failed to parse serpData");
+    }
+  }
+
+  if (!product) {
+    product = allLocalProducts.find((p) => p.id === id) || wishlistItems.find((p) => p.id === id);
+  }
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -62,13 +96,25 @@ export default function ProductDetailScreen() {
   }
 
   const handleOpenStore = () => {
-    if (product.storeUrl) {
+    if (product?.storeUrl) {
       void Linking.openURL(product.storeUrl);
     }
   };
 
-  const handleSave = () => {
+  const handleSaveToWishlist = (listId: string) => {
+    if (!product) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    addProductToWishlist(listId, product);
+    setSavedToList(listId);
+
+    const listName = wishlists.find((w) => w.id === listId)?.title || "wishlist";
+    Alert.alert("Saved!", `"${product.title}" added to ${listName}`);
+  };
+
+  const isInList = (listId: string) => {
+    const list = wishlists.find((w) => w.id === listId);
+    if (!list) return false;
+    return list.items.some((item) => item.id === product?.id) || savedToList === listId;
   };
 
   return (
@@ -78,9 +124,6 @@ export default function ProductDetailScreen() {
           <ArrowLeft size={22} color={colors.text} />
         </Pressable>
         <View style={styles.topBarRight}>
-          <Pressable onPress={handleSave} style={[styles.iconBtn, { backgroundColor: colors.surface + "E6" }]}>
-            <Heart size={18} color={colors.primary} fill={colors.primary} />
-          </Pressable>
           <Pressable style={[styles.iconBtn, { backgroundColor: colors.surface + "E6" }]}>
             <Share2 size={18} color={colors.text} />
           </Pressable>
@@ -101,12 +144,14 @@ export default function ProductDetailScreen() {
             <Text style={[styles.productTitle, { color: colors.text }]}>{product.title}</Text>
 
             <View style={styles.metaRow}>
-              <View style={styles.ratingRow}>
-                <Star size={16} color="#FFB300" fill="#FFB300" />
-                <Text style={[styles.rating, { color: colors.text }]}>
-                  {product.rating ?? "N/A"}
-                </Text>
-              </View>
+              {product.rating !== undefined && (
+                <View style={styles.ratingRow}>
+                  <Star size={16} color="#FFB300" fill="#FFB300" />
+                  <Text style={[styles.rating, { color: colors.text }]}>
+                    {product.rating}
+                  </Text>
+                </View>
+              )}
               <View style={styles.storeRow}>
                 <Store size={14} color={colors.textSecondary} />
                 <Text style={[styles.storeName, { color: colors.textSecondary }]}>{product.store}</Text>
@@ -124,13 +169,15 @@ export default function ProductDetailScreen() {
                   ${product.price.toFixed(2)}
                 </Text>
               </View>
-              <Pressable
-                onPress={handleOpenStore}
-                style={[styles.visitBtn, { backgroundColor: colors.primary }]}
-              >
-                <ExternalLink size={16} color="#FFFFFF" />
-                <Text style={styles.visitBtnText}>Visit Store</Text>
-              </Pressable>
+              {product.storeUrl ? (
+                <Pressable
+                  onPress={handleOpenStore}
+                  style={[styles.visitBtn, { backgroundColor: colors.primary }]}
+                >
+                  <ExternalLink size={16} color="#FFFFFF" />
+                  <Text style={styles.visitBtnText}>Visit Store</Text>
+                </Pressable>
+              ) : null}
             </View>
 
             {product.description ? (
@@ -174,18 +221,40 @@ export default function ProductDetailScreen() {
               <Text style={[styles.sectionLabel, { color: colors.text }]}>Save to Wishlist</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.saveChips}>
-                  {wishlists.map((list) => (
-                    <Pressable
-                      key={list.id}
-                      onPress={() => {
-                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      }}
-                      style={[styles.saveChip, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
-                    >
-                      <Text style={{ fontSize: 18 }}>{list.emoji}</Text>
-                      <Text style={[styles.saveChipText, { color: colors.text }]}>{list.title}</Text>
-                    </Pressable>
-                  ))}
+                  {wishlists.map((list) => {
+                    const alreadyIn = isInList(list.id);
+                    return (
+                      <Pressable
+                        key={list.id}
+                        onPress={() => {
+                          if (!alreadyIn) {
+                            handleSaveToWishlist(list.id);
+                          }
+                        }}
+                        style={[
+                          styles.saveChip,
+                          {
+                            backgroundColor: alreadyIn ? colors.success + "15" : colors.surface,
+                            borderColor: alreadyIn ? colors.success : colors.borderLight,
+                          },
+                        ]}
+                      >
+                        {alreadyIn ? (
+                          <Check size={16} color={colors.success} />
+                        ) : (
+                          <Text style={{ fontSize: 18 }}>{list.emoji}</Text>
+                        )}
+                        <Text
+                          style={[
+                            styles.saveChipText,
+                            { color: alreadyIn ? colors.success : colors.text },
+                          ]}
+                        >
+                          {alreadyIn ? "Saved" : list.title}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </ScrollView>
             </View>

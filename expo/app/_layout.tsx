@@ -7,6 +7,7 @@ import { WishlistProvider } from "@/providers/WishlistProvider";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -85,13 +86,6 @@ function RootLayoutNav() {
           }}
         />
         <Stack.Screen
-          name="add-item"
-          options={{
-            headerShown: false,
-            presentation: "modal",
-          }}
-        />
-        <Stack.Screen
           name="create-list"
           options={{
             headerShown: false,
@@ -111,11 +105,13 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView>
-        <AuthProvider>
-          <WishlistProvider>
-            <RootLayoutNav />
-          </WishlistProvider>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <WishlistProvider>
+              <RootLayoutNav />
+            </WishlistProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </GestureHandlerRootView>
     </QueryClientProvider>
   );

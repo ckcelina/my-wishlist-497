@@ -127,6 +127,27 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     },
   });
 
+  const updateProfileMutation = useMutation({
+    mutationFn: async (updates: Partial<Pick<UserProfile, "full_name" | "country" | "currency" | "avatar_url">>) => {
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      console.log("Profile updated:", data);
+      setProfile(data as UserProfile);
+      return data as UserProfile;
+    },
+  });
+
   const signOutMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.auth.signOut();
@@ -149,9 +170,11 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       signUp: signUpMutation.mutateAsync,
       signIn: signInMutation.mutateAsync,
       signOut: signOutMutation.mutateAsync,
+      updateProfile: updateProfileMutation.mutateAsync,
       isSigningUp: signUpMutation.isPending,
       isSigningIn: signInMutation.isPending,
       isSigningOut: signOutMutation.isPending,
+      isUpdatingProfile: updateProfileMutation.isPending,
       signUpError: signUpMutation.error,
       signInError: signInMutation.error,
     }),
@@ -165,9 +188,11 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       signUpMutation.mutateAsync,
       signInMutation.mutateAsync,
       signOutMutation.mutateAsync,
+      updateProfileMutation.mutateAsync,
       signUpMutation.isPending,
       signInMutation.isPending,
       signOutMutation.isPending,
+      updateProfileMutation.isPending,
       signUpMutation.error,
       signInMutation.error,
     ]

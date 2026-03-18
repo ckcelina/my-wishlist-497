@@ -31,7 +31,7 @@ import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { Product } from "@/types";
 import { generateObject } from "@rork-ai/toolkit-sdk";
-import { searchProducts, SerpApiResult } from "@/lib/api";
+import { searchProducts, scrapeProductUrl, SerpApiResult } from "@/lib/api";
 import { z } from "zod";
 
 const productSchema = z.object({
@@ -65,6 +65,11 @@ export default function AddScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SerpApiResult[]>([]);
   const [selectedResult, setSelectedResult] = useState<SerpApiResult | null>(null);
+  const [isScrapingUrl, setIsScrapingUrl] = useState(false);
+  const [scrapedData, setScrapedData] = useState<{ title: string; image: string; description: string; price: number; store: string } | null>(null);
+  const [linkSearchResults, setLinkSearchResults] = useState<SerpApiResult[]>([]);
+  const [selectedLinkResult, setSelectedLinkResult] = useState<SerpApiResult | null>(null);
+  const [linkSelectedList, setLinkSelectedList] = useState<string>("");
 
   const scaleAnim1 = useRef(new Animated.Value(1)).current;
   const scaleAnim2 = useRef(new Animated.Value(1)).current;
@@ -246,15 +251,92 @@ export default function AddScreen() {
     setMode("menu");
   };
 
-  const handleAddFromLink = () => {
+  const resetLinkState = () => {
+    setProductUrl("");
+    setScrapedData(null);
+    setLinkSearchResults([]);
+    setSelectedLinkResult(null);
+    setLinkSelectedList("");
+    setIsScrapingUrl(false);
+  };
+
+  const handleAddFromLink = async () => {
     if (!productUrl.trim()) {
       Alert.alert("Missing URL", "Please paste a product link.");
       return;
     }
-    Alert.alert(
-      "Coming Soon",
-      "Automatic product detection from links will be available in a future update. Try manual entry for now!"
-    );
+
+    setIsScrapingUrl(true);
+    setScrapedData(null);
+    setLinkSearchResults([]);
+    setSelectedLinkResult(null);
+
+    try {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const result = await scrapeProductUrl(productUrl.trim());
+
+      if (result.error && !result.title) {
+        Alert.alert("Scrape Failed", result.error);
+        setIsScrapingUrl(false);
+        return;
+      }
+
+      setScrapedData({
+        title: result.title,
+        image: result.image,
+        description: result.description,
+        price: result.price,
+        store: result.store,
+      });
+
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      if (result.title) {
+        console.log("[Link] Searching for scraped product:", result.title);
+        const { results } = await searchProducts(result.title);
+        setLinkSearchResults(results);
+      }
+    } catch (err) {
+      console.error("[Link] Scrape error:", err);
+      Alert.alert("Error", "Failed to detect product from URL.");
+    } finally {
+      setIsScrapingUrl(false);
+    }
+  };
+
+  const handleAddFromLinkResult = () => {
+    if (!linkSelectedList) {
+      Alert.alert("Select a List", "Please choose a wishlist to add to.");
+      return;
+    }
+
+    const productTitle = selectedLinkResult?.title || scrapedData?.title || "Product from Link";
+    const productPrice = selectedLinkResult?.price || scrapedData?.price || 0;
+    const productStore = selectedLinkResult?.store || scrapedData?.store || "Unknown Store";
+    const productImage = selectedLinkResult?.image || scrapedData?.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop";
+    const productDesc = scrapedData?.description || selectedLinkResult?.snippet || "";
+
+    const newProduct: Product = {
+      id: `link_${Date.now()}`,
+      title: productTitle,
+      image: productImage,
+      price: productPrice,
+      currency: selectedLinkResult?.currency || "USD",
+      store: productStore,
+      storeUrl: selectedLinkResult?.link || productUrl,
+      description: productDesc,
+      category: "Other",
+      isPurchased: false,
+      addedAt: new Date().toISOString().split("T")[0],
+      country: "US",
+      rating: selectedLinkResult?.rating,
+    };
+
+    addProductToWishlist(linkSelectedList, newProduct);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert("Added!", `"${productTitle}" has been added to your wishlist.`);
+    resetLinkState();
+    setMode("menu");
   };
 
   const handleManualAdd = () => {
@@ -497,8 +579,11 @@ export default function AddScreen() {
   if (mode === "link") {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView contentContainerStyle={[styles.formContent, { paddingTop: insets.top + 16 }]}>
-          <Pressable onPress={() => setMode("menu")} style={styles.backButton}>
+        <ScrollView
+          contentContainerStyle={[styles.formContent, { paddingTop: insets.top + 16 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Pressable onPress={() => { resetLinkState(); setMode("menu"); }} style={styles.backButton}>
             <Text style={[styles.backText, { color: colors.primary }]}>← Back</Text>
           </Pressable>
           <Text style={[styles.formTitle, { color: colors.text }]}>Paste Product Link</Text>
@@ -516,16 +601,148 @@ export default function AddScreen() {
               onChangeText={setProductUrl}
               autoCapitalize="none"
               keyboardType="url"
+              editable={!isScrapingUrl}
             />
+            {productUrl.length > 0 && !isScrapingUrl && (
+              <Pressable onPress={() => setProductUrl("")}>
+                <X size={16} color={colors.textTertiary} />
+              </Pressable>
+            )}
           </View>
 
-          <Pressable
-            onPress={handleAddFromLink}
-            style={[styles.primaryButton, { backgroundColor: colors.primary }]}
-          >
-            <Sparkles size={18} color="#FFFFFF" />
-            <Text style={styles.primaryButtonText}>Detect Product</Text>
-          </Pressable>
+          {!scrapedData && (
+            <Pressable
+              onPress={handleAddFromLink}
+              style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: isScrapingUrl ? 0.7 : 1 }]}
+              disabled={isScrapingUrl}
+            >
+              {isScrapingUrl ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Sparkles size={18} color="#FFFFFF" />
+              )}
+              <Text style={styles.primaryButtonText}>
+                {isScrapingUrl ? "Detecting..." : "Detect Product"}
+              </Text>
+            </Pressable>
+          )}
+
+          {scrapedData && (
+            <View style={styles.detectionArea}>
+              <View style={[styles.detectedCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+                <View style={styles.detectedHeader}>
+                  <Sparkles size={18} color={colors.primary} />
+                  <Text style={[styles.detectedTitle, { color: colors.primary }]}>Product Detected</Text>
+                </View>
+                <Text style={[styles.detectedName, { color: colors.text }]}>{scrapedData.title || "Unknown Product"}</Text>
+                {scrapedData.store ? (
+                  <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>Store: {scrapedData.store}</Text>
+                ) : null}
+                {scrapedData.price > 0 && (
+                  <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>Price: ${scrapedData.price.toFixed(2)}</Text>
+                )}
+                {scrapedData.description ? (
+                  <Text style={[styles.detectedDesc, { color: colors.textSecondary }]} numberOfLines={2}>
+                    {scrapedData.description}
+                  </Text>
+                ) : null}
+              </View>
+
+              {linkSearchResults.length > 0 && (
+                <View style={styles.resultsSection}>
+                  <View style={styles.resultsSectionHeader}>
+                    <Search size={16} color={colors.textSecondary} />
+                    <Text style={[styles.resultsSectionTitle, { color: colors.text }]}>
+                      Also Found ({linkSearchResults.length})
+                    </Text>
+                  </View>
+                  {linkSearchResults.map((result, idx) => (
+                    <Pressable
+                      key={`link-result-${idx}`}
+                      onPress={() => {
+                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setSelectedLinkResult(selectedLinkResult === result ? null : result);
+                      }}
+                      style={[
+                        styles.resultCard,
+                        {
+                          backgroundColor: selectedLinkResult === result ? colors.primaryFaded : colors.surface,
+                          borderColor: selectedLinkResult === result ? colors.primary : colors.borderLight,
+                        },
+                      ]}
+                    >
+                      {result.image ? (
+                        <Image source={{ uri: result.image }} style={styles.resultImage} contentFit="cover" />
+                      ) : (
+                        <View style={[styles.resultImagePlaceholder, { backgroundColor: colors.surfaceSecondary }]}>
+                          <Search size={16} color={colors.textTertiary} />
+                        </View>
+                      )}
+                      <View style={styles.resultInfo}>
+                        <Text style={[styles.resultTitle, { color: colors.text }]} numberOfLines={2}>
+                          {result.title}
+                        </Text>
+                        <View style={styles.resultMeta}>
+                          <Text style={[styles.resultPrice, { color: colors.primary }]}>
+                            {result.price > 0 ? `${result.price.toFixed(2)}` : "Price N/A"}
+                          </Text>
+                          <Text style={[styles.resultStore, { color: colors.textSecondary }]}>
+                            {result.store}
+                          </Text>
+                        </View>
+                      </View>
+                      {selectedLinkResult === result && (
+                        <View style={[styles.checkBadge, { backgroundColor: colors.primary }]}>
+                          <Check size={14} color="#FFFFFF" />
+                        </View>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>ADD TO WISHLIST *</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.listChips}>
+                    {wishlists.map((list) => (
+                      <Pressable
+                        key={list.id}
+                        onPress={() => setLinkSelectedList(list.id)}
+                        style={[
+                          styles.listChip,
+                          {
+                            backgroundColor: linkSelectedList === list.id ? colors.primary : colors.surface,
+                            borderColor: linkSelectedList === list.id ? colors.primary : colors.border,
+                          },
+                        ]}
+                      >
+                        <Text style={{ fontSize: 16 }}>{list.emoji}</Text>
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: linkSelectedList === list.id ? "#FFFFFF" : colors.text },
+                          ]}
+                        >
+                          {list.title}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+
+              <Pressable
+                onPress={handleAddFromLinkResult}
+                style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+              >
+                <Plus size={18} color="#FFFFFF" />
+                <Text style={styles.primaryButtonText}>
+                  {selectedLinkResult ? "Add Selected Product" : "Add Detected Product"}
+                </Text>
+              </Pressable>
+            </View>
+          )}
         </ScrollView>
       </View>
     );
