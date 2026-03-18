@@ -33,6 +33,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { useLocation } from "@/providers/LocationProvider";
+import { usePriceAlerts } from "@/providers/PriceAlertProvider";
 import { mockProducts, trendingProducts } from "@/mocks/data";
 import { Product } from "@/types";
 import { comparePrices, getProductDetail, ProductSeller } from "@/lib/api";
@@ -44,10 +45,10 @@ export default function ProductDetailScreen() {
   const { id, serpData } = useLocalSearchParams<{ id: string; serpData?: string }>();
   const { wishlists, addProductToWishlist } = useWishlistContext();
   const { country, serpApiCountryCode, format, convert, currencyCode, getCurrencySymbol } = useLocation();
+  const { hasAlert, addAlert, removeAlert, getProductHistory } = usePriceAlerts();
 
   const [savedToList, setSavedToList] = useState<string | null>(null);
   const [sellers, setSellers] = useState<ProductSeller[]>([]);
-  const [priceAlertEnabled, setPriceAlertEnabled] = useState(false);
   const [priceComparison, setPriceComparison] = useState<
     { country: string; results: { title: string; price: number; currency: string; store: string; link: string }[] }[]
   >([]);
@@ -175,15 +176,30 @@ export default function ProductDetailScreen() {
     Alert.alert("Saved!", `"${product.title}" added to ${listName}`);
   };
 
+  const priceAlertEnabled = product ? hasAlert(product.id) : false;
+  const priceHistory = product ? getProductHistory(product.id) : [];
+
   const handleTogglePriceAlert = () => {
+    if (!product) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setPriceAlertEnabled(!priceAlertEnabled);
     if (!priceAlertEnabled) {
+      void addAlert({
+        productId: product.id,
+        title: product.title,
+        image: product.image,
+        targetPrice: product.price * 0.9,
+        currentPrice: product.price,
+        currency: product.currency,
+        store: product.store,
+        storeUrl: product.storeUrl,
+        country: serpApiCountryCode,
+      });
       Alert.alert(
         "Price Alert Set",
-        `We'll notify you when the price of "${product?.title}" drops in ${country?.name ?? "your country"}.`
+        `We'll notify you when the price of "${product.title}" drops in ${country?.name ?? "your country"}.`
       );
     } else {
+      void removeAlert(product.id);
       Alert.alert("Price Alert Removed", "You won't receive price drop notifications for this item.");
     }
   };
@@ -470,6 +486,32 @@ export default function ProductDetailScreen() {
                 <Text style={[styles.loadingText, { color: colors.primary }]}>
                   Comparing prices worldwide...
                 </Text>
+              </View>
+            )}
+
+            {priceHistory.length > 0 && (
+              <View style={styles.priceHistorySection}>
+                <View style={styles.sectionHeaderRow}>
+                  <TrendingDown size={18} color={colors.primary} />
+                  <Text style={[styles.sectionLabel, { color: colors.text, marginBottom: 0 }]}>
+                    Price History
+                  </Text>
+                </View>
+                {priceHistory.slice(-5).map((entry, idx) => {
+                  const entryPrice = format(entry.price, entry.currency);
+                  const date = new Date(entry.checkedAt);
+                  const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+                  return (
+                    <View
+                      key={`history-${idx}`}
+                      style={[styles.historyRow, { borderBottomColor: colors.borderLight }]}
+                    >
+                      <Text style={[styles.historyDate, { color: colors.textTertiary }]}>{dateStr}</Text>
+                      <Text style={[styles.historyStore, { color: colors.textSecondary }]}>{entry.store}</Text>
+                      <Text style={[styles.historyPrice, { color: colors.primary }]}>{entryPrice}</Text>
+                    </View>
+                  );
+                })}
               </View>
             )}
 
@@ -854,6 +896,29 @@ const styles = StyleSheet.create({
   saveChipText: {
     fontSize: 14,
     fontWeight: "500" as const,
+  },
+  priceHistorySection: {
+    marginBottom: 24,
+  },
+  historyRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingVertical: 10,
+    borderBottomWidth: 0.5,
+    gap: 12,
+  },
+  historyDate: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    width: 40,
+  },
+  historyStore: {
+    fontSize: 13,
+    flex: 1,
+  },
+  historyPrice: {
+    fontSize: 15,
+    fontWeight: "700" as const,
   },
   emptyState: {
     flex: 1,

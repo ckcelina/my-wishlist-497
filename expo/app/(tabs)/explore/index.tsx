@@ -8,18 +8,43 @@ import {
   Pressable,
   ActivityIndicator,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Search, X, TrendingUp, ShoppingBag, MapPin, Store } from "lucide-react-native";
+import {
+  Search,
+  X,
+  TrendingUp,
+  ShoppingBag,
+  MapPin,
+  Store,
+  Clock,
+  Trash2,
+  Tag,
+  Flame,
+  Star,
+} from "lucide-react-native";
 import { useMutation } from "@tanstack/react-query";
+import * as Haptics from "expo-haptics";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { useLocation } from "@/providers/LocationProvider";
+import { useSearchHistory } from "@/providers/SearchHistoryProvider";
+import { usePriceAlerts } from "@/providers/PriceAlertProvider";
 import { mockCategories } from "@/mocks/data";
-import { searchProducts, SerpApiResult } from "@/lib/api";
+import { searchProducts, fetchDeals, SerpApiResult } from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
 import SectionHeader from "@/components/SectionHeader";
 import { Product } from "@/types";
+
+const DEAL_CATEGORIES = [
+  { id: "deals", label: "All Deals", emoji: "🔥" },
+  { id: "electronics", label: "Electronics", emoji: "📱" },
+  { id: "fashion", label: "Fashion", emoji: "👗" },
+  { id: "home", label: "Home", emoji: "🏠" },
+  { id: "beauty", label: "Beauty", emoji: "💄" },
+  { id: "tech", label: "Tech", emoji: "💻" },
+];
 
 const FOOD_CATEGORIES = [
   { id: "fc1", name: "Food Delivery", emoji: "🍔", productCount: 0 },
@@ -44,9 +69,21 @@ export default function ExploreScreen() {
   const router = useRouter();
   const { allProducts, trendingProducts } = useWishlistContext();
   const { country, serpApiCountryCode, availableStores, format } = useLocation();
+  const { getRecentSearches, getSuggestions, addSearch, removeSearch, clearHistory } = useSearchHistory();
+  const { activeAlertCount } = usePriceAlerts();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [serpResults, setSerpResults] = useState<SerpApiResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [dealResults, setDealResults] = useState<SerpApiResult[]>([]);
+  const [selectedDealCategory, setSelectedDealCategory] = useState<string | null>(null);
+  const [showSearchHistory, setShowSearchHistory] = useState(false);
+
+  const recentSearches = useMemo(() => getRecentSearches(8), [getRecentSearches]);
+  const suggestions = useMemo(
+    () => (searchQuery.length > 0 ? getSuggestions(searchQuery, 5) : []),
+    [searchQuery, getSuggestions]
+  );
 
   const searchMutation = useMutation({
     mutationFn: async (query: string) => {
@@ -55,15 +92,29 @@ export default function ExploreScreen() {
       if (error) {
         console.log("[Explore] Search error:", error);
       }
-      return results;
+      return { results, query };
     },
-    onSuccess: (results) => {
+    onSuccess: ({ results, query }) => {
       setSerpResults(results);
       setHasSearched(true);
+      setShowSearchHistory(false);
+      void addSearch(query, serpApiCountryCode, results.length);
       console.log(`[Explore] Got ${results.length} results from SerpAPI`);
     },
     onError: () => {
       setHasSearched(true);
+      setShowSearchHistory(false);
+    },
+  });
+
+  const dealsMutation = useMutation({
+    mutationFn: async (category: string) => {
+      console.log(`[Explore] Fetching deals: ${category} in ${serpApiCountryCode}`);
+      return fetchDeals(serpApiCountryCode, category);
+    },
+    onSuccess: (data) => {
+      setDealResults(data.results);
+      console.log(`[Explore] Got ${data.results.length} deal results`);
     },
   });
 
@@ -81,25 +132,57 @@ export default function ExploreScreen() {
   const handleSearch = useCallback(() => {
     const q = searchQuery.trim();
     if (q.length < 2) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     searchMutation.mutate(q);
   }, [searchQuery, searchMutation]);
+
+  const handleHistorySearch = useCallback(
+    (query: string) => {
+      setSearchQuery(query);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      searchMutation.mutate(query);
+    },
+    [searchMutation]
+  );
 
   const handleClear = useCallback(() => {
     setSearchQuery("");
     setSerpResults([]);
     setHasSearched(false);
+    setShowSearchHistory(false);
   }, []);
 
   const handleCategoryPress = useCallback(
     (categoryName: string) => {
       const countryName = country?.name ?? "";
-      const storeQuery = availableStores.length > 0
-        ? `${categoryName} ${countryName}`
+      const storeNames = availableStores.slice(0, 2).join(" OR ");
+      const storeQuery = storeNames
+        ? `${categoryName} ${storeNames} ${countryName}`
         : `${categoryName} delivery ${countryName}`;
       setSearchQuery(storeQuery);
       searchMutation.mutate(storeQuery);
     },
     [searchMutation, country, availableStores]
+  );
+
+  const handleStorePress = useCallback(
+    (storeName: string) => {
+      const countryName = country?.name ?? "";
+      const q = `site:${storeName.toLowerCase().replace(/\s+/g, "")}.com OR ${storeName} ${countryName}`;
+      setSearchQuery(q);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      searchMutation.mutate(q);
+    },
+    [searchMutation, country]
+  );
+
+  const handleDealCategoryPress = useCallback(
+    (categoryId: string) => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSelectedDealCategory(categoryId);
+      dealsMutation.mutate(categoryId);
+    },
+    [dealsMutation]
   );
 
   const serpToProduct = useCallback(
@@ -121,7 +204,7 @@ export default function ExploreScreen() {
     [serpApiCountryCode]
   );
 
-  const isSearchActive = searchQuery.length > 0;
+  const isSearchActive = searchQuery.length > 0 || hasSearched;
 
   const allCategories = useMemo(() => {
     return [...FOOD_CATEGORIES, ...SHOPPING_CATEGORIES, ...mockCategories];
@@ -132,11 +215,21 @@ export default function ExploreScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerTop}>
           <Text style={[styles.title, { color: colors.text }]}>Explore</Text>
-          <View style={[styles.locationChip, { backgroundColor: colors.primaryFaded }]}>
-            <MapPin size={12} color={colors.primary} />
-            <Text style={[styles.locationChipText, { color: colors.primary }]}>
-              {country?.flag} {country?.name ?? "Set location"}
-            </Text>
+          <View style={styles.headerRight}>
+            {activeAlertCount > 0 && (
+              <View style={[styles.alertBadge, { backgroundColor: colors.error }]}>
+                <Text style={styles.alertBadgeText}>{activeAlertCount}</Text>
+              </View>
+            )}
+            <Pressable
+              onPress={() => router.push("/(tabs)/profile")}
+              style={[styles.locationChip, { backgroundColor: colors.primaryFaded }]}
+            >
+              <MapPin size={12} color={colors.primary} />
+              <Text style={[styles.locationChipText, { color: colors.primary }]}>
+                {country?.flag} {country?.name ?? "Set location"}
+              </Text>
+            </Pressable>
           </View>
         </View>
         <View style={[styles.searchBar, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
@@ -146,7 +239,21 @@ export default function ExploreScreen() {
             placeholderTextColor={colors.textTertiary}
             style={[styles.searchInput, { color: colors.text }]}
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(text) => {
+              setSearchQuery(text);
+              if (text.length === 0) {
+                setShowSearchHistory(false);
+                setHasSearched(false);
+                setSerpResults([]);
+              } else {
+                setShowSearchHistory(true);
+              }
+            }}
+            onFocus={() => {
+              if (searchQuery.length === 0 && recentSearches.length > 0) {
+                setShowSearchHistory(true);
+              }
+            }}
             onSubmitEditing={handleSearch}
             returnKeyType="search"
             testID="explore-search-input"
@@ -157,7 +264,7 @@ export default function ExploreScreen() {
             </Pressable>
           )}
         </View>
-        {isSearchActive && !searchMutation.isPending && (
+        {searchQuery.length > 1 && !searchMutation.isPending && !hasSearched && (
           <Pressable
             onPress={handleSearch}
             style={[styles.searchBtn, { backgroundColor: colors.primary }]}
@@ -171,7 +278,66 @@ export default function ExploreScreen() {
         )}
       </View>
 
-      {isSearchActive ? (
+      {showSearchHistory && !hasSearched && searchQuery.length === 0 && recentSearches.length > 0 ? (
+        <ScrollView contentContainerStyle={styles.historyContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.historyHeader}>
+            <View style={styles.historyTitleRow}>
+              <Clock size={16} color={colors.textSecondary} />
+              <Text style={[styles.historyTitle, { color: colors.text }]}>Recent Searches</Text>
+            </View>
+            <Pressable onPress={() => { void clearHistory(); setShowSearchHistory(false); }}>
+              <Text style={[styles.clearBtn, { color: colors.error }]}>Clear All</Text>
+            </Pressable>
+          </View>
+          {recentSearches.map((item, idx) => (
+            <Pressable
+              key={`history-${idx}`}
+              onPress={() => handleHistorySearch(item.query)}
+              style={[styles.historyItem, { borderBottomColor: colors.borderLight }]}
+            >
+              <Clock size={14} color={colors.textTertiary} />
+              <View style={styles.historyItemContent}>
+                <Text style={[styles.historyQuery, { color: colors.text }]}>{item.query}</Text>
+                {item.resultCount !== undefined && (
+                  <Text style={[styles.historyMeta, { color: colors.textTertiary }]}>
+                    {item.resultCount} results
+                  </Text>
+                )}
+              </View>
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  void removeSearch(item.query);
+                }}
+                hitSlop={8}
+              >
+                <Trash2 size={14} color={colors.textTertiary} />
+              </Pressable>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : showSearchHistory && suggestions.length > 0 && !hasSearched ? (
+        <ScrollView contentContainerStyle={styles.historyContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.historyHeader}>
+            <View style={styles.historyTitleRow}>
+              <Search size={16} color={colors.textSecondary} />
+              <Text style={[styles.historyTitle, { color: colors.text }]}>Suggestions</Text>
+            </View>
+          </View>
+          {suggestions.map((item, idx) => (
+            <Pressable
+              key={`suggestion-${idx}`}
+              onPress={() => handleHistorySearch(item.query)}
+              style={[styles.historyItem, { borderBottomColor: colors.borderLight }]}
+            >
+              <Search size={14} color={colors.textTertiary} />
+              <View style={styles.historyItemContent}>
+                <Text style={[styles.historyQuery, { color: colors.text }]}>{item.query}</Text>
+              </View>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : isSearchActive && hasSearched ? (
         <ScrollView contentContainerStyle={styles.searchResults} showsVerticalScrollIndicator={false}>
           {searchMutation.isPending && (
             <View style={styles.loadingState}>
@@ -205,6 +371,9 @@ export default function ExploreScreen() {
                     style={[styles.resultCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
                   >
                     <View style={styles.resultCardContent}>
+                      {result.image ? (
+                        <Image source={{ uri: result.image }} style={styles.resultImage} contentFit="cover" />
+                      ) : null}
                       <View style={styles.resultInfo}>
                         <Text style={[styles.resultTitle, { color: colors.text }]} numberOfLines={2}>
                           {product.title}
@@ -214,6 +383,14 @@ export default function ExploreScreen() {
                           <Text style={[styles.resultStore, { color: colors.textTertiary }]}>
                             {product.store}
                           </Text>
+                          {result.rating !== undefined && (
+                            <View style={styles.ratingRow}>
+                              <Star size={10} color="#FFB300" fill="#FFB300" />
+                              <Text style={[styles.ratingText, { color: colors.textTertiary }]}>
+                                {result.rating}
+                              </Text>
+                            </View>
+                          )}
                         </View>
                         <Text style={[styles.resultPrice, { color: colors.primary }]}>
                           {displayPrice}
@@ -264,26 +441,12 @@ export default function ExploreScreen() {
                 </Text>
               </View>
             )}
-
-          {!hasSearched &&
-            localResults.length === 0 &&
-            !searchMutation.isPending && (
-              <View style={styles.emptySearch}>
-                <Text style={styles.emptyEmoji}>🔎</Text>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                  Tap "Search in {country?.name}"
-                </Text>
-                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                  We'll find items from trusted stores that deliver to you
-                </Text>
-              </View>
-            )}
         </ScrollView>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
           {availableStores.length > 0 && (
             <>
-              <SectionHeader title={`Stores in ${country?.name ?? "your area"}`} />
+              <SectionHeader title={`Trusted Stores in ${country?.name ?? "your area"}`} />
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -292,11 +455,7 @@ export default function ExploreScreen() {
                 {availableStores.map((store, idx) => (
                   <Pressable
                     key={`store-${idx}`}
-                    onPress={() => {
-                      const q = `${store} ${country?.name ?? ""}`;
-                      setSearchQuery(q);
-                      searchMutation.mutate(q);
-                    }}
+                    onPress={() => handleStorePress(store)}
                     style={[styles.storeChip, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
                   >
                     <View style={[styles.storeChipIcon, { backgroundColor: colors.primaryFaded }]}>
@@ -307,6 +466,85 @@ export default function ExploreScreen() {
                 ))}
               </ScrollView>
             </>
+          )}
+
+          <SectionHeader title="Deals & Sales" />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.dealCategoryRow}
+          >
+            {DEAL_CATEGORIES.map((cat) => (
+              <Pressable
+                key={cat.id}
+                onPress={() => handleDealCategoryPress(cat.id)}
+                style={[
+                  styles.dealCategoryChip,
+                  {
+                    backgroundColor: selectedDealCategory === cat.id ? colors.primary : colors.surface,
+                    borderColor: selectedDealCategory === cat.id ? colors.primary : colors.borderLight,
+                  },
+                ]}
+              >
+                <Text style={styles.dealCategoryEmoji}>{cat.emoji}</Text>
+                <Text
+                  style={[
+                    styles.dealCategoryLabel,
+                    { color: selectedDealCategory === cat.id ? "#FFFFFF" : colors.text },
+                  ]}
+                >
+                  {cat.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          {dealsMutation.isPending && (
+            <View style={styles.dealsLoading}>
+              <ActivityIndicator color={colors.primary} size="small" />
+              <Text style={[styles.dealsLoadingText, { color: colors.textSecondary }]}>
+                Finding deals...
+              </Text>
+            </View>
+          )}
+
+          {dealResults.length > 0 && !dealsMutation.isPending && (
+            <View style={styles.dealsGrid}>
+              {dealResults.slice(0, 6).map((deal, idx) => {
+                const displayPrice = format(deal.price, deal.currency);
+                return (
+                  <Pressable
+                    key={`deal-${idx}`}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/product-detail",
+                        params: { id: `deal_${idx}`, serpData: JSON.stringify(deal) },
+                      })
+                    }
+                    style={[styles.dealCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                  >
+                    {deal.image ? (
+                      <Image source={{ uri: deal.image }} style={styles.dealImage} contentFit="cover" />
+                    ) : (
+                      <View style={[styles.dealImagePlaceholder, { backgroundColor: colors.surfaceSecondary }]}>
+                        <Tag size={20} color={colors.textTertiary} />
+                      </View>
+                    )}
+                    <View style={styles.dealInfo}>
+                      <Text style={[styles.dealTitle, { color: colors.text }]} numberOfLines={2}>
+                        {deal.title}
+                      </Text>
+                      <Text style={[styles.dealStore, { color: colors.textTertiary }]}>{deal.store}</Text>
+                      <Text style={[styles.dealPrice, { color: colors.primary }]}>{displayPrice}</Text>
+                    </View>
+                    <View style={[styles.dealBadge, { backgroundColor: colors.error + "15" }]}>
+                      <Flame size={10} color={colors.error} />
+                      <Text style={[styles.dealBadgeText, { color: colors.error }]}>Deal</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
           )}
 
           <SectionHeader title="Browse Categories" />
@@ -323,45 +561,53 @@ export default function ExploreScreen() {
             ))}
           </View>
 
-          <SectionHeader title="Trending Now" />
-          <View style={styles.trendingBanner}>
-            <View style={[styles.trendingCard, { backgroundColor: colors.primaryFaded }]}>
-              <TrendingUp size={20} color={colors.primary} />
-              <Text style={[styles.trendingTitle, { color: colors.primary }]}>
-                Most wishlisted this week
-              </Text>
-            </View>
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
-          >
-            {trendingProducts.map((item, index) => (
-              <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
-                <ProductCard
-                  product={item}
-                  onPress={() =>
-                    router.push({ pathname: "/product-detail", params: { id: item.id } })
-                  }
-                />
+          {trendingProducts.length > 0 && (
+            <>
+              <SectionHeader title="Trending Now" />
+              <View style={styles.trendingBanner}>
+                <View style={[styles.trendingCard, { backgroundColor: colors.primaryFaded }]}>
+                  <TrendingUp size={20} color={colors.primary} />
+                  <Text style={[styles.trendingTitle, { color: colors.primary }]}>
+                    Most wishlisted this week
+                  </Text>
+                </View>
               </View>
-            ))}
-          </ScrollView>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalList}
+              >
+                {trendingProducts.map((item, index) => (
+                  <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
+                    <ProductCard
+                      product={item}
+                      onPress={() =>
+                        router.push({ pathname: "/product-detail", params: { id: item.id } })
+                      }
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            </>
+          )}
 
-          <SectionHeader title="Featured Products" />
-          <View style={styles.featuredList}>
-            {allProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                variant="horizontal"
-                onPress={() =>
-                  router.push({ pathname: "/product-detail", params: { id: product.id } })
-                }
-              />
-            ))}
-          </View>
+          {allProducts.length > 0 && (
+            <>
+              <SectionHeader title="Featured Products" />
+              <View style={styles.featuredList}>
+                {allProducts.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    variant="horizontal"
+                    onPress={() =>
+                      router.push({ pathname: "/product-detail", params: { id: product.id } })
+                    }
+                  />
+                ))}
+              </View>
+            </>
+          )}
         </ScrollView>
       )}
     </View>
@@ -381,6 +627,23 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  alertBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  alertBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700" as const,
   },
   title: {
     fontSize: 28,
@@ -426,6 +689,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600" as const,
   },
+  historyContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  historyHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  historyTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  historyTitle: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+  },
+  clearBtn: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+  },
+  historyItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+    gap: 12,
+  },
+  historyItemContent: {
+    flex: 1,
+    gap: 2,
+  },
+  historyQuery: {
+    fontSize: 15,
+    fontWeight: "500" as const,
+  },
+  historyMeta: {
+    fontSize: 12,
+  },
   storesRow: {
     paddingHorizontal: 20,
     gap: 10,
@@ -449,6 +753,93 @@ const styles = StyleSheet.create({
   storeChipText: {
     fontSize: 13,
     fontWeight: "600" as const,
+  },
+  dealCategoryRow: {
+    paddingHorizontal: 20,
+    gap: 8,
+    marginBottom: 14,
+  },
+  dealCategoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  dealCategoryEmoji: {
+    fontSize: 16,
+  },
+  dealCategoryLabel: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+  },
+  dealsLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+    gap: 10,
+  },
+  dealsLoadingText: {
+    fontSize: 14,
+  },
+  dealsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 20,
+    gap: 10,
+    marginBottom: 8,
+  },
+  dealCard: {
+    width: "47%" as unknown as number,
+    flexBasis: "47%",
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  dealImage: {
+    width: "100%",
+    height: 100,
+  },
+  dealImagePlaceholder: {
+    width: "100%",
+    height: 100,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dealInfo: {
+    padding: 10,
+    gap: 3,
+  },
+  dealTitle: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    lineHeight: 17,
+  },
+  dealStore: {
+    fontSize: 11,
+  },
+  dealPrice: {
+    fontSize: 16,
+    fontWeight: "800" as const,
+    marginTop: 2,
+  },
+  dealBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 3,
+  },
+  dealBadgeText: {
+    fontSize: 10,
+    fontWeight: "700" as const,
   },
   categoriesGrid: {
     flexDirection: "row",
@@ -520,6 +911,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
   },
+  resultImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+  },
   resultInfo: {
     flex: 1,
     gap: 4,
@@ -532,10 +928,18 @@ const styles = StyleSheet.create({
   resultMeta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 6,
   },
   resultStore: {
     fontSize: 12,
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  ratingText: {
+    fontSize: 11,
   },
   resultPrice: {
     fontSize: 18,

@@ -68,6 +68,32 @@ export interface PriceComparisonResult {
   error: string | null;
 }
 
+export interface TrendingResult {
+  results: SerpApiResult[];
+  category: string;
+  error: string | null;
+}
+
+export interface DealsResult {
+  results: SerpApiResult[];
+  error: string | null;
+}
+
+export interface PriceCheckItem {
+  title: string;
+  currentPrice: number;
+  previousPrice: number;
+  dropped: boolean;
+  savings?: number;
+  store?: string;
+  link?: string;
+}
+
+export interface PriceCheckResult {
+  results: PriceCheckItem[];
+  error: string | null;
+}
+
 export interface DbHealthResult {
   status: string;
   message: string;
@@ -213,6 +239,108 @@ export async function comparePrices(
   } catch (err) {
     console.error("[API] Price comparison failed:", err);
     return { comparison: [], error: "Network error" };
+  }
+}
+
+export async function fetchTrendingProducts(
+  country: string = "us",
+  categories?: string[]
+): Promise<TrendingResult> {
+  try {
+    const baseUrl = getBaseUrl();
+    if (!baseUrl) {
+      return { results: [], category: "", error: "API URL not configured" };
+    }
+
+    console.log(`[API] Fetching trending in ${country}`);
+    const response = await fetch(`${baseUrl}/api/search/trending`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ country, categories }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        results: [],
+        category: "",
+        error: (errorData as Record<string, string>).error || `Request failed: ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    console.log(`[API] Trending returned ${(data as TrendingResult).results.length} results`);
+    return data as TrendingResult;
+  } catch (err) {
+    console.error("[API] Trending failed:", err);
+    return { results: [], category: "", error: "Network error" };
+  }
+}
+
+export async function fetchDeals(
+  country: string = "us",
+  category: string = "deals"
+): Promise<DealsResult> {
+  try {
+    const baseUrl = getBaseUrl();
+    if (!baseUrl) {
+      return { results: [], error: "API URL not configured" };
+    }
+
+    console.log(`[API] Fetching deals: ${category} in ${country}`);
+    const response = await fetch(`${baseUrl}/api/search/deals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ country, category }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        results: [],
+        error: (errorData as Record<string, string>).error || `Request failed: ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    console.log(`[API] Deals returned ${(data as DealsResult).results.length} results`);
+    return data as DealsResult;
+  } catch (err) {
+    console.error("[API] Deals failed:", err);
+    return { results: [], error: "Network error" };
+  }
+}
+
+export async function checkPrices(
+  products: { title: string; lastPrice: number; currency: string; country: string }[]
+): Promise<PriceCheckResult> {
+  try {
+    const baseUrl = getBaseUrl();
+    if (!baseUrl) {
+      return { results: [], error: "API URL not configured" };
+    }
+
+    console.log(`[API] Checking prices for ${products.length} products`);
+    const response = await fetch(`${baseUrl}/api/search/price-check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ products }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        results: [],
+        error: (errorData as Record<string, string>).error || `Request failed: ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    console.log(`[API] Price check complete`);
+    return data as PriceCheckResult;
+  } catch (err) {
+    console.error("[API] Price check failed:", err);
+    return { results: [], error: "Network error" };
   }
 }
 

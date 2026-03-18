@@ -432,6 +432,241 @@ app.post("/convert", async (c) => {
   }
 });
 
+app.post("/search/trending", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { country = "us", categories } = body as {
+      country?: string;
+      categories?: string[];
+    };
+
+    const apiKey = process.env.SERPAPI_KEY;
+    if (!apiKey) {
+      return c.json({ results: [], error: "SerpAPI key not configured" }, 500);
+    }
+
+    const defaultCategories = [
+      "trending tech gadgets",
+      "best sellers electronics",
+      "popular fashion items",
+      "top rated home decor",
+    ];
+    const searchCategories = categories ?? defaultCategories;
+    const randomCategory =
+      searchCategories[Math.floor(Math.random() * searchCategories.length)];
+
+    const params = new URLSearchParams({
+      engine: "google_shopping",
+      q: randomCategory,
+      api_key: apiKey,
+      gl: country,
+      hl: "en",
+      num: "10",
+      sort_by: "review_score",
+    });
+
+    console.log(
+      `[SerpAPI] Fetching trending: "${randomCategory}" in ${country}`
+    );
+    const response = await fetch(
+      `https://serpapi.com/search.json?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      return c.json(
+        { results: [], error: `SerpAPI returned ${response.status}` },
+        502
+      );
+    }
+
+    const data = (await response.json()) as Record<string, unknown>;
+    const shoppingResults =
+      (data.shopping_results as Record<string, unknown>[]) || [];
+
+    const results = shoppingResults.slice(0, 10).map(
+      (item: Record<string, unknown>) => ({
+        title: (item.title as string) || "",
+        price:
+          typeof item.extracted_price === "number" ? item.extracted_price : 0,
+        currency: (item.currency as string) || "USD",
+        store: (item.source as string) || "Unknown",
+        link: (item.link as string) || (item.product_link as string) || "",
+        image: (item.thumbnail as string) || "",
+        rating: typeof item.rating === "number" ? item.rating : undefined,
+        reviews: typeof item.reviews === "number" ? item.reviews : undefined,
+        snippet: (item.snippet as string) || "",
+        productId: (item.product_id as string) || "",
+        delivery: (item.delivery as string) || "",
+        category: randomCategory,
+      })
+    );
+
+    console.log(`[SerpAPI] Trending: ${results.length} results`);
+    return c.json({ results, category: randomCategory, error: null });
+  } catch (err) {
+    console.error("[SerpAPI] Trending failed:", err);
+    return c.json({ results: [], error: "Trending fetch failed" }, 500);
+  }
+});
+
+app.post("/search/deals", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { country = "us", category = "deals" } = body as {
+      country?: string;
+      category?: string;
+    };
+
+    const apiKey = process.env.SERPAPI_KEY;
+    if (!apiKey) {
+      return c.json({ results: [], error: "SerpAPI key not configured" }, 500);
+    }
+
+    const dealQueries: Record<string, string> = {
+      deals: "best deals today",
+      electronics: "electronics deals sale",
+      fashion: "fashion clothing sale discount",
+      home: "home decor deals clearance",
+      beauty: "beauty products on sale",
+      tech: "tech gadgets deals discount",
+    };
+
+    const query = dealQueries[category] || `${category} deals sale`;
+
+    const params = new URLSearchParams({
+      engine: "google_shopping",
+      q: query,
+      api_key: apiKey,
+      gl: country,
+      hl: "en",
+      num: "15",
+      sort_by: "price_low_to_high",
+    });
+
+    console.log(`[SerpAPI] Fetching deals: "${query}" in ${country}`);
+    const response = await fetch(
+      `https://serpapi.com/search.json?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      return c.json(
+        { results: [], error: `SerpAPI returned ${response.status}` },
+        502
+      );
+    }
+
+    const data = (await response.json()) as Record<string, unknown>;
+    const shoppingResults =
+      (data.shopping_results as Record<string, unknown>[]) || [];
+
+    const results = shoppingResults.slice(0, 15).map(
+      (item: Record<string, unknown>) => ({
+        title: (item.title as string) || "",
+        price:
+          typeof item.extracted_price === "number" ? item.extracted_price : 0,
+        currency: (item.currency as string) || "USD",
+        store: (item.source as string) || "Unknown",
+        link: (item.link as string) || (item.product_link as string) || "",
+        image: (item.thumbnail as string) || "",
+        rating: typeof item.rating === "number" ? item.rating : undefined,
+        reviews: typeof item.reviews === "number" ? item.reviews : undefined,
+        snippet: (item.snippet as string) || "",
+        productId: (item.product_id as string) || "",
+        delivery: (item.delivery as string) || "",
+      })
+    );
+
+    console.log(`[SerpAPI] Deals: ${results.length} results`);
+    return c.json({ results, error: null });
+  } catch (err) {
+    console.error("[SerpAPI] Deals failed:", err);
+    return c.json({ results: [], error: "Deals fetch failed" }, 500);
+  }
+});
+
+app.post("/search/price-check", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { products } = body as {
+      products: { title: string; lastPrice: number; currency: string; country: string }[];
+    };
+
+    if (!products || products.length === 0) {
+      return c.json({ results: [], error: "No products provided" }, 400);
+    }
+
+    const apiKey = process.env.SERPAPI_KEY;
+    if (!apiKey) {
+      return c.json({ results: [], error: "SerpAPI key not configured" }, 500);
+    }
+
+    console.log(
+      `[SerpAPI] Price check for ${products.length} products`
+    );
+
+    const checkResults = await Promise.allSettled(
+      products.slice(0, 5).map(async (product) => {
+        const params = new URLSearchParams({
+          engine: "google_shopping",
+          q: product.title,
+          api_key: apiKey,
+          gl: product.country || "us",
+          hl: "en",
+          num: "3",
+        });
+
+        const resp = await fetch(
+          `https://serpapi.com/search.json?${params.toString()}`
+        );
+        if (!resp.ok) return { title: product.title, currentPrice: 0, previousPrice: product.lastPrice, dropped: false };
+
+        const data = (await resp.json()) as Record<string, unknown>;
+        const results =
+          (data.shopping_results as Record<string, unknown>[]) || [];
+        const topResult = results[0];
+        const currentPrice =
+          topResult && typeof topResult.extracted_price === "number"
+            ? topResult.extracted_price
+            : 0;
+
+        return {
+          title: product.title,
+          currentPrice,
+          previousPrice: product.lastPrice,
+          dropped: currentPrice > 0 && currentPrice < product.lastPrice,
+          savings: currentPrice > 0 ? product.lastPrice - currentPrice : 0,
+          store: topResult ? (topResult.source as string) || "" : "",
+          link: topResult ? (topResult.link as string) || "" : "",
+        };
+      })
+    );
+
+    const results = checkResults
+      .filter(
+        (r): r is PromiseFulfilledResult<{
+          title: string;
+          currentPrice: number;
+          previousPrice: number;
+          dropped: boolean;
+          savings?: number;
+          store?: string;
+          link?: string;
+        }> => r.status === "fulfilled"
+      )
+      .map((r) => r.value);
+
+    const droppedCount = results.filter((r) => r.dropped).length;
+    console.log(
+      `[SerpAPI] Price check complete: ${droppedCount}/${results.length} dropped`
+    );
+
+    return c.json({ results, error: null });
+  } catch (err) {
+    console.error("[SerpAPI] Price check failed:", err);
+    return c.json({ results: [], error: "Price check failed" }, 500);
+  }
+});
+
 app.get("/db/health", async (c) => {
   const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -451,6 +686,8 @@ app.get("/db/health", async (c) => {
     "collaborators",
     "chat_messages",
     "item_assignments",
+    "price_alerts",
+    "price_history",
   ];
 
   const tableStatus: Record<string, { exists: boolean; count: number; error?: string }> = {};
