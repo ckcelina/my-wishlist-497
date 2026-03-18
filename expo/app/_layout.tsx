@@ -30,7 +30,7 @@ function AuthGate() {
     AsyncStorage.getItem("has_onboarded_v1").then((val) => {
       setHasOnboarded(val === "true");
     }).catch(() => setHasOnboarded(true));
-  }, []);
+  }, [segments]);
 
   useEffect(() => {
     if (!isInitialized || hasOnboarded === null) return;

@@ -25,8 +25,8 @@ const SLIDES = [
     title: "Your Global\nShopping List",
     subtitle:
       "Save products from any store worldwide and organize them in beautiful wishlists.",
-    bg: "#2D6A4F",
-    accent: "#40916C",
+    bg: "#1a0a2e",
+    accent: "#4c2090",
   },
   {
     id: 2,
@@ -34,8 +34,8 @@ const SLIDES = [
     title: "Search\nWorldwide",
     subtitle:
       "Find products in your country and compare prices across 190+ countries instantly.",
-    bg: "#1B4332",
-    accent: "#2D6A4F",
+    bg: "#110b1d",
+    accent: "#8032ee",
   },
   {
     id: 3,
@@ -43,8 +43,8 @@ const SLIDES = [
     title: "Never Miss\na Price Drop",
     subtitle:
       "Set price alerts and get notified the moment your saved products go on sale.",
-    bg: "#0D3B2A",
-    accent: "#1B4332",
+    bg: "#0d0818",
+    accent: "#4c2090",
   },
 ];
 
