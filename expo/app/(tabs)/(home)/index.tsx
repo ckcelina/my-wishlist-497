@@ -12,7 +12,7 @@ import {
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Search, Gift, Sparkles } from "lucide-react-native";
+import { Search, Gift, Sparkles, Plus } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import WishlistCard from "@/components/WishlistCard";
@@ -138,17 +138,39 @@ export default function HomeScreen() {
           </View>
         </Animated.View>
 
-        <SectionHeader title="My Lists" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-          {myLists.map((item, index) => (
-            <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
-              <WishlistCard
-                wishlist={item}
-                onPress={() => router.push({ pathname: "/wishlist-detail", params: { id: item.id } })}
-              />
+        <SectionHeader title="My Lists" onSeeAll={() => router.push("/create-list")} />
+        {myLists.length === 0 ? (
+          <Pressable
+            onPress={() => router.push("/create-list")}
+            style={[styles.emptyListCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "30" }]}
+          >
+            <View style={[styles.emptyListIcon, { backgroundColor: colors.primary + "20" }]}>
+              <Plus size={24} color={colors.primary} />
             </View>
-          ))}
-        </ScrollView>
+            <Text style={[styles.emptyListTitle, { color: colors.text }]}>Create your first wishlist</Text>
+            <Text style={[styles.emptyListDesc, { color: colors.textSecondary }]}>Start saving products you love</Text>
+          </Pressable>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+            <Pressable
+              onPress={() => router.push("/create-list")}
+              style={[styles.createListCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "30" }]}
+            >
+              <View style={[styles.createListIconWrap, { backgroundColor: colors.primary + "20" }]}>
+                <Plus size={22} color={colors.primary} />
+              </View>
+              <Text style={[styles.createListText, { color: colors.primary }]}>New List</Text>
+            </Pressable>
+            {myLists.map((item) => (
+              <View key={item.id} style={{ marginLeft: 12 }}>
+                <WishlistCard
+                  wishlist={item}
+                  onPress={() => router.push({ pathname: "/wishlist-detail", params: { id: item.id } })}
+                />
+              </View>
+            ))}
+          </ScrollView>
+        )}
 
         {sharedLists.length > 0 && (
           <>
@@ -278,5 +300,50 @@ const styles = StyleSheet.create({
   },
   horizontalList: {
     paddingHorizontal: 20,
+  },
+  emptyListCard: {
+    marginHorizontal: 20,
+    padding: 28,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderStyle: "dashed" as const,
+    alignItems: "center" as const,
+    gap: 10,
+  },
+  emptyListIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    marginBottom: 4,
+  },
+  emptyListTitle: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+  },
+  emptyListDesc: {
+    fontSize: 13,
+  },
+  createListCard: {
+    width: 120,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderStyle: "dashed" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 10,
+  },
+  createListIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  createListText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
   },
 });

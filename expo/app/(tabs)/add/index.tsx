@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import {
   Link2,
   PenLine,
@@ -48,8 +49,10 @@ type DetectedProduct = z.infer<typeof productSchema>;
 export default function AddScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const { wishlists, addProductToWishlist } = useWishlistContext();
+  const hasWishlists = wishlists.length > 0;
 
   const [mode, setMode] = useState<"menu" | "link" | "manual" | "image">("menu");
   const [productUrl, setProductUrl] = useState("");
@@ -864,6 +867,20 @@ export default function AddScreen() {
           Choose how you'd like to add an item
         </Text>
 
+        {!hasWishlists && (
+          <Pressable
+            onPress={() => router.push("/create-list")}
+            style={[styles.noListBanner, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "30" }]}
+          >
+            <Plus size={20} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.noListTitle, { color: colors.primary }]}>Create a wishlist first</Text>
+              <Text style={[styles.noListDesc, { color: colors.textSecondary }]}>You need a list to save products to</Text>
+            </View>
+            <ChevronRight size={18} color={colors.primary} />
+          </Pressable>
+        )}
+
         <View style={styles.menuCards}>
           <Pressable
             onPress={() => setMode("image")}
@@ -954,6 +971,23 @@ const styles = StyleSheet.create({
   menuSubtitle: {
     fontSize: 15,
     marginBottom: 28,
+  },
+  noListBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 12,
+    marginBottom: 20,
+  },
+  noListTitle: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+  },
+  noListDesc: {
+    fontSize: 12,
+    marginTop: 2,
   },
   menuCards: {
     gap: 14,
