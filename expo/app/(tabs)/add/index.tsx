@@ -75,7 +75,7 @@ export default function AddScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { serpApiCountryCode, city } = useLocation();
+  const { serpApiCountryCode, city, format } = useLocation();
 
   const { wishlists, addProductToWishlist } = useWishlistContext();
   const hasWishlists = wishlists.length > 0;
@@ -861,7 +861,7 @@ export default function AddScreen() {
                 </Text>
                 <View style={styles.resultMeta}>
                   <Text style={[styles.resultPrice, { color: colors.primary }]}>
-                    {result.price > 0 ? `$${result.price.toFixed(2)}` : "Price N/A"}
+                    {result.price > 0 ? format(result.price, result.currency || "USD") : "Price N/A"}
                   </Text>
                   <Text style={[styles.resultStore, { color: colors.textSecondary }]}>
                     {result.store}
@@ -916,11 +916,16 @@ export default function AddScreen() {
             ))}
           </View>
         </ScrollView>
+        {!selectedListId && (
+          <Text style={[styles.selectListHint, { color: colors.textTertiary }]}>
+            Tap a list above to enable adding
+          </Text>
+        )}
       </View>
 
       <Pressable
-        onPress={onAdd}
-        style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+        onPress={selectedListId ? onAdd : undefined}
+        style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: selectedListId ? 1 : 0.35 }]}
       >
         <Plus size={18} color="#FFFFFF" />
         <Text style={styles.primaryButtonText}>{addLabel}</Text>
@@ -1377,7 +1382,7 @@ export default function AddScreen() {
                   </Text>
                   {detectedProduct.estimatedPrice !== undefined && detectedProduct.estimatedPrice > 0 && (
                     <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>
-                      Est. Price: ${detectedProduct.estimatedPrice.toFixed(2)}
+                      Est. Price: {format(detectedProduct.estimatedPrice, "USD")}
                     </Text>
                   )}
                   <Text style={[styles.detectedDesc, { color: colors.textSecondary }]} numberOfLines={2}>
@@ -1472,7 +1477,7 @@ export default function AddScreen() {
                   <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>Store: {scrapedData.store}</Text>
                 ) : null}
                 {scrapedData.price > 0 && (
-                  <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>Price: ${scrapedData.price.toFixed(2)}</Text>
+                  <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>Price: {format(scrapedData.price, "USD")}</Text>
                 )}
                 {scrapedData.description ? (
                   <Text style={[styles.detectedDesc, { color: colors.textSecondary }]} numberOfLines={2}>
@@ -2136,5 +2141,9 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     paddingHorizontal: 8,
     paddingTop: 4,
+  },
+  selectListHint: {
+    fontSize: 12,
+    marginTop: 8,
   },
 });
