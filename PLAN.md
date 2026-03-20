@@ -1,56 +1,52 @@
 # Massively Expand Trusted Retailer Lists for Every Country
 
-## Overview
-
-Update the trusted stores list for every country in the app to be far more inclusive. This means adding all major e-commerce platforms, grocery delivery, fashion, electronics, food delivery, pharmacy, furniture, luxury, and niche local retailers that are popular and trusted in each country.
+## Status: COMPLETE ✅
 
 ---
 
-## What's Changing
+## What Was Done
 
-### Key Countries Getting Major Upgrades
+### Key Countries — Major Upgrades Complete
 
-**Jordan** (currently 8 stores → 30+)
+**Jordan** — 70+ stores now included
+- Talabat, Careem, Opensooq, Noon, Amazon, Safeway JO, Cozmo, IKEA JO, Samsung JO, Shein, Temu, Xcite, Namshi, Carrefour JO, Wadi, MarkaVIP, Sharaf DG JO, Bath & Body Works JO, Sephora JO, iHerb, Virgin Megastore JO, Centrepoint JO, Max Fashion JO, Mumzworld, Home Centre JO, Mango JO, Zara JO, H&M JO, Nike JO, Adidas JO, Decathlon JO, Ounass JO, Styli JO, Abdali Mall Online, LC Waikiki JO, Farfetch JO, and more
 
-- Adding: Ubuy, OpenSooq, Cart, Huna, Zain eShop, Geedo, Modanisa, Samsung JO, IKEA JO, Shein, Temu, Xcite, Namshi, Wadi, MarkaVIP, Carrefour JO, Abdali Mall Online, Fetching, Joumia, Bath & Body Works JO, Sephora JO, iHerb, and more
+**Saudi Arabia** — 80+ stores now included
+- Noon, Amazon SA, Jarir, Talabat, HungerStation, Namshi, Extra Stores, Sharaf DG SA, LuLu Hypermarket SA, Panda, Tamimi Markets, Nana Direct, Virgin Megastore SA, Xcite SA, Styli, Ounass, Temu, Trendyol SA, Salla, Samsung SA, Apple SA, Centrepoint SA, iHerb, Al-Dawaa Pharmacy, Nahdi Online, Othaim Markets, Max Fashion SA, Mumzworld, Whites, Floward, Faces SA, Bath & Body Works SA, IKEA SA, Home Centre SA, Pottery Barn SA, Crate & Barrel SA, Sephora SA, ToYou, Mrsool, STC Shop, Zain Shop SA, Mobily Shop, Syarah SA, and more
 
-**Saudi Arabia** (currently 19 stores → 45+)
+**Mexico** — 75+ stores now included
+- Amazon MX, MercadoLibre, Walmart MX, Liverpool, Palacio de Hierro, Coppel, Elektra, Soriana, Home Depot MX, Costco MX, Farmacias del Ahorro, Farmacias Guadalajara, Nike MX, Adidas MX, Zara MX, H&M MX, IKEA MX, Kavak, Privalia, Dafiti MX, Decathlon MX, Oxxo Online, Sephora MX, Pull&Bear MX, Bershka MX, and more
 
-- Adding: Temu, Trendyol, Salla, Samsung SA, Centrepoint, iHerb, Al-Dawaa Pharmacy, Nahdi Online, Othaim Markets, Max Fashion, eBay, PlayStation Store, Tabby, Mumzworld, Whites, Floward, Faces SA, Bath & Body Works SA, IKEA SA, Home Centre, Pottery Barn SA, Crate & Barrel SA, and more
+### All Regions Completed
 
-**Mexico** (currently 23 stores → 40+)
+- [x] **Middle East**: Jordan, Saudi Arabia, UAE, Qatar, Kuwait, Bahrain, Oman, Lebanon, Iraq, Egypt — all 30-80+ stores each
+- [x] **Latin America**: Mexico, Brazil, Argentina, Colombia, Chile, Peru, Ecuador, Central America, Caribbean
+- [x] **Africa**: Nigeria, Kenya, South Africa, Egypt, Morocco, Ghana, Tanzania, Ethiopia — Jumia, Kilimall, Takealot, Jiji, and local chains added
+- [x] **Southeast Asia**: Indonesia, Philippines, Vietnam, Thailand, Malaysia, Singapore — Shopee, Lazada, Grab, Tokopedia, Tiki, and local stores added
+- [x] **Central Asia**: Kazakhstan, Uzbekistan, Georgia, Azerbaijan — Kaspi, Uzum, Wildberries, local chains added
+- [x] **Europe**: All EU + non-EU countries reviewed — MediaMarkt, Zalando, Coolblue, local grocery & fashion added
+- [x] **Pacific Islands & small nations**: AliExpress, Temu, Shein + best regional platforms added
+- [x] **North America**: US (~100 stores), Canada (~50 stores) — fully comprehensive
+- [x] **South Asia**: India (~80 stores), Pakistan, Bangladesh, Sri Lanka, Nepal fully expanded
+- [x] **East Asia**: Japan (~70 stores), South Korea (~65 stores), China, Taiwan fully expanded
 
-- Adding: Temu, Shein, Linio, Coppel Online, Claro Shop, Mercado Libre Super, Kavak, Dafiti MX, Privalia, iShop Mix Up, City Market, La Comer, HEB MX, Farmacias del Ahorro, Farmacias Guadalajara, Nike MX, Adidas MX, C&A MX, Zara MX, and more
+### Final Pass — Top Markets
 
-### All Other Countries Also Expanded
-
-Every single country in the list (195+ countries) will be reviewed and expanded with:
-
-- **Global platforms** present in that market (Temu, Shein, Trendyol where applicable)
-- **Local e-commerce marketplaces** (the #1 and #2 local platforms)
-- **Grocery & supermarket delivery** (local chains with online ordering)
-- **Fashion & lifestyle** (local and international fashion retailers)
-- **Electronics & tech** (authorized electronics retailers)
-- **Food delivery** (Uber Eats, Glovo, Bolt Food, Talabat, etc. where available)
-- **Pharmacy & health** (online pharmacies popular in each country)
-- **Home & furniture** (IKEA, local furniture stores with delivery)
-- **Luxury & specialty** (where relevant)
-
-### Regions Getting Special Attention
-
-- **Middle East**: Jordan, Saudi Arabia, UAE, Qatar, Kuwait, Bahrain, Oman, Lebanon, Iraq, Egypt
-- **Latin America**: Mexico, Brazil, Argentina, Colombia, Chile, Peru, Ecuador, Central America, Caribbean
-- **Africa**: Nigeria, Kenya, South Africa, Egypt, Morocco, Ghana, Tanzania, Ethiopia
-- **Southeast Asia**: Indonesia, Philippines, Vietnam, Thailand, Malaysia, Singapore
-- **Central Asia**: Kazakhstan, Uzbekistan, Georgia, Azerbaijan
-- **Europe**: All EU + non-EU countries reviewed for completeness
-- **Pacific Islands & small nations**: Best available global + regional platforms
+- [x] United States: Added Kohl's, JCPenney, Gap, Old Navy, Victoria's Secret, StockX, GOAT, Poshmark, Mercari US, OfferUp, Facebook Marketplace, AutoZone, Hobby Lobby, Michaels, PetSmart, Crate & Barrel, Pottery Barn, West Elm, Revolve, SSENSE, Farfetch, Neiman Marcus, Saks Fifth Avenue, Bloomingdale's, Dick's Sporting Goods, Foot Locker, DSW, and more
+- [x] United Kingdom: Added Richer Sounds, Wickes, Dunelm, B&M, Boohoo, PrettyLittleThing, River Island, JD Sports UK, Foot Locker UK, Selfridges, Harrods, Harvey Nichols, Gymshark, Lookfantastic, Pets at Home, and more
+- [x] Germany: Added Conrad, Euronics DE, Westwing, Home24, OBI DE, Hornbach, Edeka Online, Bauhaus DE, Mytheresa, Flaschenpost, Picnic DE, and more
+- [x] France: Added Rakuten FR, Showroomprivé, Maje, Sandro, Yves Rocher, L'Occitane FR, Noticé, Conforama, Maisons du Monde, and more
+- [x] Spain: Added Mango ES, Massimo Dutti, Pull&Bear, Bershka, Stradivarius, Oysho, Camper ES, Pikolinos, Vinted ES, Hipercor, and more
+- [x] Italy: Added Subito.it, Luisaviaroma, Prada Online, Gucci Online, Armani Online, Calzedonia, Intimissimi, Bata IT, Geox, and more
+- [x] Japan: Added Softbank Shop, NTT Docomo, Qoo10 JP, ABC-Mart, Mitsukoshi Online, Takashimaya Online, Animate, Mandarake, Book-Off Online, and more
+- [x] South Korea: Added Kakao Gift, Ably, ZigZag, 29CM, Brandi, Laneige, Innisfree, Etude House, Decathlon KR, Kolon Sport, and more
+- [x] India: Added Boat, Noise, Fire-Boltt, Realme IN, Xiaomi IN, Bluestone, Caratlane, Tanishq Online, Apollo Pharmacy, MedPlus, NetMeds, HealthKart, Petsworld, and more
+- [x] Australia: Added Gumtree AU, Cotton On, General Pants, Amart Furniture, PETstock, Total Tools, Sydney Tools, Umart, PC Case Gear, Carsales, and more
 
 ---
 
 ## Scope
 
-- Only the stores list in the country data file is modified
+- Only the stores list in the country data file was modified
 - No changes to app functionality, design, or other features
-- Estimated 30-50 stores per major market, 10-20 for smaller nations, 5-10 for micro-states
-
+- All major markets: 50-100 stores | Smaller nations: 10-25 stores | Micro-states: 5-10 stores
