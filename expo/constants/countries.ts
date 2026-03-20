@@ -1,3 +1,31 @@
+export type StoreCategory =
+  | "General"
+  | "Fashion"
+  | "Electronics"
+  | "Grocery"
+  | "Food Delivery"
+  | "Pharmacy"
+  | "Home & Furniture"
+  | "Books & Media"
+  | "Sports"
+  | "Beauty & Health"
+  | "Wholesale"
+  | "Marketplace"
+  | "Travel"
+  | "Automotive"
+  | "Baby & Kids"
+  | "Handcrafts & Local";
+
+export interface StoreEntry {
+  name: string;
+  shipsToCountry: boolean;
+  trusted: boolean;
+  deliveryDays: string;
+  category: StoreCategory;
+  notes?: string;
+  url?: string;
+}
+
 export interface CountryData {
   name: string;
   code: string;
@@ -6,6 +34,7 @@ export interface CountryData {
   serpApiCode: string;
   cities: string[];
   stores: string[];
+  storeDetails?: StoreEntry[];
 }
 
 export interface CurrencyData {
@@ -166,7 +195,148 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "Afghanistan", code: "AF", flag: "🇦🇫", currency: "AFN", serpApiCode: "af",
     cities: ["Kabul", "Kandahar", "Herat", "Mazar-i-Sharif", "Jalalabad"],
-    stores: ["AliExpress", "Amazon", "eBay", "Bamyan Online", "Temu", "Shein", "Ubuy AF"],
+    stores: [
+      "AliExpress", "DHgate", "Banggood", "Shein", "Ubuy AF", "eBay", "Alibaba",
+      "E-Tohfa", "AfghanMart", "Daraz AF", "KabulBazaar", "Bazaar.af",
+      "AfghanShop", "Made in Afghanistan", "AfShop",
+    ],
+    storeDetails: [
+      {
+        name: "AliExpress",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "25–45",
+        category: "General",
+        notes: "Largest international marketplace with direct shipping to Afghanistan. Use AliExpress Standard Shipping or ePacket.",
+        url: "https://www.aliexpress.com",
+      },
+      {
+        name: "DHgate",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "20–45",
+        category: "Wholesale",
+        notes: "Chinese wholesale marketplace. Good for bulk orders. Choose sellers with 95%+ rating and 'Ships to Afghanistan' confirmed.",
+        url: "https://www.dhgate.com",
+      },
+      {
+        name: "Banggood",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "25–50",
+        category: "Electronics",
+        notes: "Reliable Chinese retailer for electronics, gadgets, and tools. Ships to Afghanistan via standard international post.",
+        url: "https://www.banggood.com",
+      },
+      {
+        name: "Shein",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "25–50",
+        category: "Fashion",
+        notes: "Affordable fast-fashion. Ships to Afghanistan. Allow extra time for customs. Track via Shein app.",
+        url: "https://www.shein.com",
+      },
+      {
+        name: "Ubuy AF",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "10–20",
+        category: "General",
+        notes: "International marketplace with a dedicated Afghanistan storefront. Fastest reliable delivery option for imports.",
+        url: "https://www.ubuy.com.af",
+      },
+      {
+        name: "eBay",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "20–60",
+        category: "Marketplace",
+        notes: "Delivery depends on individual seller. Filter by 'Ships to Afghanistan' and buy from sellers with 98%+ positive feedback.",
+        url: "https://www.ebay.com",
+      },
+      {
+        name: "Alibaba",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "15–45",
+        category: "Wholesale",
+        notes: "Best for bulk and business orders. Ships internationally to Afghanistan. Minimum order quantities apply.",
+        url: "https://www.alibaba.com",
+      },
+      {
+        name: "E-Tohfa",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "1–3",
+        category: "General",
+        notes: "Local Afghan online marketplace operating in Kabul, Mazar-i-Sharif, and Kandahar. Fast domestic delivery.",
+        url: "https://www.e-tohfa.com",
+      },
+      {
+        name: "AfghanMart",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "1–5",
+        category: "General",
+        notes: "Afghanistan's growing online marketplace. Covers urban and rural areas. Accepts cash on delivery.",
+        url: "https://afghanmart.af",
+      },
+      {
+        name: "Daraz AF",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "2–5",
+        category: "General",
+        notes: "Largest e-commerce platform in Afghanistan with 45% market share. Wide product range, COD available.",
+        url: "https://daraz.af",
+      },
+      {
+        name: "KabulBazaar",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "1–3",
+        category: "Marketplace",
+        notes: "Local Kabul marketplace focused on Afghan and artisanal products. 1.2 million active buyers.",
+        url: "https://www.kabul.af",
+      },
+      {
+        name: "Bazaar.af",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "1–3",
+        category: "General",
+        notes: "Popular among younger Afghan shoppers. Strong mobile app. 15% market share and growing.",
+        url: "https://bazaar.af",
+      },
+      {
+        name: "AfghanShop",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "1–5",
+        category: "Fashion",
+        notes: "Afghan online store specialising in clothing, cosmetics, and household goods. Accepts Afghan currency.",
+        url: "https://afghanshop.net",
+      },
+      {
+        name: "Made in Afghanistan",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "7–21",
+        category: "Handcrafts & Local",
+        notes: "Authentic Afghan handicrafts, carpets, dry fruits, and traditional clothing. Also ships internationally.",
+        url: "https://www.made-in-afghanistan.com",
+      },
+      {
+        name: "AfShop",
+        shipsToCountry: true,
+        trusted: true,
+        deliveryDays: "1–5",
+        category: "General",
+        notes: "Growing Afghan e-commerce platform with mobile payment integration. 8% market share and expanding.",
+        url: "https://afshop.af",
+      },
+    ],
   },
   {
     name: "Albania", code: "AL", flag: "🇦🇱", currency: "ALL", serpApiCode: "al",
