@@ -1,41 +1,56 @@
-# 5-Phase Fix: Currency, Plus Button, Lens Selection, 404 Error, Stores List
+# Massively Expand Trusted Retailer Lists for Every Country
 
-## Phases Overview
+## Overview
 
----
-
-### Phase 1 — Quick UX & Currency Fixes ✅
-- [x] Plus button fix — raised higher so "Add" label is visible
-- [x] Unified currency in Add screen search results
-- [x] "Add detected product" button greyed out until list selected
+Update the trusted stores list for every country in the app to be far more inclusive. This means adding all major e-commerce platforms, grocery delivery, fashion, electronics, food delivery, pharmacy, furniture, luxury, and niche local retailers that are popular and trusted in each country.
 
 ---
 
-### Phase 2 — Google Lens-Style Image Selection ✅
-- [x] ImageSelectionOverlay component with draggable/resizable crop box
-- [x] After uploading photo, selection overlay appears before processing
-- [x] "Search Selection" crops region via expo-image-manipulator and sends for detection
-- [x] "Full Image" option sends entire image as before
+## What's Changing
+
+### Key Countries Getting Major Upgrades
+
+**Jordan** (currently 8 stores → 30+)
+
+- Adding: Ubuy, OpenSooq, Cart, Huna, Zain eShop, Geedo, Modanisa, Samsung JO, IKEA JO, Shein, Temu, Xcite, Namshi, Wadi, MarkaVIP, Carrefour JO, Abdali Mall Online, Fetching, Joumia, Bath & Body Works JO, Sephora JO, iHerb, and more
+
+**Saudi Arabia** (currently 19 stores → 45+)
+
+- Adding: Temu, Trendyol, Salla, Samsung SA, Centrepoint, iHerb, Al-Dawaa Pharmacy, Nahdi Online, Othaim Markets, Max Fashion, eBay, PlayStation Store, Tabby, Mumzworld, Whites, Floward, Faces SA, Bath & Body Works SA, IKEA SA, Home Centre, Pottery Barn SA, Crate & Barrel SA, and more
+
+**Mexico** (currently 23 stores → 40+)
+
+- Adding: Temu, Shein, Linio, Coppel Online, Claro Shop, Mercado Libre Super, Kavak, Dafiti MX, Privalia, iShop Mix Up, City Market, La Comer, HEB MX, Farmacias del Ahorro, Farmacias Guadalajara, Nike MX, Adidas MX, C&A MX, Zara MX, and more
+
+### All Other Countries Also Expanded
+
+Every single country in the list (195+ countries) will be reviewed and expanded with:
+
+- **Global platforms** present in that market (Temu, Shein, Trendyol where applicable)
+- **Local e-commerce marketplaces** (the #1 and #2 local platforms)
+- **Grocery & supermarket delivery** (local chains with online ordering)
+- **Fashion & lifestyle** (local and international fashion retailers)
+- **Electronics & tech** (authorized electronics retailers)
+- **Food delivery** (Uber Eats, Glovo, Bolt Food, Talabat, etc. where available)
+- **Pharmacy & health** (online pharmacies popular in each country)
+- **Home & furniture** (IKEA, local furniture stores with delivery)
+- **Luxury & specialty** (where relevant)
+
+### Regions Getting Special Attention
+
+- **Middle East**: Jordan, Saudi Arabia, UAE, Qatar, Kuwait, Bahrain, Oman, Lebanon, Iraq, Egypt
+- **Latin America**: Mexico, Brazil, Argentina, Colombia, Chile, Peru, Ecuador, Central America, Caribbean
+- **Africa**: Nigeria, Kenya, South Africa, Egypt, Morocco, Ghana, Tanzania, Ethiopia
+- **Southeast Asia**: Indonesia, Philippines, Vietnam, Thailand, Malaysia, Singapore
+- **Central Asia**: Kazakhstan, Uzbekistan, Georgia, Azerbaijan
+- **Europe**: All EU + non-EU countries reviewed for completeness
+- **Pacific Islands & small nations**: Best available global + regional platforms
 
 ---
 
-### Phase 3 — Fix AI Detection 404 Error ✅
-- [x] Added retry logic (up to 3 attempts) for 404 errors in generateObject
-- [x] Truncate oversized base64 to avoid payload issues
-- [x] Graceful fallback — if AI fails, visual search results still shown
+## Scope
 
----
+- Only the stores list in the country data file is modified
+- No changes to app functionality, design, or other features
+- Estimated 30-50 stores per major market, 10-20 for smaller nations, 5-10 for micro-states
 
-### Phase 4 — Price Display Unification App-Wide ✅
-- [x] ProductCard.tsx — replaced hardcoded `$` with `format(price, currency)`
-- [x] wishlist-chat.tsx — replaced hardcoded `$` with `formatPrice(price, currency)`
-- [x] product-detail.tsx — replaced hardcoded `"USD"` in seller price with product currency
-- [x] explore/index.tsx — replaced hardcoded `"USD"` in converter with user's currencyCode
-- [x] add/index.tsx — replaced hardcoded `"USD"` in estimated price and scraped price display
-
----
-
-### Phase 5 — Massively Expanded Trusted Stores Per Country ✅
-- [x] Research comprehensive trusted stores for major countries
-- [x] Populate countries with empty/minimal store lists
-- [x] Include e-commerce, supermarket delivery, fashion, electronics, food delivery platforms
