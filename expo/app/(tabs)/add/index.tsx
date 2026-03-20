@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Animated,
   ActivityIndicator,
   Platform,
+  LayoutChangeEvent,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -31,6 +32,7 @@ import {
   ExternalLink,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as Haptics from "expo-haptics";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
@@ -38,6 +40,7 @@ import { useLocation } from "@/providers/LocationProvider";
 import { Product } from "@/types";
 import { generateObject } from "@rork-ai/toolkit-sdk";
 import { searchProducts, scrapeProductUrl, searchByBarcode, searchByImage, SerpApiResult, VisualMatch } from "@/lib/api";
+import ImageSelectionOverlay from "@/components/ImageSelectionOverlay";
 import { z } from "zod";
 
 const productSchema = z.object({
@@ -75,7 +78,7 @@ export default function AddScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { serpApiCountryCode, city, format } = useLocation();
+  const { serpApiCountryCode, city, format, currencyCode } = useLocation();
 
   const { wishlists, addProductToWishlist } = useWishlistContext();
   const hasWishlists = wishlists.length > 0;
@@ -89,6 +92,14 @@ export default function AddScreen() {
   const [selectedList, setSelectedList] = useState<string>("");
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imageMimeType, setImageMimeType] = useState<string>("image/jpeg");
+  const [showSelectionOverlay, setShowSelectionOverlay] = useState(false);
+  const [imageOriginalWidth, setImageOriginalWidth] = useState(0);
+  const [imageOriginalHeight, setImageOriginalHeight] = useState(0);
+  const [imageDisplayWidth, setImageDisplayWidth] = useState(0);
+  const [imageDisplayHeight, setImageDisplayHeight] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectedProduct, setDetectedProduct] = useState<DetectedProduct | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -138,6 +149,14 @@ export default function AddScreen() {
 
   const resetImageState = () => {
     setSelectedImage(null);
+    setImageBase64(null);
+    setImageMimeType("image/jpeg");
+    setShowSelectionOverlay(false);
+    setImageOriginalWidth(0);
+    setImageOriginalHeight(0);
+    setImageDisplayWidth(0);
+    setImageDisplayHeight(0);
+    setIsProcessing(false);
     setDetectedProduct(null);
     setSearchResults([]);
     setSelectedResult(null);
@@ -181,22 +200,27 @@ export default function AddScreen() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 0.7,
+        quality: 0.8,
         base64: true,
-        allowsEditing: true,
       });
 
       if (result.canceled || !result.assets[0]) return;
 
       const asset = result.assets[0];
+      console.log("[ImagePicker] Got image:", asset.width, "x", asset.height);
       setSelectedImage(asset.uri);
+      setImageBase64(asset.base64 || null);
+      setImageMimeType(asset.mimeType || "image/jpeg");
+      setImageOriginalWidth(asset.width);
+      setImageOriginalHeight(asset.height);
       setDetectedProduct(null);
       setSearchResults([]);
       setSelectedResult(null);
+      setVisualMatches([]);
+      setShowSelectionOverlay(true);
+      setIsProcessing(false);
 
-      if (asset.base64) {
-        await processImageSearch(asset.base64, asset.mimeType || "image/jpeg");
-      } else {
+      if (!asset.base64) {
         Alert.alert("Error", "Could not read image data. Please try again.");
       }
     } catch (err) {
@@ -214,28 +238,96 @@ export default function AddScreen() {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        quality: 0.7,
+        quality: 0.8,
         base64: true,
-        allowsEditing: true,
       });
 
       if (result.canceled || !result.assets[0]) return;
 
       const asset = result.assets[0];
+      console.log("[Camera] Got image:", asset.width, "x", asset.height);
       setSelectedImage(asset.uri);
+      setImageBase64(asset.base64 || null);
+      setImageMimeType(asset.mimeType || "image/jpeg");
+      setImageOriginalWidth(asset.width);
+      setImageOriginalHeight(asset.height);
       setDetectedProduct(null);
       setSearchResults([]);
       setSelectedResult(null);
       setVisualMatches([]);
-
-      if (asset.base64) {
-        await processImageSearch(asset.base64, asset.mimeType || "image/jpeg");
-      }
+      setShowSelectionOverlay(true);
+      setIsProcessing(false);
     } catch (err) {
       console.error("[Camera] Error:", err);
       Alert.alert("Error", "Failed to take photo.");
     }
   };
+
+  const handleSearchFullImage = useCallback(async () => {
+    if (!imageBase64 || !selectedImage) return;
+    console.log("[ImageSearch] Searching full image");
+    setShowSelectionOverlay(false);
+    setIsProcessing(true);
+    await processImageSearch(imageBase64, imageMimeType);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageBase64, imageMimeType, selectedImage]);
+
+  const handleSearchSelection = useCallback(async (selection: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    imageWidth: number;
+    imageHeight: number;
+  }) => {
+    if (!selectedImage || !imageBase64) return;
+    console.log("[ImageSearch] Searching selection:", JSON.stringify(selection));
+    setShowSelectionOverlay(false);
+    setIsProcessing(true);
+
+    try {
+      const scaleX = imageOriginalWidth / selection.imageWidth;
+      const scaleY = imageOriginalHeight / selection.imageHeight;
+
+      const cropRect = {
+        originX: Math.round(selection.x * scaleX),
+        originY: Math.round(selection.y * scaleY),
+        width: Math.round(selection.width * scaleX),
+        height: Math.round(selection.height * scaleY),
+      };
+
+      console.log("[ImageSearch] Crop rect (original coords):", JSON.stringify(cropRect));
+
+      const context = ImageManipulator.manipulate(selectedImage);
+      context.crop(cropRect);
+      const imageRef = await context.renderAsync();
+      const result = await imageRef.saveAsync({
+        base64: true,
+        format: SaveFormat.JPEG,
+        compress: 0.8,
+      });
+
+      if (result.base64) {
+        console.log("[ImageSearch] Cropped image ready, processing...");
+        await processImageSearch(result.base64, "image/jpeg");
+      } else {
+        console.log("[ImageSearch] No base64 from crop, falling back to full image");
+        await processImageSearch(imageBase64, imageMimeType);
+      }
+    } catch (err) {
+      console.error("[ImageSearch] Crop failed:", err);
+      console.log("[ImageSearch] Falling back to full image search");
+      await processImageSearch(imageBase64, imageMimeType);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedImage, imageBase64, imageMimeType, imageOriginalWidth, imageOriginalHeight]);
+
+  const onImageContainerLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setImageDisplayWidth(width);
+    setImageDisplayHeight(height);
+    console.log("[ImageLayout] Display size:", width, "x", height);
+  }, []);
 
   const processImageSearch = async (base64: string, mimeType: string) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -287,43 +379,62 @@ export default function AddScreen() {
   };
 
   const detectProductFromImage = async (base64: string, mimeType: string) => {
-    try {
-      console.log("[AI] Detecting product from image...");
+    const maxRetries = 2;
+    let attempt = 0;
 
-      const detected = await generateObject({
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Analyze this product image. Identify the product name, description, category, estimated price if visible, brand if identifiable, and a good search query to find this product on shopping sites.",
-              },
-              {
-                type: "image",
-                image: `data:${mimeType};base64,${base64}`,
-              },
-            ],
-          },
-        ],
-        schema: productSchema,
-      });
+    while (attempt <= maxRetries) {
+      try {
+        console.log(`[AI] Detecting product from image (attempt ${attempt + 1})...`);
 
-      console.log("[AI] Detected product:", JSON.stringify(detected));
-      setDetectedProduct(detected);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const truncatedBase64 = base64.length > 500000 ? base64.substring(0, 500000) : base64;
 
-      if (searchResults.length === 0) {
-        const cityQuery = city ? `${detected.searchQuery} ${city} delivery` : detected.searchQuery;
-        await searchForProduct(cityQuery);
+        const detected = await generateObject({
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Analyze this product image. Identify the product name, description, category, estimated price if visible, brand if identifiable, and a good search query to find this product on shopping sites.",
+                },
+                {
+                  type: "image",
+                  image: `data:${mimeType};base64,${truncatedBase64}`,
+                },
+              ],
+            },
+          ],
+          schema: productSchema,
+        });
+
+        console.log("[AI] Detected product:", JSON.stringify(detected));
+        setDetectedProduct(detected);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+        if (searchResults.length === 0) {
+          const cityQuery = city ? `${detected.searchQuery} ${city} delivery` : detected.searchQuery;
+          await searchForProduct(cityQuery);
+        }
+        return;
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        console.error(`[AI] Detection failed (attempt ${attempt + 1}):`, errorMsg);
+
+        if (errorMsg.includes("404") && attempt < maxRetries) {
+          console.log("[AI] Got 404, retrying after short delay...");
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+          attempt++;
+          continue;
+        }
+
+        if (searchResults.length === 0 && visualMatches.length === 0) {
+          console.log("[AI] No visual results either, showing fallback message");
+        }
+        return;
+      } finally {
+        setIsDetecting(false);
+        setIsProcessing(false);
       }
-    } catch (err) {
-      console.error("[AI] Detection failed:", err);
-      if (searchResults.length === 0 && visualMatches.length === 0) {
-        Alert.alert("Detection Failed", "Could not identify the product. Try manual entry instead.");
-      }
-    } finally {
-      setIsDetecting(false);
     }
   };
 
@@ -1271,17 +1382,52 @@ export default function AddScreen() {
             </View>
           ) : (
             <View style={styles.detectionArea}>
-              <View style={styles.imagePreviewRow}>
-                <Image source={{ uri: selectedImage }} style={styles.previewImage} contentFit="cover" />
-                <Pressable
-                  onPress={resetImageState}
-                  style={[styles.removeImageBtn, { backgroundColor: colors.error + "20" }]}
-                >
-                  <X size={16} color={colors.error} />
-                </Pressable>
-              </View>
+              {showSelectionOverlay && !isProcessing ? (
+                <View style={styles.selectionOverlayContainer}>
+                  <View
+                    style={styles.selectionImageWrapper}
+                    onLayout={onImageContainerLayout}
+                  >
+                    <Image
+                      source={{ uri: selectedImage }}
+                      style={[styles.selectionPreviewImage, { height: 320 }]}
+                      contentFit="contain"
+                    />
+                    {imageDisplayWidth > 0 && imageDisplayHeight > 0 && (
+                      <ImageSelectionOverlay
+                        imageWidth={imageDisplayWidth}
+                        imageHeight={320}
+                        onSelectionConfirm={handleSearchSelection}
+                        onSearchFull={handleSearchFullImage}
+                        primaryColor={colors.primary}
+                        textColor={colors.text}
+                        surfaceColor={colors.surface}
+                      />
+                    )}
+                  </View>
+                  <Pressable
+                    onPress={resetImageState}
+                    style={[styles.selectionCloseBtn, { backgroundColor: colors.error + "20" }]}
+                  >
+                    <X size={16} color={colors.error} />
+                    <Text style={[styles.selectionCloseBtnText, { color: colors.error }]}>Choose Different Image</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.imagePreviewRow}>
+                    <Image source={{ uri: selectedImage }} style={styles.previewImage} contentFit="cover" />
+                    <Pressable
+                      onPress={resetImageState}
+                      style={[styles.removeImageBtn, { backgroundColor: colors.error + "20" }]}
+                    >
+                      <X size={16} color={colors.error} />
+                    </Pressable>
+                  </View>
+                </>
+              )}
 
-              {(isVisualSearching || isDetecting) && (
+              {!showSelectionOverlay && (isVisualSearching || isDetecting) && (
                 <View style={[styles.statusCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
                   <ActivityIndicator color={colors.primary} size="small" />
                   <View style={{ flex: 1 }}>
@@ -1297,7 +1443,14 @@ export default function AddScreen() {
                 </View>
               )}
 
-              {visualSearchError && !isVisualSearching && !isDetecting && searchResults.length === 0 && (
+              {!showSelectionOverlay && isProcessing && !isVisualSearching && !isDetecting && searchResults.length === 0 && visualMatches.length === 0 && !visualSearchError && (
+                <View style={[styles.statusCard, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "20" }]}>
+                  <ActivityIndicator color={colors.primary} size="small" />
+                  <Text style={[styles.statusText, { color: colors.primary }]}>Processing image...</Text>
+                </View>
+              )}
+
+              {!showSelectionOverlay && visualSearchError && !isVisualSearching && !isDetecting && searchResults.length === 0 && (
                 <View style={[styles.statusCard, { backgroundColor: colors.error + "10", borderColor: colors.error + "30" }]}>
                   <Text style={[styles.statusText, { color: colors.error }]}>
                     {visualSearchError}
@@ -1305,7 +1458,7 @@ export default function AddScreen() {
                 </View>
               )}
 
-              {visualSearchQuery && !isVisualSearching && (
+              {!showSelectionOverlay && visualSearchQuery && !isVisualSearching && (
                 <View style={[styles.searchQueryTag, { backgroundColor: colors.primaryFaded }]}>
                   <Eye size={12} color={colors.primary} />
                   <Text style={[styles.searchQueryText, { color: colors.primary }]} numberOfLines={1}>
@@ -1314,7 +1467,7 @@ export default function AddScreen() {
                 </View>
               )}
 
-              {visualMatches.length > 0 && !isVisualSearching && (
+              {!showSelectionOverlay && visualMatches.length > 0 && !isVisualSearching && (
                 <View style={styles.resultsSection}>
                   <View style={styles.resultsSectionHeader}>
                     <Eye size={16} color={colors.textSecondary} />
@@ -1365,7 +1518,7 @@ export default function AddScreen() {
                 </View>
               )}
 
-              {detectedProduct && !isDetecting && (
+              {!showSelectionOverlay && detectedProduct && !isDetecting && (
                 <View style={[styles.detectedCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
                   <View style={styles.detectedHeader}>
                     <Sparkles size={18} color={colors.primary} />
@@ -1382,7 +1535,7 @@ export default function AddScreen() {
                   </Text>
                   {detectedProduct.estimatedPrice !== undefined && detectedProduct.estimatedPrice > 0 && (
                     <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>
-                      Est. Price: {format(detectedProduct.estimatedPrice, "USD")}
+                      Est. Price: {format(detectedProduct.estimatedPrice, currencyCode)}
                     </Text>
                   )}
                   <Text style={[styles.detectedDesc, { color: colors.textSecondary }]} numberOfLines={2}>
@@ -1391,7 +1544,7 @@ export default function AddScreen() {
                 </View>
               )}
 
-              {renderSearchResults(
+              {!showSelectionOverlay && renderSearchResults(
                 searchResults,
                 selectedResult,
                 setSelectedResult,
@@ -1399,7 +1552,7 @@ export default function AddScreen() {
                 `Searching stores in ${serpApiCountryCode.toUpperCase()}${city ? `, ${city}` : ""}...`
               )}
 
-              {(detectedProduct || visualMatches.length > 0) && !isDetecting && !isSearching && !isVisualSearching && (
+              {!showSelectionOverlay && (detectedProduct || visualMatches.length > 0) && !isDetecting && !isSearching && !isVisualSearching && (
                 renderWishlistSelector(
                   selectedList,
                   setSelectedList,
@@ -1477,7 +1630,7 @@ export default function AddScreen() {
                   <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>Store: {scrapedData.store}</Text>
                 ) : null}
                 {scrapedData.price > 0 && (
-                  <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>Price: {format(scrapedData.price, "USD")}</Text>
+                  <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>Price: {format(scrapedData.price, currencyCode)}</Text>
                 )}
                 {scrapedData.description ? (
                   <Text style={[styles.detectedDesc, { color: colors.textSecondary }]} numberOfLines={2}>
@@ -2145,5 +2298,29 @@ const styles = StyleSheet.create({
   selectListHint: {
     fontSize: 12,
     marginTop: 8,
+  },
+  selectionOverlayContainer: {
+    gap: 12,
+  },
+  selectionImageWrapper: {
+    position: "relative" as const,
+    borderRadius: 20,
+    overflow: "hidden" as const,
+  },
+  selectionPreviewImage: {
+    width: "100%" as const,
+    borderRadius: 20,
+  },
+  selectionCloseBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
+  },
+  selectionCloseBtnText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
   },
 });

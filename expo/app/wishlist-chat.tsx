@@ -30,6 +30,7 @@ import {
   useWishlistMessages,
   useItemAssignments,
 } from "@/providers/WishlistProvider";
+import { useLocation } from "@/providers/LocationProvider";
 
 const appLogo = require("@/assets/images/logo.png");
 
@@ -55,6 +56,7 @@ function formatDateSeparator(timestamp: string): string {
 
 export default function WishlistChatScreen() {
   const colors = useAppColors();
+  const { format: formatPrice } = useLocation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -305,7 +307,7 @@ export default function WishlistChatScreen() {
                       {item.title}
                     </Text>
                     <Text style={[styles.claimItemPrice, { color: colors.primary }]}>
-                      ${item.price.toFixed(2)}
+                      {formatPrice(item.price, item.currency)}
                     </Text>
                   </View>
                   {isClaimed ? (

@@ -10,6 +10,7 @@ import {
 import { Image } from "expo-image";
 import { Heart, ExternalLink, Check } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
+import { useLocation } from "@/providers/LocationProvider";
 import { Product } from "@/types";
 
 interface ProductCardProps {
@@ -24,6 +25,7 @@ export default React.memo(function ProductCard({
   variant = "compact",
 }: ProductCardProps) {
   const colors = useAppColors();
+  const { format } = useLocation();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -68,7 +70,7 @@ export default React.memo(function ProductCard({
             </Text>
             <View style={styles.horizontalBottom}>
               <Text style={[styles.price, { color: colors.primary }]}>
-                ${product.price.toFixed(2)}
+                {format(product.price, product.currency)}
               </Text>
               {product.isPurchased && (
                 <View style={[styles.purchasedBadge, { backgroundColor: colors.success + "20" }]}>
@@ -119,7 +121,7 @@ export default React.memo(function ProductCard({
           <Text style={[styles.store, { color: colors.textTertiary }]}>{product.store}</Text>
           <View style={styles.cardFooter}>
             <Text style={[styles.price, { color: colors.primary }]}>
-              ${product.price.toFixed(2)}
+              {format(product.price, product.currency)}
             </Text>
             <ExternalLink size={14} color={colors.textTertiary} />
           </View>

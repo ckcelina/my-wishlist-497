@@ -320,8 +320,8 @@ export default function ExploreScreen() {
   const convertedAmount = useMemo(() => {
     const num = parseFloat(convertAmount);
     if (!convertAmount || isNaN(num) || num <= 0) return null;
-    return format(num, "USD");
-  }, [convertAmount, format]);
+    return format(num, currencyCode);
+  }, [convertAmount, format, currencyCode]);
 
   const isSearchActive = searchQuery.length > 0 || hasSearched;
 

@@ -383,7 +383,7 @@ export default function ProductDetailScreen() {
                   </Text>
                 </View>
                 {sellers.slice(0, 8).map((seller, index) => {
-                  const sellerPrice = seller.price > 0 ? format(seller.price, "USD") : seller.totalPrice || seller.basePrice;
+                  const sellerPrice = seller.price > 0 ? format(seller.price, product.currency) : seller.totalPrice || seller.basePrice;
                   return (
                     <Pressable
                       key={`seller-${index}`}
