@@ -130,6 +130,22 @@ export default function ExploreScreen() {
   const [convertAmount, setConvertAmount] = useState("");
 
   const searchInputRef = useRef<TextInput>(null);
+  const prevCountryRef = useRef<string>(serpApiCountryCode);
+
+  useEffect(() => {
+    if (prevCountryRef.current === serpApiCountryCode) return;
+    prevCountryRef.current = serpApiCountryCode;
+    console.log(`[Explore] Country changed to ${serpApiCountryCode}, clearing results`);
+    setSerpResults([]);
+    setDealResults([]);
+    setSelectedDealCategory(null);
+    setHasSearched(false);
+    setSearchError(null);
+    if (searchQuery.trim().length >= 2) {
+      searchMutation.mutate({ query: searchQuery.trim() });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serpApiCountryCode]);
 
   const recentSearches = useMemo(() => getRecentSearches(8), [getRecentSearches]);
   const suggestions = useMemo(
