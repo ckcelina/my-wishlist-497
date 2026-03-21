@@ -8,8 +8,26 @@
 
 ### Key Countries — Major Upgrades Complete
 
-**Jordan** — 70+ stores now included
-- Talabat, Careem, Opensooq, Noon, Amazon, Safeway JO, Cozmo, IKEA JO, Samsung JO, Shein, Temu, Xcite, Namshi, Carrefour JO, Wadi, MarkaVIP, Sharaf DG JO, Bath & Body Works JO, Sephora JO, iHerb, Virgin Megastore JO, Centrepoint JO, Max Fashion JO, Mumzworld, Home Centre JO, Mango JO, Zara JO, H&M JO, Nike JO, Adidas JO, Decathlon JO, Ounass JO, Styli JO, Abdali Mall Online, LC Waikiki JO, Farfetch JO, and more
+**Jordan** — 225+ stores now included (fully comprehensive)
+- Food/Grocery: Talabat, Careem, Huna, Toters JO, Wolt JO, InstaShop JO, TSC JO, Safeway JO, Cozmo, Spinneys JO, Le Marche JO, Carrefour JO, SPAR JO, Mega Mart JO, Lulu Hypermarket JO
+- E-commerce: Amazon, Noon, AliExpress, Temu, Shein, Ubuy JO, Cart JO, Wadi, MarkaVIP, eBay, Souq JO, iMall JO, Opensooq
+- Electronics: Geedo, Electra JO, Hyper Planet JO, Giga Store JO, iStyle JO, Xcite JO, Jarir JO, Sharaf DG JO, BestBuy.jo, Samsung JO, Apple JO, Huawei JO, Xiaomi JO, HP Store JO, Dell JO, Lenovo JO, Asus JO, Anker JO, Logitech JO, Sony JO, LG JO, Bose JO, JBL JO, DJI JO, Canon JO, Nikon JO, Microsoft Store JO, GoPro JO
+- Telecom: Zain eShop, Orange Shop JO, Umniah Shop JO
+- Fashion: Zara JO, H&M JO, Mango JO, LC Waikiki JO, Defacto JO, Centrepoint JO, Max Fashion JO, Marks & Spencer JO, Next JO, Bershka JO, Pull&Bear JO, Stradivarius JO, Oysho JO, Massimo Dutti JO, Splash JO, Babyshop JO, Mothercare JO, Namshi, Ounass JO, Sivvi JO, 6th Street JO, Styli JO, Farfetch JO, ASOS JO, Modanisa, Jollychic JO, Tommy Hilfiger JO, Calvin Klein JO, Lacoste JO, Hugo Boss JO, Michael Kors JO, Coach JO, Ralph Lauren JO, Guess JO, Armani Exchange JO, Diesel JO, Superdry JO, Levi's JO, Jack & Jones JO, Only JO, Vero Moda JO, Pepe Jeans JO, G-Star Raw JO, Romwe JO, Zaful JO
+- Beauty: Sephora JO, Bath & Body Works JO, Victoria's Secret JO, iHerb, Faces JO, The Body Shop JO, Lush JO, LookFantastic JO, Watsons JO, MAC Cosmetics JO, Kiehl's JO, L'Occitane JO, Cult Beauty JO, BeautyBay JO, Flormar JO, NYX JO, Maybelline JO, Dyson JO, Fragrance Net JO
+- Sports: Nike JO, Adidas JO, Puma JO, Reebok JO, Under Armour JO, Decathlon JO, New Balance JO, Sun & Sand Sports JO, Al Dawliah JO, Intersport JO, Go Sport JO, Columbia JO, The North Face JO, Asics JO, Gymshark JO, Myprotein JO, Garmin JO
+- Shoes: Vans JO, Converse JO, Timberland JO, Skechers JO, Clarks JO, Steve Madden JO, Aldo JO, Charles & Keith JO, Bata JO, Shoe Mart JO, Shoe Palace JO, Pedro JO, Nine West JO, Crocs JO, Birkenstock JO, Dune London JO, Kurt Geiger JO
+- Jewelry/Watches: Pandora JO, Swarovski JO, Damas JO, Malabar Gold JO, Joyalukkas JO, Tiffany & Co JO, Cartier JO, Fossil JO, Casio JO, Daniel Wellington JO, Chrono24 JO
+- Home: IKEA JO, Home Centre JO, Pan Emirates JO, Pottery Barn JO, Crate & Barrel JO, West Elm JO, Zara Home JO, H&M Home JO, Homes R Us JO, Pottery Barn Kids JO, Tupperware JO, Tefal JO, De'Longhi JO, Nespresso JO, KitchenAid JO, Philips JO, Bosch Appliances JO
+- Toys: Toys R Us JO, LEGO JO, Hamleys JO, Mattel JO, Smyths JO, Gibca JO, Hasbro JO
+- Books/Entertainment: Virgin Megastore JO, Jazeera Books JO, Readers JO, iKitab JO
+- Pharmacy/Health: Pharmacy1 JO, Wellness JO, Care Plus JO, Meddy JO, Al-Dawaa JO
+- Luxury: Net-A-Porter JO, Mr Porter JO, Mytheresa JO, The Outnet JO, Harvey Nichols JO, Harrods JO, MatchesFashion JO, Ssense JO
+- Flowers/Gifts: Floward JO, Bloomingbox JO, Gifted JO
+- Baby/Kids: Mumzworld, Mamas & Papas JO, Chicco JO
+- Luggage: Samsonite JO, American Tourister JO, Delsey JO
+- Pets: Petzone JO, Animalia JO
+- Malls Online: Abdali Mall Online, City Mall JO, Mecca Mall JO, Taj Mall JO
 
 **Saudi Arabia** — 80+ stores now included
 - Noon, Amazon SA, Jarir, Talabat, HungerStation, Namshi, Extra Stores, Sharaf DG SA, LuLu Hypermarket SA, Panda, Tamimi Markets, Nana Direct, Virgin Megastore SA, Xcite SA, Styli, Ounass, Temu, Trendyol SA, Salla, Samsung SA, Apple SA, Centrepoint SA, iHerb, Al-Dawaa Pharmacy, Nahdi Online, Othaim Markets, Max Fashion SA, Mumzworld, Whites, Floward, Faces SA, Bath & Body Works SA, IKEA SA, Home Centre SA, Pottery Barn SA, Crate & Barrel SA, Sephora SA, ToYou, Mrsool, STC Shop, Zain Shop SA, Mobily Shop, Syarah SA, and more
