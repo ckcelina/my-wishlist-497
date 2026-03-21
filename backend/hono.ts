@@ -6,7 +6,7 @@ const app = new Hono();
 app.use("*", cors());
 
 app.get("/", (c) => {
-  return c.json({ status: "ok", message: "My Wishlist API is running" });
+  return c.json({ status: "ok", message: "My Wishlist API is running", version: "2.0" });
 });
 
 app.post("/scrape/url", async (c) => {
