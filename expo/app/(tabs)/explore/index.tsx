@@ -121,6 +121,7 @@ export default function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [serpResults, setSerpResults] = useState<SerpApiResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [lastSearchedQuery, setLastSearchedQuery] = useState("");
   const [dealResults, setDealResults] = useState<SerpApiResult[]>([]);
   const [selectedDealCategory, setSelectedDealCategory] = useState<string | null>(null);
   const [showSearchHistory, setShowSearchHistory] = useState(false);
@@ -171,6 +172,7 @@ export default function ExploreScreen() {
       setSerpResults(results);
       setSearchError(error);
       setHasSearched(true);
+      setLastSearchedQuery(query);
       setShowSearchHistory(false);
       if (results.length > 0) {
         void addSearch(query, serpApiCountryCode, results.length);
@@ -235,6 +237,7 @@ export default function ExploreScreen() {
     setSearchQuery("");
     setSerpResults([]);
     setHasSearched(false);
+    setLastSearchedQuery("");
     setShowSearchHistory(false);
     setSearchError(null);
     setConvertAmount("");
@@ -319,8 +322,23 @@ export default function ExploreScreen() {
     [serpApiCountryCode]
   );
 
+  const isStoreAvailable = useCallback(
+    (storeName: string): boolean => {
+      if (!availableStores || availableStores.length === 0) return true;
+      const lower = storeName.toLowerCase();
+      return availableStores.some((s) => {
+        const sLower = s.toLowerCase();
+        return lower.includes(sLower) || sLower.includes(lower);
+      });
+    },
+    [availableStores]
+  );
+
   const filteredSerpResults = useMemo(() => {
     let results = serpResults;
+    if (availableStores.length > 0) {
+      results = results.filter((r) => isStoreAvailable(r.store));
+    }
     if (filters.freeDeliveryOnly) {
       results = results.filter(
         (r) => r.delivery?.toLowerCase().includes("free") || !r.delivery
@@ -331,7 +349,12 @@ export default function ExploreScreen() {
       results = results.filter((r) => r.store.toLowerCase().includes(sq));
     }
     return results;
-  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter]);
+  }, [serpResults, availableStores, isStoreAvailable, filters.freeDeliveryOnly, filters.storeFilter]);
+
+  const filteredDealResults = useMemo(() => {
+    if (availableStores.length === 0) return dealResults;
+    return dealResults.filter((r) => isStoreAvailable(r.store));
+  }, [dealResults, availableStores, isStoreAvailable]);
 
   const convertedAmount = useMemo(() => {
     const num = parseFloat(convertAmount);
@@ -401,7 +424,7 @@ export default function ExploreScreen() {
             </Pressable>
           )}
         </View>
-        {searchQuery.length > 1 && !searchMutation.isPending && !hasSearched && (
+        {searchQuery.trim().length > 1 && !searchMutation.isPending && (!hasSearched || searchQuery.trim() !== lastSearchedQuery) && (
           <Pressable
             onPress={handleSearch}
             style={[styles.searchBtn, { backgroundColor: colors.primary }]}
@@ -821,9 +844,9 @@ export default function ExploreScreen() {
               </View>
             )}
 
-            {dealResults.length > 0 && !dealsMutation.isPending && (
+            {filteredDealResults.length > 0 && !dealsMutation.isPending && (
               <View style={styles.dealsGrid}>
-                {dealResults.slice(0, 6).map((deal, idx) => {
+                {filteredDealResults.slice(0, 6).map((deal, idx) => {
                   const displayPrice = format(deal.price, deal.currency);
                   return (
                     <Pressable

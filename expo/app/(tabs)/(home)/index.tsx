@@ -30,7 +30,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, myLists, sharedLists, trendingProducts, refreshWishlists } = useWishlistContext();
-  const { country, city, currency, serpApiCountryCode, format } = useLocation();
+  const { country, city, currency, serpApiCountryCode, availableStores, format } = useLocation();
   const { unreadDropCount, activeAlertCount, checkPricesNow, isCheckingPrices } = usePriceAlerts();
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<"updated" | "name" | "items">("updated");
@@ -43,8 +43,17 @@ export default function HomeScreen() {
     },
     onSuccess: (data) => {
       if (data.results && data.results.length > 0) {
-        setLiveTrending(data.results);
-        console.log(`[Home] Got ${data.results.length} trending results`);
+        const filtered = availableStores.length > 0
+          ? data.results.filter((r) => {
+              const lower = r.store.toLowerCase();
+              return availableStores.some((s) => {
+                const sLower = s.toLowerCase();
+                return lower.includes(sLower) || sLower.includes(lower);
+              });
+            })
+          : data.results;
+        setLiveTrending(filtered);
+        console.log(`[Home] Got ${data.results.length} trending results, ${filtered.length} after country filter`);
       }
     },
   });
