@@ -1805,7 +1805,7 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "Angola", code: "AO", flag: "🇦🇴", currency: "AOA", serpApiCode: "ao",
     cities: ["Luanda", "Huambo", "Lobito", "Benguela", "Cabinda", "Malanje", "Lubango"],
-    stores: ["Kero", "Candando", "Shoprite AO", "Game Stores AO", "Pick n Pay AO", "Bayqi", "Mercado Angolano", "Glovo AO", "Uber Eats AO", "AliExpress", "Temu", "Shein", "Amazon", "iHerb", "Samsung AO", "Huawei AO", "Unitel T+", "Movicel Shop", "MS Shopping", "Africell Shop"],
+    stores: ["Kero", "Candando", "Shoprite AO", "Game Stores AO", "Pick n Pay AO", "Bayqi", "Jumia AO", "OLX AO", "Mercado Angolano", "Glovo AO", "Uber Eats AO", "AliExpress", "Temu", "Shein", "Amazon", "iHerb", "Samsung AO", "Huawei AO", "Unitel T+", "Movicel Shop", "MS Shopping", "Africell Shop"],
     storeDetails: [
       {
         name: "Kero",
@@ -1988,7 +1988,7 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "Argentina", code: "AR", flag: "🇦🇷", currency: "ARS", serpApiCode: "ar",
     cities: ["Buenos Aires", "Córdoba", "Rosario", "Mendoza", "La Plata", "San Miguel de Tucumán", "Mar del Plata", "Salta"],
-    stores: ["MercadoLibre", "Amazon", "Garbarino", "Frávega", "Rappi", "PedidosYa", "Uber Eats", "Tienda Nube", "Farmacity", "Musimundo", "Megatone", "Coto Digital", "Carrefour AR", "Jumbo AR", "Dafiti", "Dexter", "Netshoes AR", "Falabella AR", "Sodimac AR", "Easy AR", "iPoint", "MacStation", "Compumundo", "Shein", "Temu", "AliExpress", "Despegar", "Movistar Tienda", "Samsung AR", "Disco", "Vea Digital", "Farmacity", "Pardo", "Zara AR", "H&M AR", "Nike AR", "Adidas AR", "IKEA AR"],
+    stores: ["MercadoLibre", "Amazon", "Garbarino", "Frávega", "Rappi", "PedidosYa", "Uber Eats", "Tienda Nube", "Farmacity", "Musimundo", "Megatone", "Coto Digital", "Carrefour AR", "Jumbo AR", "Dafiti", "Dexter", "Netshoes AR", "Falabella AR", "Sodimac AR", "Easy AR", "iPoint", "MacStation", "Compumundo", "Shein", "Temu", "AliExpress", "Despegar", "Movistar Tienda", "Samsung AR", "Disco", "Vea Digital", "Pardo", "Zara AR", "H&M AR", "Nike AR", "Adidas AR", "IKEA AR", "OLX AR"],
   },
   {
     name: "Armenia", code: "AM", flag: "🇦🇲", currency: "AMD", serpApiCode: "am",
@@ -2073,7 +2073,7 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "Brazil", code: "BR", flag: "🇧🇷", currency: "BRL", serpApiCode: "br",
     cities: ["São Paulo", "Rio de Janeiro", "Brasília", "Salvador", "Fortaleza", "Belo Horizonte", "Manaus", "Curitiba", "Recife", "Porto Alegre"],
-    stores: ["Amazon BR", "MercadoLibre", "iFood", "Rappi", "Uber Eats", "Magazine Luiza", "Americanas", "Casas Bahia", "Shopee BR", "AliExpress", "Submarino", "Extra", "Ponto Frio", "Netshoes", "Dafiti", "Kabum", "Pão de Açúcar", "Carrefour BR", "Centauro", "C&A BR", "Renner", "Riachuelo", "Havan", "Leroy Merlin BR", "Samsung BR", "Apple BR", "Dell BR", "Lenovo BR", "Fast Shop", "Natura", "O Boticário", "Zattini", "Temu", "Shein", "Temu", "Nike BR", "Adidas BR", "IKEA BR", "Tok Stok", "MadeiraMadeira", "Droga Raia", "Drogasil", "Beleza na Web", "Cobasi"],
+    stores: ["Amazon BR", "MercadoLibre", "iFood", "Rappi", "Uber Eats", "Magazine Luiza", "Americanas", "Casas Bahia", "Shopee BR", "AliExpress", "Submarino", "Extra", "Ponto Frio", "Netshoes", "Dafiti", "Kabum", "Pão de Açúcar", "Carrefour BR", "Centauro", "C&A BR", "Renner", "Riachuelo", "Havan", "Leroy Merlin BR", "Samsung BR", "Apple BR", "Dell BR", "Lenovo BR", "Fast Shop", "Natura", "O Boticário", "Zattini", "Temu", "Shein", "Nike BR", "Adidas BR", "IKEA BR", "Tok Stok", "MadeiraMadeira", "Droga Raia", "Drogasil", "Beleza na Web", "Cobasi", "OLX BR"],
   },
   {
     name: "Brunei", code: "BN", flag: "🇧🇳", currency: "BND", serpApiCode: "bn",
@@ -2213,7 +2213,7 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "Egypt", code: "EG", flag: "🇪🇬", currency: "EGP", serpApiCode: "eg",
     cities: ["Cairo", "Alexandria", "Giza", "Sharm El Sheikh", "Luxor", "Aswan", "Hurghada"],
-    stores: ["Amazon EG", "Noon", "Talabat", "Elmenus", "Jumia", "AliExpress", "B.TECH", "2B", "Raya Shop", "Virgin Megastore EG", "Carrefour EG", "Spinneys EG", "Breadfast", "Shein EG", "Temu", "Samsung EG", "Apple EG", "IKEA EG", "Tradeline", "Electronia", "Fawry", "Souq.com", "Otlob", "InstaShop EG", "Seoudi Supermarket", "Kazyon", "Centrepoint EG", "Max Fashion EG", "Zara EG", "H&M EG", "Decathlon EG", "Nahdi EG"],
+    stores: ["Amazon EG", "Noon", "Talabat", "Elmenus", "Jumia", "AliExpress", "B.TECH", "2B", "Raya Shop", "Virgin Megastore EG", "Carrefour EG", "Spinneys EG", "Breadfast", "Shein EG", "Temu", "Samsung EG", "Apple EG", "IKEA EG", "Tradeline", "Electronia", "Fawry", "Opensooq EG", "OLX EG", "Otlob", "InstaShop EG", "Seoudi Supermarket", "Kazyon", "Centrepoint EG", "Max Fashion EG", "Zara EG", "H&M EG", "Decathlon EG", "Nahdi EG", "Wolt EG", "Uber Eats EG"],
   },
   {
     name: "El Salvador", code: "SV", flag: "🇸🇻", currency: "USD", serpApiCode: "sv",
@@ -2258,7 +2258,7 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "France", code: "FR", flag: "🇫🇷", currency: "EUR", serpApiCode: "fr",
     cities: ["Paris", "Marseille", "Lyon", "Toulouse", "Nice", "Nantes", "Strasbourg", "Bordeaux", "Lille", "Montpellier"],
-    stores: ["Amazon FR", "Fnac", "Deliveroo", "Uber Eats", "Just Eat", "Cdiscount", "AliExpress", "eBay FR", "Darty", "Boulanger", "Leroy Merlin", "Decathlon FR", "Carrefour FR", "Auchan", "Leclerc", "LDLC", "Rue du Commerce", "ManoMano", "Veepee", "Zalando FR", "La Redoute", "IKEA FR", "Sephora FR", "Intermarché", "Monoprix", "Picard", "Temu", "Shein", "Samsung FR", "Apple FR", "Nike FR", "Adidas FR", "Zara FR", "H&M FR", "Uniqlo FR", "Lidl FR", "Trendyol FR", "Back Market", "Rakuten FR", "PriceMinister", "Showroomprivé", "Bazarchic", "BrandAlley FR", "Spartoo", "Sarenza", "Maje", "Sandro", "Isabel Marant", "Jacquemus", "APC", "Jacadi", "Petit Bateau", "Cyrillus", "Boden FR", "La Halle", "Kiabi", "Gémo", "Camaïeu", "Devred", "Jules FR", "CELIO", "Cache Cache", "Promod", "Grain de Malice", "Grain de Malice", "Yves Rocher", "L'Occitane FR", "Nocibé", "Marionnaud", "Lookfantastic FR", "Fleuriste du Marais", "Interflora FR", "Chronopost Shop", "Brico Dépôt", "Castorama FR", "Point P Online", "Conforama", "But FR", "Maisons du Monde", "Habitat FR", "Jardiland"],
+    stores: ["Amazon FR", "Fnac", "Deliveroo", "Uber Eats", "Just Eat", "Cdiscount", "AliExpress", "eBay FR", "Darty", "Boulanger", "Leroy Merlin", "Decathlon FR", "Carrefour FR", "Auchan", "Leclerc", "LDLC", "Rue du Commerce", "ManoMano", "Veepee", "Zalando FR", "La Redoute", "IKEA FR", "Sephora FR", "Intermarché", "Monoprix", "Picard", "Temu", "Shein", "Samsung FR", "Apple FR", "Nike FR", "Adidas FR", "Zara FR", "H&M FR", "Uniqlo FR", "Lidl FR", "Trendyol FR", "Back Market", "Rakuten FR", "Showroomprivé", "Bazarchic", "BrandAlley FR", "Spartoo", "Sarenza", "Maje", "Sandro", "Isabel Marant", "Jacquemus", "APC", "Jacadi", "Petit Bateau", "Cyrillus", "Boden FR", "La Halle", "Kiabi", "Gémo", "Camaïeu", "Devred", "Jules FR", "CELIO", "Cache Cache", "Promod", "Grain de Malice", "Yves Rocher", "L'Occitane FR", "Nocibé", "Marionnaud", "Lookfantastic FR", "Fleuriste du Marais", "Interflora FR", "Chronopost Shop", "Brico Dépôt", "Castorama FR", "Point P Online", "Conforama", "But FR", "Maisons du Monde", "Habitat FR", "Jardiland"],
   },
   {
     name: "Gabon", code: "GA", flag: "🇬🇦", currency: "XAF", serpApiCode: "ga",
@@ -2433,7 +2433,7 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "Lebanon", code: "LB", flag: "🇱🇧", currency: "LBP", serpApiCode: "lb",
     cities: ["Beirut", "Tripoli", "Sidon", "Jounieh"],
-    stores: ["Talabat", "Toters", "Careem", "AliExpress", "Amazon", "Keewardz", "Spinneys LB", "Temu", "Shein", "Samsung LB", "Virgin Megastore LB", "iHerb", "Noon LB", "Le Mall Online", "ABC LB", "Carrefour LB", "Zara LB", "H&M LB", "Centrepoint LB", "Sephora LB"],
+    stores: ["Talabat", "Toters", "Careem", "Wolt LB", "Glovo LB", "AliExpress", "Amazon", "Keewardz", "Spinneys LB", "Temu", "Shein", "Samsung LB", "Virgin Megastore LB", "iHerb", "Noon LB", "Le Mall Online", "ABC LB", "Carrefour LB", "Zara LB", "H&M LB", "Centrepoint LB", "Sephora LB", "Namshi LB", "Bath & Body Works LB"],
   },
   {
     name: "Lesotho", code: "LS", flag: "🇱🇸", currency: "LSL", serpApiCode: "ls",
@@ -2543,7 +2543,7 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "Morocco", code: "MA", flag: "🇲🇦", currency: "MAD", serpApiCode: "ma",
     cities: ["Casablanca", "Rabat", "Marrakech", "Fes", "Tangier", "Agadir"],
-    stores: ["Jumia", "Glovo", "AliExpress", "Amazon", "Avito", "Marjane", "Electroplanet", "Cosmos", "Virgin Megastore MA", "Hmizate", "Temu", "Shein", "Samsung MA", "IKEA MA", "Carrefour MA", "Aswak Assalam", "Zara MA", "H&M MA", "Decathlon MA", "Uber Eats MA", "LC Waikiki MA", "Acima"],
+    stores: ["Jumia", "Glovo", "AliExpress", "Amazon", "Avito", "Marjane", "Electroplanet", "Cosmos", "Virgin Megastore MA", "Hmizate", "Temu", "Shein", "Samsung MA", "IKEA MA", "Carrefour MA", "Aswak Assalam", "Zara MA", "H&M MA", "Decathlon MA", "Uber Eats MA", "LC Waikiki MA", "Acima", "Maroc Telecom Shop", "Inwi Shop", "Orange Morocco", "Bikhir MA", "Wolt MA"],
   },
   {
     name: "Mozambique", code: "MZ", flag: "🇲🇿", currency: "MZN", serpApiCode: "mz",
@@ -2593,7 +2593,7 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "Nigeria", code: "NG", flag: "🇳🇬", currency: "NGN", serpApiCode: "ng",
     cities: ["Lagos", "Abuja", "Kano", "Ibadan", "Port Harcourt", "Benin City"],
-    stores: ["Jumia", "Konga", "Bolt Food", "Glovo", "Chowdeck", "AliExpress", "Jiji", "Slot", "Amazon", "PayPorte", "Dealdey", "Supermart", "Shoprite NG", "SPAR NG", "Temu", "Shein", "Samsung NG", "Pointek", "3CHub", "Kilimall NG", "Hubmart", "Market Square", "Decagon"],
+    stores: ["Jumia", "Konga", "Bolt Food", "Glovo", "Chowdeck", "AliExpress", "Jiji", "OLX NG", "Slot", "Amazon", "PayPorte", "Dealdey", "Supermart", "Shoprite NG", "SPAR NG", "Temu", "Shein", "Samsung NG", "Pointek", "3CHub", "Kilimall NG", "Hubmart", "Market Square", "Flutterwave Store", "VendEx NG"],
   },
   {
     name: "North Korea", code: "KP", flag: "🇰🇵", currency: "KPW", serpApiCode: "kp",
@@ -2618,7 +2618,7 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "Pakistan", code: "PK", flag: "🇵🇰", currency: "PKR", serpApiCode: "pk",
     cities: ["Karachi", "Lahore", "Islamabad", "Rawalpindi", "Faisalabad", "Multan", "Peshawar"],
-    stores: ["Daraz", "Foodpanda", "Careem", "AliExpress", "Amazon", "iShopping", "Goto", "Yayvo", "HomeShopping", "Telemart", "Mega.pk", "Naheed", "Alfatah", "Temu", "Shein", "Samsung PK", "Apple PK", "Khaadi", "Gul Ahmed", "Sapphire", "Junaid Jamshed", "Limelight", "Imtiaz", "Metro Cash & Carry PK", "Hyperstar"],
+    stores: ["Daraz", "Foodpanda", "Careem", "AliExpress", "Amazon", "iShopping", "Goto", "OLX PK", "Yayvo", "HomeShopping", "Telemart", "Mega.pk", "Naheed", "Alfatah", "Temu", "Shein", "Samsung PK", "Apple PK", "Khaadi", "Gul Ahmed", "Sapphire", "Junaid Jamshed", "Limelight", "Imtiaz", "Metro Cash & Carry PK", "Hyperstar", "Pakwheels", "Bikehelpline PK"],
   },
   {
     name: "Palau", code: "PW", flag: "🇵🇼", currency: "USD", serpApiCode: "pw",
@@ -2783,7 +2783,7 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "Spain", code: "ES", flag: "🇪🇸", currency: "EUR", serpApiCode: "es",
     cities: ["Madrid", "Barcelona", "Valencia", "Seville", "Bilbao", "Málaga", "Zaragoza", "Palma de Mallorca"],
-    stores: ["Amazon ES", "El Corte Inglés", "Glovo", "Uber Eats", "Just Eat", "Deliveroo", "AliExpress", "eBay ES", "MediaMarkt ES", "PcComponentes", "Worten ES", "IKEA ES", "Carrefour ES", "Mercadona", "Lidl ES", "Decathlon ES", "Zalando ES", "Fnac ES", "Leroy Merlin ES", "Casa del Libro", "Wallapop", "Zara Online", "Temu", "Shein", "Samsung ES", "Apple ES", "Nike ES", "Adidas ES", "H&M ES", "Uniqlo ES", "Trendyol ES", "Dia ES", "Alcampo", "Bricomart", "Sprinter", "Mango ES", "Massimo Dutti", "Pull&Bear", "Bershka", "Stradivarius", "Oysho", "Springfield", "Women'secret", "Cortefiel", "Pedro del Hierro", "Loewe Online", "Camper ES", "Pikolinos", "Parfois", "Primark ES", "Vinted ES", "Milanuncios", "Coches.net", "Idealista", "Fotocasa", "Rakuten ES", "Privalia ES", "Veepee ES", "Solozara", "Conforama ES", "Bricor", "BricoDepot ES", "Hipercor", "El Corte Inglés Supermercado", "Condis ES", "Eroski", "Bonpreu", "Caprabo", "Consum", "Plusfresc", "PC Componentes", "Coolmod", "Phone House ES", "Fnac Marketplace ES"],
+    stores: ["Amazon ES", "El Corte Inglés", "Glovo", "Uber Eats", "Just Eat", "Deliveroo", "AliExpress", "eBay ES", "MediaMarkt ES", "PcComponentes", "Worten ES", "IKEA ES", "Carrefour ES", "Mercadona", "Lidl ES", "Decathlon ES", "Zalando ES", "Fnac ES", "Leroy Merlin ES", "Casa del Libro", "Wallapop", "Zara Online", "Temu", "Shein", "Samsung ES", "Apple ES", "Nike ES", "Adidas ES", "H&M ES", "Uniqlo ES", "Trendyol ES", "Dia ES", "Alcampo", "Bricomart", "Sprinter", "Mango ES", "Massimo Dutti", "Pull&Bear", "Bershka", "Stradivarius", "Oysho", "Springfield", "Women'secret", "Cortefiel", "Pedro del Hierro", "Loewe Online", "Camper ES", "Pikolinos", "Parfois", "Primark ES", "Vinted ES", "Milanuncios", "Coches.net", "Idealista", "Fotocasa", "Rakuten ES", "Privalia ES", "Veepee ES", "Solozara", "Conforama ES", "Bricor", "BricoDepot ES", "Hipercor", "El Corte Inglés Supermercado", "Condis ES", "Eroski", "Bonpreu", "Caprabo", "Consum", "Plusfresc", "Coolmod", "Phone House ES", "Fnac Marketplace ES"],
   },
   {
     name: "Sri Lanka", code: "LK", flag: "🇱🇰", currency: "LKR", serpApiCode: "lk",
@@ -2883,7 +2883,7 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "United Arab Emirates", code: "AE", flag: "🇦🇪", currency: "AED", serpApiCode: "ae",
     cities: ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Fujairah", "Al Ain"],
-    stores: ["Noon", "Amazon AE", "Namshi", "Talabat", "Deliveroo", "Careem", "Uber Eats", "Zomato", "InstaShop", "AliExpress", "Sharaf DG", "Jumbo Electronics", "LuLu Hypermarket", "Carrefour AE", "Virgin Megastore AE", "Ounass", "Mumzworld", "Sivvi", "Spinneys AE", "Kibsons", "El Grocer", "Temu", "Shein", "Trendyol AE", "Samsung AE", "Apple AE", "IKEA AE", "Centrepoint AE", "iHerb", "Max Fashion AE", "Home Centre AE", "Bath & Body Works AE", "Sephora AE", "Faces AE", "Floward", "Jarir AE", "Xcite AE", "Nike AE", "Adidas AE", "Zara AE", "H&M AE", "Uniqlo AE", "Pottery Barn AE", "Crate & Barrel AE"],
+    stores: ["Noon", "Amazon AE", "Namshi", "Talabat", "Deliveroo", "Careem", "Uber Eats", "Zomato", "InstaShop", "AliExpress", "Sharaf DG", "Jumbo Electronics", "LuLu Hypermarket", "Carrefour AE", "Virgin Megastore AE", "Ounass", "Mumzworld", "Sivvi", "Spinneys AE", "Kibsons", "El Grocer", "Temu", "Shein", "Trendyol AE", "Samsung AE", "Apple AE", "IKEA AE", "Centrepoint AE", "iHerb", "Max Fashion AE", "Home Centre AE", "Bath & Body Works AE", "Sephora AE", "Faces AE", "Floward", "Jarir AE", "Xcite AE", "Nike AE", "Adidas AE", "Zara AE", "H&M AE", "Uniqlo AE", "Pottery Barn AE", "Crate & Barrel AE", "Watsons AE", "Boots UAE", "Harvey Nichols Dubai", "Bloomingdale's AE", "Styli AE", "6th Street AE", "Swimwear365 AE", "Ounass AE"],
   },
   {
     name: "United Kingdom", code: "GB", flag: "🇬🇧", currency: "GBP", serpApiCode: "uk",
@@ -2893,7 +2893,7 @@ export const COUNTRIES: CountryData[] = [
   {
     name: "United States", code: "US", flag: "🇺🇸", currency: "USD", serpApiCode: "us",
     cities: ["New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose", "Austin", "Jacksonville", "San Francisco", "Seattle", "Denver", "Washington DC", "Nashville", "Boston", "Portland", "Las Vegas", "Miami", "Atlanta", "Orlando", "Minneapolis", "Tampa", "Detroit", "Charlotte", "Salt Lake City", "New Orleans", "Honolulu"],
-    stores: ["Amazon", "Walmart", "Target", "Best Buy", "Costco", "Uber Eats", "DoorDash", "Grubhub", "Instacart", "eBay", "AliExpress", "Apple", "Samsung", "Dell", "Lenovo", "Microsoft Store", "Newegg", "B&H Photo", "Home Depot", "Lowe's", "Wayfair", "Etsy", "Nordstrom", "Macy's", "Nike", "Adidas", "Sephora", "Ulta", "Kroger", "Whole Foods", "Trader Joe's", "CVS", "Walgreens", "Chewy", "GameStop", "REI", "Zappos", "SHEIN", "Temu", "IKEA US", "Zara US", "H&M US", "Uniqlo US", "Decathlon US", "TJ Maxx", "Marshalls", "Bath & Body Works", "Micro Center", "Menards", "Kohl's", "JCPenney", "Gap", "Old Navy", "Banana Republic", "Victoria's Secret", "StockX", "GOAT", "Poshmark", "Mercari US", "OfferUp", "Facebook Marketplace", "AutoZone", "O'Reilly Auto Parts", "Advance Auto Parts", "Hobby Lobby", "Michaels", "PetSmart", "Dollar General", "Five Below", "Overstock", "Chewy", "Wayfair", "Crate & Barrel", "West Elm", "Pottery Barn", "Williams-Sonoma", "Sur La Table", "Guitar Center", "Sweetwater", "Backcountry", "Camping World", "Academy Sports", "Dick's Sporting Goods", "Foot Locker", "DSW", "Bloomingdale's", "Neiman Marcus", "Saks Fifth Avenue", "Revolve", "SSENSE", "Farfetch US", "Net-a-Porter US", "Chewy", "BJ's Wholesale", "Sam's Club", "Aldi US", "Lidl US"],
+    stores: ["Amazon", "Walmart", "Target", "Best Buy", "Costco", "Uber Eats", "DoorDash", "Grubhub", "Instacart", "eBay", "AliExpress", "Apple", "Samsung", "Dell", "Lenovo", "Microsoft Store", "Newegg", "B&H Photo", "Home Depot", "Lowe's", "Wayfair", "Etsy", "Nordstrom", "Macy's", "Nike", "Adidas", "Sephora", "Ulta", "Kroger", "Whole Foods", "Trader Joe's", "CVS", "Walgreens", "Chewy", "GameStop", "REI", "Zappos", "SHEIN", "Temu", "IKEA US", "Zara US", "H&M US", "Uniqlo US", "Decathlon US", "TJ Maxx", "Marshalls", "Bath & Body Works", "Micro Center", "Menards", "Kohl's", "JCPenney", "Gap", "Old Navy", "Banana Republic", "Victoria's Secret", "StockX", "GOAT", "Poshmark", "Mercari US", "OfferUp", "Facebook Marketplace", "AutoZone", "O'Reilly Auto Parts", "Advance Auto Parts", "Hobby Lobby", "Michaels", "PetSmart", "Dollar General", "Five Below", "Overstock", "Crate & Barrel", "West Elm", "Pottery Barn", "Williams-Sonoma", "Sur La Table", "Guitar Center", "Sweetwater", "Backcountry", "Camping World", "Academy Sports", "Dick's Sporting Goods", "Foot Locker", "DSW", "Bloomingdale's", "Neiman Marcus", "Saks Fifth Avenue", "Revolve", "SSENSE", "Farfetch US", "Net-a-Porter US", "BJ's Wholesale", "Sam's Club", "Aldi US", "Lidl US"],
   },
   {
     name: "Uruguay", code: "UY", flag: "🇺🇾", currency: "UYU", serpApiCode: "uy",
