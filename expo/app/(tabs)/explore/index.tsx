@@ -142,9 +142,7 @@ export default function ExploreScreen() {
     setSelectedDealCategory(null);
     setHasSearched(false);
     setSearchError(null);
-    if (searchQuery.trim().length >= 2) {
-      searchMutation.mutate({ query: searchQuery.trim() });
-    }
+    setLastSearchedQuery("");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serpApiCountryCode]);
 
@@ -158,6 +156,7 @@ export default function ExploreScreen() {
     mutationFn: async ({ query, appliedFilters }: { query: string; appliedFilters?: FilterState }) => {
       const f = appliedFilters ?? filters;
       console.log(`[Explore] Searching SerpAPI for: "${query}" in ${serpApiCountryCode}`, f);
+      setSearchError(null);
       const { results, error } = await searchProducts(query, serpApiCountryCode, {
         minPrice: f.minPrice,
         maxPrice: f.maxPrice,
@@ -322,23 +321,8 @@ export default function ExploreScreen() {
     [serpApiCountryCode]
   );
 
-  const isStoreAvailable = useCallback(
-    (storeName: string): boolean => {
-      if (!availableStores || availableStores.length === 0) return true;
-      const lower = storeName.toLowerCase();
-      return availableStores.some((s) => {
-        const sLower = s.toLowerCase();
-        return lower.includes(sLower) || sLower.includes(lower);
-      });
-    },
-    [availableStores]
-  );
-
   const filteredSerpResults = useMemo(() => {
     let results = serpResults;
-    if (availableStores.length > 0) {
-      results = results.filter((r) => isStoreAvailable(r.store));
-    }
     if (filters.freeDeliveryOnly) {
       results = results.filter(
         (r) => r.delivery?.toLowerCase().includes("free") || !r.delivery
@@ -348,13 +332,11 @@ export default function ExploreScreen() {
       const sq = filters.storeFilter.toLowerCase();
       results = results.filter((r) => r.store.toLowerCase().includes(sq));
     }
+    console.log(`[Explore] filteredSerpResults: ${results.length} of ${serpResults.length} total`);
     return results;
-  }, [serpResults, availableStores, isStoreAvailable, filters.freeDeliveryOnly, filters.storeFilter]);
+  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter]);
 
-  const filteredDealResults = useMemo(() => {
-    if (availableStores.length === 0) return dealResults;
-    return dealResults.filter((r) => isStoreAvailable(r.store));
-  }, [dealResults, availableStores, isStoreAvailable]);
+  const filteredDealResults = useMemo(() => dealResults, [dealResults]);
 
   const convertedAmount = useMemo(() => {
     const num = parseFloat(convertAmount);

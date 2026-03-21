@@ -6,7 +6,7 @@ const getBaseUrl = () => {
     console.warn("EXPO_PUBLIC_RORK_API_BASE_URL is not set");
     return "";
   }
-  return url;
+  return url.replace(/\/+$/, "");
 };
 
 const logApiError = (label: string, err: unknown) => {
