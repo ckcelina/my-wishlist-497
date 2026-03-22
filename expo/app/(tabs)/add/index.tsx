@@ -263,12 +263,31 @@ export default function AddScreen() {
     }
   };
 
+  const compressImageForSearch = async (uri: string): Promise<string | null> => {
+    try {
+      const context = ImageManipulator.manipulate(uri);
+      context.resize({ width: 800 });
+      const imageRef = await context.renderAsync();
+      const result = await imageRef.saveAsync({
+        base64: true,
+        format: SaveFormat.JPEG,
+        compress: 0.55,
+      });
+      console.log(`[ImageSearch] Compressed image base64 length: ${result.base64?.length ?? 0}`);
+      return result.base64 || null;
+    } catch (err) {
+      console.error("[ImageSearch] Compression failed:", err);
+      return null;
+    }
+  };
+
   const handleSearchFullImage = useCallback(async () => {
     if (!imageBase64 || !selectedImage) return;
     console.log("[ImageSearch] Searching full image");
     setShowSelectionOverlay(false);
     setIsProcessing(true);
-    await processImageSearch(imageBase64, imageMimeType);
+    const compressed = await compressImageForSearch(selectedImage);
+    await processImageSearch(compressed ?? imageBase64, "image/jpeg");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageBase64, imageMimeType, selectedImage]);
 
@@ -308,16 +327,19 @@ export default function AddScreen() {
       });
 
       if (result.base64) {
-        console.log("[ImageSearch] Cropped image ready, processing...");
-        await processImageSearch(result.base64, "image/jpeg");
+        console.log(`[ImageSearch] Cropped image ready (base64 length: ${result.base64.length}), compressing...`);
+        const compressed = await compressImageForSearch(result.uri);
+        await processImageSearch(compressed ?? result.base64, "image/jpeg");
       } else {
         console.log("[ImageSearch] No base64 from crop, falling back to full image");
-        await processImageSearch(imageBase64, imageMimeType);
+        const compressed = await compressImageForSearch(selectedImage);
+        await processImageSearch(compressed ?? imageBase64, imageMimeType);
       }
     } catch (err) {
       console.error("[ImageSearch] Crop failed:", err);
       console.log("[ImageSearch] Falling back to full image search");
-      await processImageSearch(imageBase64, imageMimeType);
+      const compressed = await compressImageForSearch(selectedImage);
+      await processImageSearch(compressed ?? imageBase64, imageMimeType);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedImage, imageBase64, imageMimeType, imageOriginalWidth, imageOriginalHeight]);
@@ -352,7 +374,9 @@ export default function AddScreen() {
 
       if (result.error) {
         console.log("[VisualSearch] Error:", result.error);
-        setVisualSearchError(result.error);
+        if (result.visualMatches.length === 0 && result.shoppingResults.length === 0) {
+          setVisualSearchError(result.error);
+        }
       }
 
       return result;
