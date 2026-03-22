@@ -366,7 +366,6 @@ export default function ExploreScreen() {
         results = countryFiltered;
       }
     }
-    console.log(`[Explore] filteredSerpResults: ${results.length} of ${serpResults.length} total (storePool: ${storePool.length})`);
     return results;
   }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter, availableStores, confirmedStores]);
 

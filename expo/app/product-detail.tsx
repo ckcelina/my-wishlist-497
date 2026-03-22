@@ -70,7 +70,7 @@ export default function ProductDetailScreen() {
         title: parsed.title || "Unknown Product",
         image: parsed.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
         price: parsed.price || 0,
-        currency: parsed.currency || currencyCode || "USD",
+        currency: parsed.currency || (currencyCode ? currencyCode : "USD"),
         store: parsed.store || "Unknown Store",
         storeUrl: parsed.link || "",
         description: parsed.snippet || "",
