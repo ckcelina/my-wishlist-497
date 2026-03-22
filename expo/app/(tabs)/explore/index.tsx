@@ -333,7 +333,7 @@ export default function ExploreScreen() {
       title: result.title,
       image: result.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
       price: result.price,
-      currency: result.currency || "USD",
+      currency: result.currency || currencyCode,
       store: result.store,
       storeUrl: result.link,
       description: result.snippet,
@@ -343,19 +343,11 @@ export default function ExploreScreen() {
       country: serpApiCountryCode.toUpperCase(),
       rating: result.rating,
     }),
-    [serpApiCountryCode]
-  );
-
-  const matchesAvailableStores = useCallback(
-    (storeName: string): boolean => {
-      if (availableStores.length === 0) return true;
-      return availableStores.some((s) => storeMatchesAvailable(storeName, s));
-    },
-    [availableStores]
+    [serpApiCountryCode, currencyCode]
   );
 
   const filteredSerpResults = useMemo(() => {
-    let results = serpResults.filter((r) => matchesAvailableStores(r.store));
+    let results = [...serpResults];
     if (filters.freeDeliveryOnly) {
       results = results.filter(
         (r) => r.delivery?.toLowerCase().includes("free") || !r.delivery
@@ -365,13 +357,13 @@ export default function ExploreScreen() {
       const sq = filters.storeFilter.toLowerCase();
       results = results.filter((r) => r.store.toLowerCase().includes(sq));
     }
-    console.log(`[Explore] filteredSerpResults: ${results.length} of ${serpResults.length} total (country filter: ${availableStores.length} stores)`);
+    console.log(`[Explore] filteredSerpResults: ${results.length} of ${serpResults.length} total`);
     return results;
-  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter, matchesAvailableStores, availableStores.length]);
+  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter]);
 
   const filteredDealResults = useMemo(
-    () => dealResults.filter((r) => matchesAvailableStores(r.store)),
-    [dealResults, matchesAvailableStores]
+    () => dealResults,
+    [dealResults]
   );
 
   const convertedAmount = useMemo(() => {

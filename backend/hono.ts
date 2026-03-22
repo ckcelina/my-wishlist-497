@@ -5,6 +5,46 @@ const app = new Hono();
 
 app.use("*", cors());
 
+const GL_TO_CURRENCY: Record<string, string> = {
+  us: "USD", gb: "GBP", uk: "GBP", ca: "CAD", au: "AUD", nz: "NZD",
+  de: "EUR", fr: "EUR", it: "EUR", es: "EUR", nl: "EUR", be: "EUR",
+  at: "EUR", pt: "EUR", ie: "EUR", fi: "EUR", gr: "EUR", lu: "EUR",
+  sk: "EUR", si: "EUR", ee: "EUR", lv: "EUR", lt: "EUR", cy: "EUR",
+  mt: "EUR", jp: "JPY", kr: "KRW", cn: "CNY", in: "INR", br: "BRL",
+  mx: "MXN", ar: "ARS", cl: "CLP", co: "COP", pe: "PEN",
+  sa: "SAR", ae: "AED", qa: "QAR", kw: "KWD", bh: "BHD", om: "OMR",
+  jo: "JOD", eg: "EGP", lb: "LBP", iq: "IQD", tr: "TRY",
+  pk: "PKR", bd: "BDT", lk: "LKR", np: "NPR",
+  ng: "NGN", ke: "KES", za: "ZAR", gh: "GHS", tz: "TZS",
+  et: "ETB", ma: "MAD", tn: "TND",
+  sg: "SGD", my: "MYR", th: "THB", id: "IDR", ph: "PHP", vn: "VND",
+  se: "SEK", no: "NOK", dk: "DKK", ch: "CHF", pl: "PLN",
+  cz: "CZK", hu: "HUF", ro: "RON", il: "ILS", tw: "TWD",
+  hk: "HKD", kz: "KZT", ge: "GEL", ua: "UAH", ru: "RUB",
+  is: "ISK", hr: "EUR", bg: "BGN", rs: "RSD",
+};
+
+function getCurrencyForCountry(gl: string): string {
+  return GL_TO_CURRENCY[gl.toLowerCase()] ?? "USD";
+}
+
+function mapShoppingItem(item: Record<string, unknown>, countryCode: string) {
+  const currency = (item.currency as string) || getCurrencyForCountry(countryCode);
+  return {
+    title: (item.title as string) || "",
+    price: typeof item.extracted_price === "number" ? item.extracted_price : 0,
+    currency,
+    store: (item.source as string) || "Unknown",
+    link: (item.link as string) || (item.product_link as string) || "",
+    image: (item.thumbnail as string) || "",
+    rating: typeof item.rating === "number" ? item.rating : undefined,
+    reviews: typeof item.reviews === "number" ? item.reviews : undefined,
+    snippet: (item.snippet as string) || "",
+    productId: (item.product_id as string) || "",
+    delivery: (item.delivery as string) || "",
+  };
+}
+
 app.get("/", (c) => {
   return c.json({ status: "ok", message: "My Wishlist API is running", version: "2.0" });
 });
@@ -182,21 +222,7 @@ app.post("/search/products", async (c) => {
       (data.shopping_results as Record<string, unknown>[]) || [];
 
     const results = shoppingResults.slice(0, 20).map(
-      (item: Record<string, unknown>) => ({
-        title: (item.title as string) || "",
-        price:
-          typeof item.extracted_price === "number" ? item.extracted_price : 0,
-        currency: (item.currency as string) || "USD",
-        store: (item.source as string) || "Unknown",
-        link: (item.link as string) || (item.product_link as string) || "",
-        image: (item.thumbnail as string) || "",
-        rating: typeof item.rating === "number" ? item.rating : undefined,
-        reviews:
-          typeof item.reviews === "number" ? item.reviews : undefined,
-        snippet: (item.snippet as string) || "",
-        productId: (item.product_id as string) || "",
-        delivery: (item.delivery as string) || "",
-      })
+      (item: Record<string, unknown>) => mapShoppingItem(item, country)
     );
 
     console.log(
@@ -485,18 +511,7 @@ app.post("/search/trending", async (c) => {
 
     const results = shoppingResults.slice(0, 10).map(
       (item: Record<string, unknown>) => ({
-        title: (item.title as string) || "",
-        price:
-          typeof item.extracted_price === "number" ? item.extracted_price : 0,
-        currency: (item.currency as string) || "USD",
-        store: (item.source as string) || "Unknown",
-        link: (item.link as string) || (item.product_link as string) || "",
-        image: (item.thumbnail as string) || "",
-        rating: typeof item.rating === "number" ? item.rating : undefined,
-        reviews: typeof item.reviews === "number" ? item.reviews : undefined,
-        snippet: (item.snippet as string) || "",
-        productId: (item.product_id as string) || "",
-        delivery: (item.delivery as string) || "",
+        ...mapShoppingItem(item, country),
         category: randomCategory,
       })
     );
@@ -560,20 +575,7 @@ app.post("/search/deals", async (c) => {
       (data.shopping_results as Record<string, unknown>[]) || [];
 
     const results = shoppingResults.slice(0, 15).map(
-      (item: Record<string, unknown>) => ({
-        title: (item.title as string) || "",
-        price:
-          typeof item.extracted_price === "number" ? item.extracted_price : 0,
-        currency: (item.currency as string) || "USD",
-        store: (item.source as string) || "Unknown",
-        link: (item.link as string) || (item.product_link as string) || "",
-        image: (item.thumbnail as string) || "",
-        rating: typeof item.rating === "number" ? item.rating : undefined,
-        reviews: typeof item.reviews === "number" ? item.reviews : undefined,
-        snippet: (item.snippet as string) || "",
-        productId: (item.product_id as string) || "",
-        delivery: (item.delivery as string) || "",
-      })
+      (item: Record<string, unknown>) => mapShoppingItem(item, country)
     );
 
     console.log(`[SerpAPI] Deals: ${results.length} results`);
@@ -1006,19 +1008,7 @@ app.post("/search/visual", async (c) => {
         const shopData = (await shopResp.json()) as Record<string, unknown>;
         const items = (shopData.shopping_results as Record<string, unknown>[]) || [];
 
-        shoppingResults = items.slice(0, 20).map((item: Record<string, unknown>) => ({
-          title: (item.title as string) || "",
-          price: typeof item.extracted_price === "number" ? item.extracted_price : 0,
-          currency: (item.currency as string) || "USD",
-          store: (item.source as string) || "Unknown",
-          link: (item.link as string) || (item.product_link as string) || "",
-          image: (item.thumbnail as string) || "",
-          rating: typeof item.rating === "number" ? item.rating : undefined,
-          reviews: typeof item.reviews === "number" ? item.reviews : undefined,
-          snippet: (item.snippet as string) || "",
-          productId: (item.product_id as string) || "",
-          delivery: (item.delivery as string) || "",
-        }));
+        shoppingResults = items.slice(0, 20).map((item: Record<string, unknown>) => mapShoppingItem(item, country));
 
         console.log(`[SerpAPI] Shopping found ${shoppingResults.length} results`);
       }
@@ -1093,20 +1083,7 @@ app.post("/search/barcode", async (c) => {
       (data.shopping_results as Record<string, unknown>[]) || [];
 
     const results = shoppingResults.slice(0, 15).map(
-      (item: Record<string, unknown>) => ({
-        title: (item.title as string) || "",
-        price:
-          typeof item.extracted_price === "number" ? item.extracted_price : 0,
-        currency: (item.currency as string) || "USD",
-        store: (item.source as string) || "Unknown",
-        link: (item.link as string) || (item.product_link as string) || "",
-        image: (item.thumbnail as string) || "",
-        rating: typeof item.rating === "number" ? item.rating : undefined,
-        reviews: typeof item.reviews === "number" ? item.reviews : undefined,
-        snippet: (item.snippet as string) || "",
-        productId: (item.product_id as string) || "",
-        delivery: (item.delivery as string) || "",
-      })
+      (item: Record<string, unknown>) => mapShoppingItem(item, country)
     );
 
     console.log(
