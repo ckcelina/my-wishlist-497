@@ -40,7 +40,7 @@ import { useLocation } from "@/providers/LocationProvider";
 import { useSearchHistory } from "@/providers/SearchHistoryProvider";
 import { usePriceAlerts } from "@/providers/PriceAlertProvider";
 import { searchProducts, fetchDeals, SerpApiResult } from "@/lib/api";
-import { storeMatchesAvailable, extractUniqueStores } from "@/lib/storeUtils";
+import { extractUniqueStores } from "@/lib/storeUtils";
 import SearchFilters, { FilterState, SortOption } from "@/components/SearchFilters";
 import { Product } from "@/types";
 
@@ -205,14 +205,18 @@ export default function ExploreScreen() {
 
   const autoVerifyMutation = useMutation({
     mutationFn: async () => {
-      console.log(`[Explore] Auto-verifying stores for ${serpApiCountryCode}`);
+      console.log(`[Explore] Auto-loading deals for ${serpApiCountryCode}`);
       setIsVerifyingStores(true);
       return fetchDeals(serpApiCountryCode, "deals");
     },
     onSuccess: (data) => {
       if (data.results.length > 0) {
         addConfirmedStores(extractUniqueStores(data.results), serpApiCountryCode);
-        console.log(`[Explore] Auto-verified ${data.results.length} result stores for ${serpApiCountryCode}`);
+        if (dealResults.length === 0) {
+          setDealResults(data.results);
+          setSelectedDealCategory("deals");
+        }
+        console.log(`[Explore] Auto-loaded ${data.results.length} deals for ${serpApiCountryCode}`);
       }
       setIsVerifyingStores(false);
     },
@@ -357,17 +361,8 @@ export default function ExploreScreen() {
       const sq = filters.storeFilter.toLowerCase();
       results = results.filter((r) => r.store.toLowerCase().includes(sq));
     }
-    const storePool = confirmedStores.length > 0 ? confirmedStores : availableStores;
-    if (storePool.length > 0) {
-      const countryFiltered = results.filter((r) =>
-        storePool.some((s) => storeMatchesAvailable(r.store, s))
-      );
-      if (countryFiltered.length > 0) {
-        results = countryFiltered;
-      }
-    }
     return results;
-  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter, availableStores, confirmedStores]);
+  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter]);
 
   const filteredDealResults = useMemo(
     () => dealResults,
@@ -384,18 +379,16 @@ export default function ExploreScreen() {
 
   const verifiedTrustedStores = useMemo(() => {
     if (confirmedStores.length === 0) return availableStores;
+    const normalizedConfirmed = new Set(confirmedStores.map((s) => s.toLowerCase().trim()));
     return availableStores.filter((s) =>
-      confirmedStores.some((cs) => storeMatchesAvailable(cs, s))
+      normalizedConfirmed.has(s.toLowerCase().trim()) ||
+      confirmedStores.some((cs) => cs.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(cs.toLowerCase()))
     );
   }, [availableStores, confirmedStores]);
 
   useEffect(() => {
     if (!isLoaded) return;
     if (autoVerifiedRef.current.has(serpApiCountryCode)) return;
-    if (confirmedStores.length > 0) {
-      autoVerifiedRef.current.add(serpApiCountryCode);
-      return;
-    }
     autoVerifiedRef.current.add(serpApiCountryCode);
     autoVerifyMutation.mutate();
   // eslint-disable-next-line react-hooks/exhaustive-deps

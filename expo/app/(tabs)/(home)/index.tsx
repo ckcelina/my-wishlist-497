@@ -19,7 +19,7 @@ import { useWishlistContext } from "@/providers/WishlistProvider";
 import { useLocation } from "@/providers/LocationProvider";
 import { usePriceAlerts } from "@/providers/PriceAlertProvider";
 import { fetchTrendingProducts, SerpApiResult } from "@/lib/api";
-import { storeMatchesAvailable, extractUniqueStores } from "@/lib/storeUtils";
+import { extractUniqueStores } from "@/lib/storeUtils";
 import WishlistCard from "@/components/WishlistCard";
 import ProductCard from "@/components/ProductCard";
 import { Product } from "@/types";
@@ -31,7 +31,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, myLists, sharedLists, trendingProducts, refreshWishlists } = useWishlistContext();
-  const { country, city, currency, serpApiCountryCode, currencyCode, availableStores, confirmedStores, addConfirmedStores, format } = useLocation();
+  const { country, city, currency, serpApiCountryCode, currencyCode, addConfirmedStores, format } = useLocation();
   const { unreadDropCount, activeAlertCount, checkPricesNow, isCheckingPrices } = usePriceAlerts();
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<"updated" | "name" | "items">("updated");
@@ -44,19 +44,13 @@ export default function HomeScreen() {
     },
     onSuccess: (data) => {
       if (data.results && data.results.length > 0) {
-        const storePool = confirmedStores.length > 0 ? confirmedStores : availableStores;
-        const filtered = storePool.length > 0
-          ? data.results.filter((r) =>
-              storePool.some((s) => storeMatchesAvailable(r.store, s))
-            )
-          : data.results;
         addConfirmedStores(
-          extractUniqueStores(filtered),
+          extractUniqueStores(data.results),
           serpApiCountryCode
         );
-        setLiveTrending(filtered);
+        setLiveTrending(data.results);
         console.log(
-          `[Home] Got ${data.results.length} trending, ${filtered.length} matched for ${serpApiCountryCode}`
+          `[Home] Got ${data.results.length} trending for ${serpApiCountryCode}`
         );
       }
     },
