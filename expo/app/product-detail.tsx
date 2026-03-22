@@ -35,7 +35,7 @@ import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 import { useLocation } from "@/providers/LocationProvider";
 import { usePriceAlerts, PriceHistoryEntry } from "@/providers/PriceAlertProvider";
-import { mockProducts, trendingProducts } from "@/mocks/data";
+import { mockProducts } from "@/mocks/data";
 import { Product } from "@/types";
 import { comparePrices, getProductDetail, ProductSeller } from "@/lib/api";
 import PriceHistoryChart from "@/components/PriceHistoryChart";
@@ -55,7 +55,7 @@ export default function ProductDetailScreen() {
     { country: string; results: { title: string; price: number; currency: string; store: string; link: string }[] }[]
   >([]);
 
-  const allLocalProducts = [...mockProducts, ...trendingProducts];
+  const allLocalProducts = [...mockProducts];
   const wishlistItems = wishlists.flatMap((w) => w.items);
 
   let product: Product | undefined;

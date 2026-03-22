@@ -25,7 +25,7 @@ const GL_TO_CURRENCY: Record<string, string> = {
 };
 
 function getCurrencyForCountry(gl: string): string {
-  return GL_TO_CURRENCY[gl.toLowerCase()] ?? "USD";
+  return GL_TO_CURRENCY[gl.toLowerCase()] ?? "";
 }
 
 function mapShoppingItem(item: Record<string, unknown>, countryCode: string) {
@@ -461,42 +461,83 @@ app.post("/convert", async (c) => {
 app.post("/search/trending", async (c) => {
   try {
     const body = await c.req.json();
-    const { country = "us", categories } = body as {
+    const { country } = body as {
       country?: string;
       categories?: string[];
     };
+
+    if (!country) {
+      return c.json({ results: [], category: "", error: "Country is required for trending" }, 400);
+    }
 
     const apiKey = process.env.SERPAPI_KEY;
     if (!apiKey) {
       return c.json({ results: [], error: "SerpAPI key not configured" }, 500);
     }
 
-    const defaultCategories = [
-      "trending tech gadgets",
-      "best sellers electronics",
-      "popular fashion items",
-      "top rated home decor",
-    ];
-    const searchCategories = categories ?? defaultCategories;
-    const randomCategory =
-      searchCategories[Math.floor(Math.random() * searchCategories.length)];
+    let trendingQuery = "";
+
+    try {
+      const trendsParams = new URLSearchParams({
+        engine: "google_trends_trending_now",
+        geo: country.toUpperCase(),
+        api_key: apiKey,
+      });
+
+      console.log(`[SerpAPI] Fetching Google Trends for ${country.toUpperCase()}`);
+      const trendsResp = await fetch(`https://serpapi.com/search.json?${trendsParams.toString()}`);
+
+      if (trendsResp.ok) {
+        const trendsData = (await trendsResp.json()) as Record<string, unknown>;
+        const trendingSearches = (trendsData.trending_searches as Record<string, unknown>[]) || [];
+        const dailySearches = (trendsData.daily_searches as Record<string, unknown>[]) || [];
+
+        if (trendingSearches.length > 0) {
+          const topItems = trendingSearches.slice(0, 5);
+          const picked = topItems[Math.floor(Math.random() * topItems.length)];
+          trendingQuery = ((picked.query as string) || (picked.keyword as string) || "").trim();
+          console.log(`[SerpAPI] Trending query from trending_searches: "${trendingQuery}"`);
+        }
+
+        if (!trendingQuery && dailySearches.length > 0) {
+          const firstDay = dailySearches[0];
+          const searches = (firstDay.searches as Record<string, unknown>[]) || [];
+          if (searches.length > 0) {
+            const topSearches = searches.slice(0, 5);
+            const picked = topSearches[Math.floor(Math.random() * topSearches.length)];
+            trendingQuery = ((picked.query as string) || "").trim();
+            console.log(`[SerpAPI] Trending query from daily_searches: "${trendingQuery}"`);
+          }
+        }
+      } else {
+        console.log(`[SerpAPI] Google Trends returned ${trendsResp.status}, falling back`);
+      }
+    } catch (trendsErr) {
+      console.log("[SerpAPI] Google Trends fetch failed, using fallback:", trendsErr);
+    }
+
+    if (!trendingQuery) {
+      const fallbackQueries = [
+        "best selling products",
+        "most popular items",
+        "top rated products",
+        "new arrivals",
+      ];
+      trendingQuery = fallbackQueries[Math.floor(Math.random() * fallbackQueries.length)];
+      console.log(`[SerpAPI] Using fallback trending query: "${trendingQuery}"`);
+    }
 
     const params = new URLSearchParams({
       engine: "google_shopping",
-      q: randomCategory,
+      q: trendingQuery,
       api_key: apiKey,
       gl: country,
       hl: "en",
       num: "10",
-      sort_by: "review_score",
     });
 
-    console.log(
-      `[SerpAPI] Fetching trending: "${randomCategory}" in ${country}`
-    );
-    const response = await fetch(
-      `https://serpapi.com/search.json?${params.toString()}`
-    );
+    console.log(`[SerpAPI] Fetching trending shopping: "${trendingQuery}" in ${country}`);
+    const response = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
 
     if (!response.ok) {
       return c.json(
@@ -512,12 +553,12 @@ app.post("/search/trending", async (c) => {
     const results = shoppingResults.slice(0, 10).map(
       (item: Record<string, unknown>) => ({
         ...mapShoppingItem(item, country),
-        category: randomCategory,
+        category: trendingQuery,
       })
     );
 
-    console.log(`[SerpAPI] Trending: ${results.length} results`);
-    return c.json({ results, category: randomCategory, error: null });
+    console.log(`[SerpAPI] Trending: ${results.length} results for "${trendingQuery}"`);
+    return c.json({ results, category: trendingQuery, error: null });
   } catch (err) {
     console.error("[SerpAPI] Trending failed:", err);
     return c.json({ results: [], error: "Trending fetch failed" }, 500);

@@ -7,7 +7,6 @@ import {
   mockWishlists,
   mockNotifications,
   mockProducts,
-  trendingProducts,
   mockChatMessages,
   mockAssignments,
 } from "@/mocks/data";
@@ -509,7 +508,7 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       unreadCount,
       user,
       allProducts: mockProducts,
-      trendingProducts,
+
       chatMessages,
       assignments,
       unreadChatCount,

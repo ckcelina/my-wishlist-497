@@ -173,7 +173,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
   );
 
   const serpApiCountryCode = useMemo(
-    () => country?.serpApiCode ?? "us",
+    () => country?.serpApiCode ?? "",
     [country]
   );
 

@@ -143,7 +143,7 @@ export async function scrapeProductUrl(url: string): Promise<ScrapeResult> {
 
 export async function searchProducts(
   query: string,
-  country: string = "us",
+  country: string,
   options?: { minPrice?: number; maxPrice?: number; sortBy?: string }
 ): Promise<{ results: SerpApiResult[]; error: string | null }> {
   try {
@@ -186,7 +186,7 @@ export async function searchProducts(
 
 export async function getProductDetail(
   productId: string,
-  country: string = "us"
+  country: string
 ): Promise<ProductDetailResult> {
   try {
     const baseUrl = getBaseUrl();
@@ -220,7 +220,7 @@ export async function getProductDetail(
 
 export async function comparePrices(
   query: string,
-  countries: string[] = ["us", "uk", "ca", "au"]
+  countries: string[]
 ): Promise<PriceComparisonResult> {
   try {
     const baseUrl = getBaseUrl();
@@ -253,7 +253,7 @@ export async function comparePrices(
 }
 
 export async function fetchTrendingProducts(
-  country: string = "us",
+  country: string,
   categories?: string[]
 ): Promise<TrendingResult> {
   try {
@@ -288,7 +288,7 @@ export async function fetchTrendingProducts(
 }
 
 export async function fetchDeals(
-  country: string = "us",
+  country: string,
   category: string = "deals"
 ): Promise<DealsResult> {
   try {
@@ -474,7 +474,7 @@ export interface BarcodeSearchResult {
 
 export async function searchByBarcode(
   barcode: string,
-  country: string = "us"
+  country: string
 ): Promise<BarcodeSearchResult> {
   try {
     const baseUrl = getBaseUrl();
@@ -526,7 +526,7 @@ export interface VisualSearchResult {
 
 export async function searchByImage(
   imageBase64: string,
-  country: string = "us",
+  country: string,
   city: string = "",
   mimeType: string = "image/jpeg"
 ): Promise<VisualSearchResult> {

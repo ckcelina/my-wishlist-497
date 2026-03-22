@@ -17,7 +17,6 @@ import { useRouter } from "expo-router";
 import {
   Search,
   X,
-  TrendingUp,
   ShoppingBag,
   MapPin,
   Store,
@@ -114,7 +113,7 @@ export default function ExploreScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { allProducts, trendingProducts, recentlyViewed } = useWishlistContext();
+  const { allProducts, recentlyViewed } = useWishlistContext();
   const { country, serpApiCountryCode, availableStores, confirmedStores, addConfirmedStores, isLoaded, format, getCurrencySymbol, currencyCode } = useLocation();
   const { getRecentSearches, getSuggestions, addSearch, removeSearch, clearHistory } = useSearchHistory();
   const { activeAlertCount } = usePriceAlerts();
@@ -228,13 +227,13 @@ export default function ExploreScreen() {
   const localResults = useMemo(() => {
     if (searchQuery.length === 0) return [];
     const q = searchQuery.toLowerCase();
-    return [...allProducts, ...trendingProducts].filter(
+    return allProducts.filter(
       (p) =>
         p.title.toLowerCase().includes(q) ||
         p.category.toLowerCase().includes(q) ||
         p.store.toLowerCase().includes(q)
     );
-  }, [searchQuery, allProducts, trendingProducts]);
+  }, [searchQuery, allProducts]);
 
   const handleSearch = useCallback(() => {
     const q = searchQuery.trim();
@@ -962,61 +961,7 @@ export default function ExploreScreen() {
             </View>
           </View>
 
-          {trendingProducts.length > 0 && (
-            <View style={styles.sectionContainer}>
-              <View style={styles.sectionRow}>
-                <TrendingUp size={16} color={colors.primary} />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Trending Now</Text>
-              </View>
-              <View style={[styles.trendingBanner, { backgroundColor: colors.primaryFaded }]}>
-                <TrendingUp size={18} color={colors.primary} />
-                <Text style={[styles.trendingBannerText, { color: colors.primary }]}>
-                  Most wishlisted this week
-                </Text>
-              </View>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalList}
-              >
-                {trendingProducts.map((item, index) => {
-                  const displayPrice = format(item.price, item.currency);
-                  return (
-                    <Pressable
-                      key={item.id}
-                      onPress={() =>
-                        router.push({ pathname: "/product-detail", params: { id: item.id } })
-                      }
-                      style={[
-                        styles.trendingCard,
-                        { backgroundColor: colors.surface, borderColor: colors.borderLight },
-                        index > 0 ? { marginLeft: 12 } : undefined,
-                      ]}
-                    >
-                      <Image source={{ uri: item.image }} style={styles.trendingImage} contentFit="cover" />
-                      <View style={styles.trendingInfo}>
-                        <Text style={[styles.trendingTitle, { color: colors.text }]} numberOfLines={2}>
-                          {item.title}
-                        </Text>
-                        <Text style={[styles.trendingStore, { color: colors.textTertiary }]}>{item.store}</Text>
-                        <View style={styles.trendingBottom}>
-                          <Text style={[styles.trendingPrice, { color: colors.primary }]}>{displayPrice}</Text>
-                          {item.rating !== undefined && (
-                            <View style={styles.ratingRow}>
-                              <Star size={10} color="#FFB300" fill="#FFB300" />
-                              <Text style={[styles.ratingText, { color: colors.textSecondary }]}>
-                                {item.rating}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
+
         </ScrollView>
       )}
     </View>

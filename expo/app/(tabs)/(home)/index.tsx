@@ -12,7 +12,7 @@ import {
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Plus, ChevronRight, Sparkles, MapPin, Bell, TrendingUp, ShoppingBag } from "lucide-react-native";
+import { Plus, ChevronRight, MapPin, Bell, TrendingUp, ShoppingBag } from "lucide-react-native";
 import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
@@ -21,7 +21,6 @@ import { usePriceAlerts } from "@/providers/PriceAlertProvider";
 import { fetchTrendingProducts, SerpApiResult } from "@/lib/api";
 import { extractUniqueStores } from "@/lib/storeUtils";
 import WishlistCard from "@/components/WishlistCard";
-import ProductCard from "@/components/ProductCard";
 import { Product } from "@/types";
 
 const appLogo = require("@/assets/images/logo.png");
@@ -30,7 +29,7 @@ export default function HomeScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, myLists, sharedLists, trendingProducts, refreshWishlists } = useWishlistContext();
+  const { user, myLists, sharedLists, refreshWishlists } = useWishlistContext();
   const { country, city, currency, serpApiCountryCode, currencyCode, addConfirmedStores, format } = useLocation();
   const { unreadDropCount, activeAlertCount, checkPricesNow, isCheckingPrices } = usePriceAlerts();
   const [refreshing, setRefreshing] = useState(false);
@@ -57,7 +56,11 @@ export default function HomeScreen() {
   });
 
   useEffect(() => {
-    trendingMutation.mutate();
+    if (serpApiCountryCode) {
+      trendingMutation.mutate();
+    } else {
+      setLiveTrending([]);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serpApiCountryCode]);
 
@@ -404,36 +407,19 @@ export default function HomeScreen() {
           </>
         )}
 
-        {trendingProducts.length > 0 && liveTrending.length === 0 && (
-          <>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleRow}>
-                <Sparkles size={18} color={colors.primary} />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Trending</Text>
-              </View>
-              <Pressable
-                onPress={() => router.push("/(tabs)/explore")}
-                style={styles.seeAllBtn}
-              >
-                <Text style={[styles.seeAllText, { color: colors.primary }]}>See All</Text>
-                <ChevronRight size={16} color={colors.primary} />
-              </Pressable>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
+        {liveTrending.length === 0 && !trendingMutation.isPending && serpApiCountryCode && (
+          <View style={styles.emptyTrendingCard}>
+            <TrendingUp size={24} color={colors.textTertiary} />
+            <Text style={[styles.emptyTrendingText, { color: colors.textSecondary }]}>
+              No trending items found in {country?.name ?? "your area"}
+            </Text>
+            <Pressable
+              onPress={() => trendingMutation.mutate()}
+              style={[styles.retryBtn, { backgroundColor: colors.primaryFaded }]}
             >
-              {trendingProducts.slice(0, 6).map((item, index) => (
-                <View key={item.id} style={index > 0 ? { marginLeft: 12 } : undefined}>
-                  <ProductCard
-                    product={item}
-                    onPress={() => router.push({ pathname: "/product-detail", params: { id: item.id } })}
-                  />
-                </View>
-              ))}
-            </ScrollView>
-          </>
+              <Text style={[styles.retryBtnText, { color: colors.primary }]}>Try Again</Text>
+            </Pressable>
+          </View>
         )}
       </ScrollView>
     </View>
@@ -711,6 +697,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   sortChipText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+  },
+  emptyTrendingCard: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    padding: 24,
+    borderRadius: 16,
+    alignItems: "center" as const,
+    gap: 10,
+  },
+  emptyTrendingText: {
+    fontSize: 14,
+    textAlign: "center" as const,
+  },
+  retryBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  retryBtnText: {
     fontSize: 13,
     fontWeight: "600" as const,
   },
