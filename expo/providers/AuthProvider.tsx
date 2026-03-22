@@ -173,6 +173,69 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     },
   });
 
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("Not authenticated");
+      console.log("[Auth] Starting account deletion for:", user.id);
+
+      try {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .delete()
+          .eq("id", user.id);
+        if (profileError) console.log("[Auth] Profile delete error:", profileError.message);
+
+        const { data: userWishlists } = await supabase
+          .from("wishlists")
+          .select("id")
+          .eq("user_id", user.id);
+
+        if (userWishlists && userWishlists.length > 0) {
+          const wIds = userWishlists.map((w: { id: string }) => w.id);
+          await supabase.from("wishlist_items").delete().in("wishlist_id", wIds);
+          await supabase.from("collaborators").delete().in("wishlist_id", wIds);
+          await supabase.from("chat_messages").delete().in("wishlist_id", wIds);
+          await supabase.from("item_assignments").delete().in("wishlist_id", wIds);
+          await supabase.from("wishlists").delete().eq("user_id", user.id);
+        }
+
+        await supabase.from("collaborators").delete().eq("user_id", user.id);
+        await supabase.from("price_alerts").delete().eq("user_id", user.id);
+      } catch (dbErr) {
+        console.log("[Auth] DB cleanup error (non-fatal):", dbErr);
+      }
+
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) console.log("[Auth] Sign out error during delete:", signOutError.message);
+
+      setProfile(null);
+      setSession(null);
+      setUser(null);
+      queryClient.clear();
+
+      try {
+        await AsyncStorage.multiRemove([
+          "wishlists_data",
+          "notifications_data",
+          "chat_messages_v2",
+          "item_assignments_v2",
+          "recently_viewed_v1",
+          "search_history_v2",
+          "price_alerts_data",
+          "has_onboarded_v1",
+          "user_country_code",
+          "user_currency_code",
+          "user_city",
+          "theme_mode",
+        ]);
+      } catch (e) {
+        console.log("[Auth] Error clearing AsyncStorage:", e);
+      }
+
+      console.log("[Auth] Account deleted and all data cleared");
+    },
+  });
+
   const isAuthenticated = useMemo(() => !!session?.user, [session]);
 
   return useMemo(
@@ -186,10 +249,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       signUp: signUpMutation.mutateAsync,
       signIn: signInMutation.mutateAsync,
       signOut: signOutMutation.mutateAsync,
+      deleteAccount: deleteAccountMutation.mutateAsync,
       updateProfile: updateProfileMutation.mutateAsync,
       isSigningUp: signUpMutation.isPending,
       isSigningIn: signInMutation.isPending,
       isSigningOut: signOutMutation.isPending,
+      isDeletingAccount: deleteAccountMutation.isPending,
       isUpdatingProfile: updateProfileMutation.isPending,
       signUpError: signUpMutation.error,
       signInError: signInMutation.error,
@@ -204,10 +269,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       signUpMutation.mutateAsync,
       signInMutation.mutateAsync,
       signOutMutation.mutateAsync,
+      deleteAccountMutation.mutateAsync,
       updateProfileMutation.mutateAsync,
       signUpMutation.isPending,
       signInMutation.isPending,
       signOutMutation.isPending,
+      deleteAccountMutation.isPending,
       updateProfileMutation.isPending,
       signUpMutation.error,
       signInMutation.error,

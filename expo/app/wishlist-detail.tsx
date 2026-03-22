@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useMemo } from "react";
+import React, { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Share,
   Platform,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,6 +31,10 @@ import {
   ShoppingBag,
   RefreshCw,
   TrendingDown,
+  PenLine,
+  X,
+  UserPlus,
+  Mail,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
@@ -38,6 +44,7 @@ import { useMutation } from "@tanstack/react-query";
 import { checkPrices } from "@/lib/api";
 import { useWishlistById, useWishlistContext, useItemAssignments } from "@/providers/WishlistProvider";
 import ProductCard from "@/components/ProductCard";
+import * as db from "@/lib/database";
 
 export default function WishlistDetailScreen() {
   const colors = useAppColors();
@@ -45,12 +52,17 @@ export default function WishlistDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const wishlist = useWishlistById(id ?? "");
-  const { togglePurchased, removeProductFromWishlist, toggleShareWishlist, user, deleteWishlistById } = useWishlistContext();
+  const { togglePurchased, removeProductFromWishlist, toggleShareWishlist, user, deleteWishlistById, updateProductInWishlist, refreshWishlists } = useWishlistContext();
   const itemAssignments = useItemAssignments(id ?? "");
   const { format, convert, currencyCode, serpApiCountryCode } = useLocation();
 
   const [showMenu, setShowMenu] = useState(false);
   const [priceDropMap, setPriceDropMap] = useState<Record<string, number>>({});
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editPriority, setEditPriority] = useState<'high' | 'medium' | 'low' | undefined>(undefined);
+  const [editNotes, setEditNotes] = useState("");
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const menuAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -147,6 +159,56 @@ export default function WishlistDetailScreen() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     togglePurchased(wishlist.id, productId);
   };
+
+  const inviteMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const foundUser = await db.findUserByEmail(email.trim().toLowerCase());
+      if (!foundUser) {
+        throw new Error("No user found with that email. They need to sign up first.");
+      }
+      if (!wishlist) throw new Error("Wishlist not found");
+      const alreadyCollab = wishlist.collaborators.some((c) => c.id === foundUser.id);
+      if (alreadyCollab) {
+        throw new Error("This user is already a collaborator.");
+      }
+      const success = await db.addCollaborator(
+        wishlist.id,
+        foundUser.id,
+        foundUser.full_name,
+        foundUser.avatar_url ?? "",
+        "editor"
+      );
+      if (!success) throw new Error("Failed to add collaborator.");
+      return foundUser;
+    },
+    onSuccess: (foundUser) => {
+      Alert.alert("Invited!", `${foundUser.full_name} has been added as a collaborator.`);
+      setInviteEmail("");
+      setShowInviteModal(false);
+      refreshWishlists();
+    },
+    onError: (err: Error) => {
+      Alert.alert("Invite Failed", err.message);
+    },
+  });
+
+  const handleEditItem = useCallback((productId: string) => {
+    const item = wishlist?.items.find((i) => i.id === productId);
+    if (!item) return;
+    setEditingItem(productId);
+    setEditPriority(item.priority);
+    setEditNotes(item.notes ?? "");
+  }, [wishlist]);
+
+  const handleSaveItemEdit = useCallback(() => {
+    if (!editingItem || !wishlist) return;
+    updateProductInWishlist(wishlist.id, editingItem, {
+      priority: editPriority,
+      notes: editNotes.trim() || undefined,
+    });
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setEditingItem(null);
+  }, [editingItem, wishlist, editPriority, editNotes, updateProductInWishlist]);
 
   const handleRemoveProduct = (productId: string, productTitle: string) => {
     Alert.alert("Remove Item", `Remove "${productTitle}" from this list?`, [
@@ -361,6 +423,15 @@ export default function WishlistDetailScreen() {
               <Copy size={16} color={colors.text} />
               <Text style={[styles.menuItemText, { color: colors.text }]}>Copy Link</Text>
             </Pressable>
+            {wishlist.isShared && isOwner && (
+              <Pressable
+                onPress={() => { setShowMenu(false); setShowInviteModal(true); }}
+                style={[styles.menuItem, { borderBottomColor: colors.borderLight }]}
+              >
+                <UserPlus size={16} color={themeColor} />
+                <Text style={[styles.menuItemText, { color: colors.text }]}>Invite People</Text>
+              </Pressable>
+            )}
             {isOwner && (
               <Pressable
                 onPress={() => { setShowMenu(false); handleDeleteWishlist(); }}
@@ -466,6 +537,12 @@ export default function WishlistDetailScreen() {
                       </View>
                       <View style={styles.itemActions}>
                         <Pressable
+                          onPress={() => handleEditItem(product.id)}
+                          style={[styles.actionBtn, { backgroundColor: colors.primaryFaded }]}
+                        >
+                          <PenLine size={14} color={colors.primary} />
+                        </Pressable>
+                        <Pressable
                           onPress={() => handleTogglePurchased(product.id)}
                           style={[
                             styles.actionBtn,
@@ -527,6 +604,134 @@ export default function WishlistDetailScreen() {
           )}
         </ScrollView>
       </Animated.View>
+
+      <Modal visible={editingItem !== null} transparent animationType="fade">
+        <View style={styles.editModalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setEditingItem(null)} />
+          <View style={[styles.editModalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.editModalHeader}>
+              <Text style={[styles.editModalTitle, { color: colors.text }]}>Edit Item</Text>
+              <Pressable onPress={() => setEditingItem(null)}>
+                <X size={22} color={colors.text} />
+              </Pressable>
+            </View>
+
+            <Text style={[styles.editLabel, { color: colors.textSecondary }]}>Priority</Text>
+            <View style={styles.priorityRow}>
+              {([undefined, 'low', 'medium', 'high'] as const).map((p) => {
+                const isActive = editPriority === p;
+                const label = p === undefined ? 'None' : p === 'high' ? '🔴 High' : p === 'medium' ? '🟡 Medium' : '🟢 Low';
+                const activeColor = p === 'high' ? '#FF4F4F' : p === 'medium' ? '#FF8C00' : p === 'low' ? '#00B894' : colors.textSecondary;
+                return (
+                  <Pressable
+                    key={p ?? 'none'}
+                    onPress={() => setEditPriority(p)}
+                    style={[
+                      styles.priorityOption,
+                      {
+                        backgroundColor: isActive ? activeColor + '18' : colors.surfaceSecondary,
+                        borderColor: isActive ? activeColor : colors.borderLight,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.priorityOptionText, { color: isActive ? activeColor : colors.text }]}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={[styles.editLabel, { color: colors.textSecondary, marginTop: 16 }]}>Notes</Text>
+            <TextInput
+              value={editNotes}
+              onChangeText={setEditNotes}
+              placeholder="Add a note..."
+              placeholderTextColor={colors.textTertiary}
+              style={[
+                styles.editNotesInput,
+                { backgroundColor: colors.surfaceSecondary, color: colors.text, borderColor: colors.border },
+              ]}
+              multiline
+              maxLength={300}
+            />
+
+            <View style={styles.editModalActions}>
+              <Pressable
+                onPress={() => setEditingItem(null)}
+                style={[styles.editModalBtn, { backgroundColor: colors.surfaceSecondary }]}
+              >
+                <Text style={[styles.editModalBtnText, { color: colors.text }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleSaveItemEdit}
+                style={[styles.editModalBtn, { backgroundColor: colors.primary }]}
+              >
+                <Text style={[styles.editModalBtnText, { color: '#FFFFFF' }]}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showInviteModal} transparent animationType="slide">
+        <View style={styles.editModalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowInviteModal(false)} />
+          <View style={[styles.editModalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.editModalHeader}>
+              <Text style={[styles.editModalTitle, { color: colors.text }]}>Invite People</Text>
+              <Pressable onPress={() => setShowInviteModal(false)}>
+                <X size={22} color={colors.text} />
+              </Pressable>
+            </View>
+            <Text style={[styles.editLabel, { color: colors.textSecondary }]}>Email Address</Text>
+            <View style={styles.inviteInputRow}>
+              <Mail size={18} color={colors.textTertiary} />
+              <TextInput
+                value={inviteEmail}
+                onChangeText={setInviteEmail}
+                placeholder="friend@example.com"
+                placeholderTextColor={colors.textTertiary}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[
+                  styles.inviteInput,
+                  { color: colors.text },
+                ]}
+              />
+            </View>
+            <Text style={[styles.inviteHint, { color: colors.textTertiary }]}>
+              The person must have an account to be added as a collaborator.
+            </Text>
+            <View style={styles.editModalActions}>
+              <Pressable
+                onPress={() => { setShowInviteModal(false); setInviteEmail(""); }}
+                style={[styles.editModalBtn, { backgroundColor: colors.surfaceSecondary }]}
+              >
+                <Text style={[styles.editModalBtnText, { color: colors.text }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => inviteMutation.mutate(inviteEmail)}
+                disabled={!inviteEmail.trim() || inviteMutation.isPending}
+                style={[
+                  styles.editModalBtn,
+                  {
+                    backgroundColor: inviteEmail.trim() ? colors.primary : colors.surfaceSecondary,
+                    opacity: inviteMutation.isPending ? 0.7 : 1,
+                  },
+                ]}
+              >
+                {inviteMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={[styles.editModalBtnText, { color: inviteEmail.trim() ? '#FFFFFF' : colors.textTertiary }]}>Invite</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -859,5 +1064,93 @@ const styles = StyleSheet.create({
   itemNotes: {
     fontSize: 11,
     flex: 1,
+  },
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  editModalContent: {
+    width: "88%" as unknown as number,
+    borderRadius: 24,
+    padding: 24,
+  },
+  editModalHeader: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+    marginBottom: 20,
+  },
+  editModalTitle: {
+    fontSize: 20,
+    fontWeight: "700" as const,
+  },
+  editLabel: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    marginBottom: 8,
+    marginLeft: 2,
+  },
+  priorityRow: {
+    flexDirection: "row" as const,
+    gap: 8,
+  },
+  priorityOption: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: "center" as const,
+  },
+  priorityOptionText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+  },
+  editNotesInput: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    fontSize: 15,
+    minHeight: 80,
+    textAlignVertical: "top" as const,
+  },
+  editModalActions: {
+    flexDirection: "row" as const,
+    gap: 12,
+    marginTop: 20,
+  },
+  editModalBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center" as const,
+  },
+  editModalBtnText: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+  },
+  inviteInputRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    backgroundColor: "#F5F5F5",
+  },
+  inviteInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+  },
+  inviteHint: {
+    fontSize: 12,
+    marginTop: 8,
+    marginLeft: 2,
+    lineHeight: 16,
   },
 });

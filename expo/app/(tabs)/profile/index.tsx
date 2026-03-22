@@ -35,6 +35,7 @@ import {
   Search,
   Store,
   ArrowLeftRight,
+  Trash2,
 } from "lucide-react-native";
 import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
@@ -49,7 +50,7 @@ export default function ProfileScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const { user, wishlists, sharedLists, allProducts } = useWishlistContext();
-  const { profile, signOut, isSigningOut, updateProfile, isUpdatingProfile } = useAuth();
+  const { profile, signOut, isSigningOut, deleteAccount, isDeletingAccount, updateProfile, isUpdatingProfile } = useAuth();
   const { themeMode, setThemeMode } = useTheme();
   const {
     country, city, currency, countryCode, currencyCode,
@@ -164,6 +165,39 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "This will permanently delete your account, all wishlists, and all data. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Everything",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Final Confirmation",
+              "Are you absolutely sure? All your data will be permanently lost.",
+              [
+                { text: "Keep Account", style: "cancel" },
+                {
+                  text: isDeletingAccount ? "Deleting..." : "Delete Forever",
+                  style: "destructive",
+                  onPress: () => {
+                    deleteAccount().catch((err: unknown) => {
+                      console.log("[Profile] Delete account error:", err);
+                      Alert.alert("Error", "Failed to delete account. Please try again.");
+                    });
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   };
 
   const renderCountryItem = useCallback(
@@ -409,13 +443,35 @@ export default function ProfileScreen() {
                 )}
               </View>
             </Pressable>
-            <Pressable style={styles.settingRow} onPress={handleSignOut}>
+            <Pressable
+              style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
+              onPress={handleSignOut}
+            >
               <View style={styles.settingLeft}>
                 <LogOut size={20} color={colors.error} />
                 <Text style={[styles.settingLabel, { color: colors.error }]}>Sign Out</Text>
               </View>
               <View style={styles.settingRight}>
                 <ChevronRight size={18} color={colors.textTertiary} />
+              </View>
+            </Pressable>
+            <Pressable
+              style={styles.settingRow}
+              onPress={handleDeleteAccount}
+              disabled={isDeletingAccount}
+            >
+              <View style={styles.settingLeft}>
+                <Trash2 size={20} color={colors.error} />
+                <Text style={[styles.settingLabel, { color: colors.error }]}>
+                  {isDeletingAccount ? "Deleting Account..." : "Delete Account"}
+                </Text>
+              </View>
+              <View style={styles.settingRight}>
+                {isDeletingAccount ? (
+                  <ActivityIndicator size="small" color={colors.error} />
+                ) : (
+                  <ChevronRight size={18} color={colors.textTertiary} />
+                )}
               </View>
             </Pressable>
           </View>

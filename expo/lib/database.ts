@@ -500,3 +500,71 @@ export async function removeItemAssignment(wishlistId: string, productId: string
     return false;
   }
 }
+
+export async function addCollaborator(
+  wishlistId: string,
+  userId: string,
+  name: string,
+  avatar: string,
+  role: "editor" | "viewer" = "editor"
+): Promise<boolean> {
+  try {
+    console.log("[DB] Adding collaborator:", userId, "to wishlist:", wishlistId);
+    const { error } = await supabase.from("collaborators").insert({
+      wishlist_id: wishlistId,
+      user_id: userId,
+      name,
+      avatar,
+      role,
+    });
+
+    if (error) {
+      console.log("[DB] Error adding collaborator:", error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[DB] addCollaborator error:", err);
+    return false;
+  }
+}
+
+export async function removeCollaborator(wishlistId: string, userId: string): Promise<boolean> {
+  try {
+    console.log("[DB] Removing collaborator:", userId, "from wishlist:", wishlistId);
+    const { error } = await supabase
+      .from("collaborators")
+      .delete()
+      .eq("wishlist_id", wishlistId)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.log("[DB] Error removing collaborator:", error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[DB] removeCollaborator error:", err);
+    return false;
+  }
+}
+
+export async function findUserByEmail(email: string): Promise<{ id: string; full_name: string; avatar_url: string | null } | null> {
+  try {
+    console.log("[DB] Finding user by email:", email);
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .eq("email", email)
+      .single();
+
+    if (error) {
+      console.log("[DB] User not found:", error.message);
+      return null;
+    }
+    return data as { id: string; full_name: string; avatar_url: string | null };
+  } catch (err) {
+    console.error("[DB] findUserByEmail error:", err);
+    return null;
+  }
+}

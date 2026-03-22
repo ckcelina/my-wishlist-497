@@ -231,6 +231,11 @@ export default function AddScreen() {
 
   const handleTakePhoto = async () => {
     try {
+      if (Platform.OS === 'web') {
+        Alert.alert("Not Available", "Camera is not available on web. Please use 'Pick from Gallery' instead.");
+        return;
+      }
+
       const permResult = await ImagePicker.requestCameraPermissionsAsync();
       if (!permResult.granted) {
         Alert.alert("Permission Needed", "Please allow camera access.");
