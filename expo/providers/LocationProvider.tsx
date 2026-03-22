@@ -71,22 +71,29 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     if (!isLoaded || !profile) return;
 
     const profileCountry = getCountryByCode(profile.country) ?? getCountryByName(profile.country);
-    if (!profileCountry) return;
+    if (!profileCountry) {
+      console.log("[Location] Profile has no valid country:", profile.country);
+      return;
+    }
 
     const syncFromProfile = async () => {
       const storedCountry = await AsyncStorage.getItem(LOCATION_COUNTRY_KEY);
 
       if (!storedCountry || storedCountry !== profileCountry.code) {
-        console.log("[Location] Syncing from profile:", profileCountry.name);
+        console.log("[Location] Syncing from profile:", profileCountry.name, "(stored was:", storedCountry, ")");
         setCountryCodeState(profileCountry.code);
         setCurrencyCodeState(profileCountry.currency);
         await AsyncStorage.setItem(LOCATION_COUNTRY_KEY, profileCountry.code);
+        await AsyncStorage.setItem(LOCATION_CURRENCY_KEY, profileCountry.currency);
+      } else if (!currencyCode) {
+        console.log("[Location] Currency missing, syncing from profile country:", profileCountry.currency);
+        setCurrencyCodeState(profileCountry.currency);
         await AsyncStorage.setItem(LOCATION_CURRENCY_KEY, profileCountry.currency);
       }
     };
 
     void syncFromProfile();
-  }, [profile, isLoaded]);
+  }, [profile, isLoaded, currencyCode]);
 
   const country = useMemo<CountryData | undefined>(
     () => (countryCode ? getCountryByCode(countryCode) : undefined),
@@ -147,15 +154,15 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
 
   const convert = useCallback(
     (amount: number, fromCurrency: string): number => {
-      const toCurr = currencyCode || "USD";
-      return convertCurrency(amount, fromCurrency, toCurr);
+      if (!currencyCode) return amount;
+      return convertCurrency(amount, fromCurrency, currencyCode);
     },
     [currencyCode]
   );
 
   const format = useCallback(
     (amount: number, fromCurrency?: string): string => {
-      const toCurr = currencyCode || "USD";
+      const toCurr = currencyCode || fromCurrency || "USD";
       if (fromCurrency && fromCurrency !== toCurr) {
         const converted = convertCurrency(amount, fromCurrency, toCurr);
         return formatPrice(converted, toCurr);
@@ -210,7 +217,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
       countryCode,
       country,
       city,
-      currencyCode: currencyCode || "USD",
+      currencyCode,
       currency,
       isLoaded,
       hasCountry,

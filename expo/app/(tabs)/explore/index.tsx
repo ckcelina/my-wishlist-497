@@ -357,28 +357,31 @@ export default function ExploreScreen() {
       const sq = filters.storeFilter.toLowerCase();
       results = results.filter((r) => r.store.toLowerCase().includes(sq));
     }
-    if (availableStores.length > 0) {
+    const storePool = confirmedStores.length > 0 ? confirmedStores : availableStores;
+    if (storePool.length > 0) {
       const countryFiltered = results.filter((r) =>
-        availableStores.some((s) => storeMatchesAvailable(r.store, s))
+        storePool.some((s) => storeMatchesAvailable(r.store, s))
       );
       if (countryFiltered.length > 0) {
         results = countryFiltered;
       }
     }
-    console.log(`[Explore] filteredSerpResults: ${results.length} of ${serpResults.length} total`);
+    console.log(`[Explore] filteredSerpResults: ${results.length} of ${serpResults.length} total (storePool: ${storePool.length})`);
     return results;
-  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter, availableStores]);
+  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter, availableStores, confirmedStores]);
 
   const filteredDealResults = useMemo(
     () => dealResults,
     [dealResults]
   );
 
+  const [convertFromCurrency, setConvertFromCurrency] = useState<string>("USD");
+
   const convertedAmount = useMemo(() => {
     const num = parseFloat(convertAmount);
     if (!convertAmount || isNaN(num) || num <= 0) return null;
-    return format(num, "USD");
-  }, [convertAmount, format]);
+    return format(num, convertFromCurrency);
+  }, [convertAmount, format, convertFromCurrency]);
 
   const verifiedTrustedStores = useMemo(() => {
     if (confirmedStores.length === 0) return availableStores;
@@ -785,7 +788,17 @@ export default function ExploreScreen() {
             <View style={[styles.converterCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
               <View style={styles.converterRow}>
                 <View style={styles.converterSide}>
-                  <Text style={[styles.converterLabel, { color: colors.textTertiary }]}>USD</Text>
+                  <Pressable
+                    onPress={() => {
+                      const common = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD"];
+                      const idx = common.indexOf(convertFromCurrency);
+                      setConvertFromCurrency(common[(idx + 1) % common.length]);
+                    }}
+                    style={styles.converterCurrencyToggle}
+                  >
+                    <Text style={[styles.converterLabel, { color: colors.textTertiary }]}>{convertFromCurrency}</Text>
+                    <ArrowLeftRight size={12} color={colors.textTertiary} />
+                  </Pressable>
                   <TextInput
                     value={convertAmount}
                     onChangeText={setConvertAmount}
@@ -798,9 +811,9 @@ export default function ExploreScreen() {
                 </View>
                 <ArrowRight size={20} color={colors.textTertiary} />
                 <View style={[styles.converterSide, styles.converterOutput, { backgroundColor: colors.primaryFaded }]}>
-                  <Text style={[styles.converterLabel, { color: colors.primary }]}>{currencyCode}</Text>
+                  <Text style={[styles.converterLabel, { color: colors.primary }]}>{currencyCode || "USD"}</Text>
                   <Text style={[styles.converterResult, { color: colors.primary }]}>
-                    {convertedAmount ?? (convertAmount ? "—" : "—")}
+                    {convertedAmount ?? "—"}
                   </Text>
                 </View>
               </View>
@@ -1569,5 +1582,10 @@ const styles = StyleSheet.create({
   converterResult: {
     fontSize: 24,
     fontWeight: "800" as const,
+  },
+  converterCurrencyToggle: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
   },
 });

@@ -31,42 +31,37 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
   const [recentlyViewed, setRecentlyViewed] = useState<Product[]>([]);
 
   const user = useMemo<UserProfile>(() => {
-    if (profile && authUser) {
-      return {
-        id: authUser.id,
-        name: profile.full_name || authUser.email?.split("@")[0] || "User",
-        email: profile.email || authUser.email || "",
-        avatar: profile.avatar_url || "",
-        country: profile.country || "",
-        currency: profile.currency || "",
-        wishlistCount: 0,
-        savedItems: 0,
-        sharedLists: 0,
-      };
-    }
-    if (authUser) {
-      return {
-        id: authUser.id,
-        name: authUser.user_metadata?.full_name as string || authUser.email?.split("@")[0] || "User",
-        email: authUser.email || "",
-        avatar: "",
-        country: "",
-        currency: "",
-        wishlistCount: 0,
-        savedItems: 0,
-        sharedLists: 0,
-      };
-    }
-    return {
-      id: "guest",
-      name: "Guest",
-      email: "",
-      avatar: "",
+    const base = {
       country: "",
       currency: "",
       wishlistCount: 0,
       savedItems: 0,
       sharedLists: 0,
+    };
+    if (profile && authUser) {
+      return {
+        ...base,
+        id: authUser.id,
+        name: profile.full_name || authUser.email?.split("@")[0] || "User",
+        email: profile.email || authUser.email || "",
+        avatar: profile.avatar_url || "",
+      };
+    }
+    if (authUser) {
+      return {
+        ...base,
+        id: authUser.id,
+        name: authUser.user_metadata?.full_name as string || authUser.email?.split("@")[0] || "User",
+        email: authUser.email || "",
+        avatar: "",
+      };
+    }
+    return {
+      ...base,
+      id: "guest",
+      name: "Guest",
+      email: "",
+      avatar: "",
     };
   }, [authUser, profile]);
 

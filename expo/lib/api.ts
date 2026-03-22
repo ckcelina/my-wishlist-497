@@ -114,7 +114,7 @@ export async function scrapeProductUrl(url: string): Promise<ScrapeResult> {
   try {
     const baseUrl = getBaseUrl();
     if (!baseUrl) {
-      return { title: "", image: "", description: "", price: 0, currency: "USD", store: "", url, error: "API URL not configured" };
+      return { title: "", image: "", description: "", price: 0, currency: "", store: "", url, error: "API URL not configured" };
     }
 
     console.log(`[API] Scraping URL: ${url}`);
@@ -137,7 +137,7 @@ export async function scrapeProductUrl(url: string): Promise<ScrapeResult> {
     return data as ScrapeResult;
   } catch (err) {
     logApiError("[API] Scrape failed", err);
-    return { title: "", image: "", description: "", price: 0, currency: "USD", store: "", url, error: "Network error" };
+    return { title: "", image: "", description: "", price: 0, currency: "", store: "", url, error: "Network error" };
   }
 }
 
