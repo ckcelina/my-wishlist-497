@@ -21,10 +21,11 @@
 - Added fallback: if country is set but currency is missing, currency syncs from country data
 - Enhanced logging for sync debugging
 
-**4. Stores not properly filtered by country** ✅ FIXED
-- Search results now use confirmed stores (from SerpAPI verification) as the primary filter
-- Falls back to configured available stores only when no confirmed stores exist
-- Home page trending also uses confirmed stores pool
+**4. Stores not properly filtered by country** ✅ FIXED → SIMPLIFIED
+- Removed trusted stores filtering entirely — Google Shopping's `gl` parameter handles country filtering
+- Removed confirmed stores verification system (was making extra API calls and adding complexity)
+- Search now goes directly to Google Shopping via SerpAPI with the user's country code
+- Category searches simplified to just use category name (no store names appended)
 
 ---
 
@@ -37,10 +38,11 @@
 **6. Home page trending uses hardcoded "USD" currency fallback** ✅ FIXED
 - serpToProduct now uses user's currencyCode as fallback instead of hardcoded "USD"
 
-**7. Search results not filtered to country-available stores** ✅ FIXED
-- filteredSerpResults now uses confirmedStores (verified by SerpAPI) as primary filter pool
-- Falls back to availableStores only when no confirmed stores exist
-- Added confirmedStores to the dependency array
+**7. Search results not filtered to country-available stores** ✅ REDESIGNED
+- Removed store-based filtering — Google Shopping already filters by country via `gl` parameter
+- Removed "Verified Stores" section from Explore page (was unreliable and confusing)
+- Removed auto-verify API calls that wasted SerpAPI credits on page load
+- All search results now come directly from Google Shopping for the user's country
 
 **8. Price display inconsistency** ✅ FIXED
 - LocationProvider format() now gracefully handles empty currencyCode
@@ -74,7 +76,9 @@
 - Signup collects country during registration
 - Onboarding asks for country on first run
 - Currency converter uses tappable source currency
-- Store filtering uses verified stores from SerpAPI
+- Search uses Google Shopping directly (no intermediate store filtering)
+- Visual search has improved error handling with fallback to AI detection
+- Backend image upload tries multiple hosts with graceful fallback
 
 ---
 
@@ -84,7 +88,12 @@
 - [x] **Onboarding** — 4th slide with interactive country picker
 - [x] **Remove all "US/USD" defaults** — Starting state is empty, waits for real selection
 - [x] **Unify country/currency state** — WishlistProvider no longer duplicates location state
-- [x] **Store filtering** — Search results filtered by confirmed/available stores
+- [x] **Store filtering** — Removed store filtering in favor of direct Google Shopping (country-based via `gl` param)
 - [x] **Currency converter** — Tappable source currency, converts to user's selected currency
 - [x] **Currency fallback consistency** — All hardcoded "USD" fallbacks replaced
 - [x] **Country stored as code** — Country code saved to database profile
+- [x] **Search simplification** — Removed trusted stores system, auto-verify, confirmed stores tracking
+- [x] **Visual search reliability** — Backend tries multiple upload hosts, graceful fallback when all fail
+- [x] **Image search error handling** — AI detection works as fallback when visual search fails
+- [x] **Category search fix** — Categories search by name only, no store names appended
+- [x] **Explore page cleanup** — Removed Verified Stores section, removed auto-deal-loading on mount

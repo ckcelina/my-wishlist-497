@@ -363,7 +363,7 @@ export default function AddScreen() {
       city,
       mimeType
     ).then((result) => {
-      console.log("[VisualSearch] Got result:", result.visualMatches.length, "matches");
+      console.log("[VisualSearch] Got result:", result.visualMatches.length, "matches,", result.shoppingResults.length, "shopping");
       setVisualMatches(result.visualMatches);
       setVisualSearchQuery(result.searchQuery);
 
@@ -373,16 +373,12 @@ export default function AddScreen() {
       }
 
       if (result.error) {
-        console.log("[VisualSearch] Error:", result.error);
-        if (result.visualMatches.length === 0 && result.shoppingResults.length === 0) {
-          setVisualSearchError(result.error);
-        }
+        console.log("[VisualSearch] Non-fatal error:", result.error);
       }
 
       return result;
     }).catch((err) => {
       console.error("[VisualSearch] Failed:", err);
-      setVisualSearchError("Visual search failed");
       return null;
     }).finally(() => {
       setIsVisualSearching(false);
@@ -390,15 +386,16 @@ export default function AddScreen() {
 
     const aiDetectPromise = detectProductFromImage(base64, mimeType);
 
-    const [visualResult] = await Promise.allSettled([visualSearchPromise, aiDetectPromise]);
+    const [visualResult, aiResult] = await Promise.allSettled([visualSearchPromise, aiDetectPromise]);
 
-    if (
-      visualResult.status === "fulfilled" &&
-      visualResult.value &&
-      visualResult.value.shoppingResults.length === 0 &&
-      detectedProduct
-    ) {
-      console.log("[ImageSearch] Visual search had no shopping results, using AI query as fallback");
+    const vr = visualResult.status === "fulfilled" ? visualResult.value : null;
+    const hasVisualResults = vr && (vr.visualMatches.length > 0 || vr.shoppingResults.length > 0);
+    const hasAiResults = aiResult.status === "fulfilled";
+
+    if (!hasVisualResults && !hasAiResults) {
+      setVisualSearchError("Could not identify the product. Try a clearer image or use text search.");
+    } else if (!hasVisualResults && vr?.error) {
+      console.log("[ImageSearch] Visual search failed but AI detection succeeded");
     }
   };
 

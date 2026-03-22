@@ -20,7 +20,6 @@ import { useAuth } from "@/providers/AuthProvider";
 const LOCATION_COUNTRY_KEY = "user_country_code";
 const LOCATION_CITY_KEY = "user_city";
 const LOCATION_CURRENCY_KEY = "user_currency_code";
-const CONFIRMED_STORES_KEY = "confirmed_stores_by_country_v1";
 
 export const [LocationProvider, useLocation] = createContextHook(() => {
   const queryClient = useQueryClient();
@@ -30,32 +29,20 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
   const [city, setCityState] = useState<string>("");
   const [currencyCode, setCurrencyCodeState] = useState<string>("");
   const [isLoaded, setIsLoaded] = useState(false);
-  const [confirmedByCountry, setConfirmedByCountry] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [storedCountry, storedCity, storedCurrency, storedConfirmed] =
+        const [storedCountry, storedCity, storedCurrency] =
           await Promise.all([
             AsyncStorage.getItem(LOCATION_COUNTRY_KEY),
             AsyncStorage.getItem(LOCATION_CITY_KEY),
             AsyncStorage.getItem(LOCATION_CURRENCY_KEY),
-            AsyncStorage.getItem(CONFIRMED_STORES_KEY),
           ]);
 
         if (storedCountry) setCountryCodeState(storedCountry);
         if (storedCity) setCityState(storedCity);
         if (storedCurrency) setCurrencyCodeState(storedCurrency);
-        if (storedConfirmed) {
-          try {
-            setConfirmedByCountry(
-              JSON.parse(storedConfirmed) as Record<string, string[]>
-            );
-            console.log("[Location] Loaded confirmed stores from storage");
-          } catch {
-            console.log("[Location] Failed to parse confirmed stores");
-          }
-        }
 
         console.log("[Location] Loaded:", { storedCountry, storedCity, storedCurrency });
       } catch (err) {
@@ -187,29 +174,6 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     [country]
   );
 
-  const confirmedStores = useMemo(
-    () => confirmedByCountry[countryCode] ?? [],
-    [confirmedByCountry, countryCode]
-  );
-
-  const addConfirmedStores = useCallback(
-    (stores: string[], forCountryCode: string) => {
-      setConfirmedByCountry((prev) => {
-        const existing = new Set<string>(prev[forCountryCode] ?? []);
-        const newStores = stores.filter((s) => s.trim().length > 0 && !existing.has(s));
-        if (newStores.length === 0) return prev;
-        newStores.forEach((s) => existing.add(s));
-        const updated = { ...prev, [forCountryCode]: Array.from(existing) };
-        void AsyncStorage.setItem(CONFIRMED_STORES_KEY, JSON.stringify(updated));
-        console.log(
-          `[Location] +${newStores.length} confirmed stores for ${forCountryCode} (total: ${existing.size})`
-        );
-        return updated;
-      });
-    },
-    []
-  );
-
   const hasCountry = useMemo(() => Boolean(countryCode), [countryCode]);
 
   return useMemo(
@@ -224,8 +188,6 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
       serpApiCountryCode,
       availableStores,
       availableCities,
-      confirmedStores,
-      addConfirmedStores,
       setCountry,
       setCity,
       setCurrency,
@@ -239,7 +201,6 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     [
       countryCode, country, city, currencyCode, currency, isLoaded, hasCountry,
       serpApiCountryCode, availableStores, availableCities,
-      confirmedStores, addConfirmedStores,
       setCountry, setCity, setCurrency, convert, format,
     ]
   );

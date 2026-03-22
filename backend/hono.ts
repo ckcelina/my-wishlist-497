@@ -912,58 +912,58 @@ app.post("/search/visual", async (c) => {
     console.log(`[SerpAPI] Visual search in ${country}${city ? `, city: ${city}` : ""}`);
 
     let imageUrl = "";
-    try {
-      const formData = new FormData();
-      const buffer = Buffer.from(imageBase64, "base64");
-      const ext = mimeType.includes("png") ? "png" : "jpg";
-      const blob = new Blob([buffer], { type: mimeType });
-      formData.append("file", blob, `upload.${ext}`);
+    const uploadHosts = [
+      {
+        name: "0x0.st",
+        upload: async (buf: Buffer, ext: string, mime: string) => {
+          const formData = new FormData();
+          const blob = new Blob([buf], { type: mime });
+          formData.append("file", blob, `upload.${ext}`);
+          const resp = await fetch("https://0x0.st", { method: "POST", body: formData });
+          if (!resp.ok) throw new Error(`${resp.status}`);
+          return (await resp.text()).trim();
+        },
+      },
+      {
+        name: "catbox.moe",
+        upload: async (buf: Buffer, ext: string, mime: string) => {
+          const formData = new FormData();
+          formData.append("reqtype", "fileupload");
+          const blob = new Blob([buf], { type: mime });
+          formData.append("fileToUpload", blob, `upload.${ext}`);
+          const resp = await fetch("https://catbox.moe/user/api.php", { method: "POST", body: formData });
+          if (!resp.ok) throw new Error(`${resp.status}`);
+          return (await resp.text()).trim();
+        },
+      },
+    ];
 
-      console.log("[Upload] Uploading image to temp host...");
-      const uploadResp = await fetch("https://0x0.st", {
-        method: "POST",
-        body: formData,
-      });
+    const buffer = Buffer.from(imageBase64, "base64");
+    const ext = mimeType.includes("png") ? "png" : "jpg";
 
-      if (uploadResp.ok) {
-        imageUrl = (await uploadResp.text()).trim();
-        console.log(`[Upload] Image hosted at: ${imageUrl}`);
-      } else {
-        console.log(`[Upload] Upload failed: ${uploadResp.status}`);
-      }
-    } catch (uploadErr) {
-      console.log("[Upload] Temp upload failed:", uploadErr);
-    }
-
-    if (!imageUrl) {
+    for (const host of uploadHosts) {
       try {
-        const formData = new FormData();
-        formData.append("reqtype", "fileupload");
-        const buffer = Buffer.from(imageBase64, "base64");
-        const ext = mimeType.includes("png") ? "png" : "jpg";
-        const blob = new Blob([buffer], { type: mimeType });
-        formData.append("fileToUpload", blob, `upload.${ext}`);
-
-        const uploadResp = await fetch("https://catbox.moe/user/api.php", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (uploadResp.ok) {
-          imageUrl = (await uploadResp.text()).trim();
-          console.log(`[Upload] Catbox hosted at: ${imageUrl}`);
+        console.log(`[Upload] Trying ${host.name}...`);
+        imageUrl = await host.upload(buffer, ext, mimeType);
+        if (imageUrl && imageUrl.startsWith("http")) {
+          console.log(`[Upload] Success via ${host.name}: ${imageUrl}`);
+          break;
         }
-      } catch (catboxErr) {
-        console.log("[Upload] Catbox fallback failed:", catboxErr);
+        imageUrl = "";
+      } catch (err) {
+        console.log(`[Upload] ${host.name} failed:`, err);
       }
     }
 
     if (!imageUrl) {
+      console.log("[Upload] All hosts failed, returning error with suggestion");
       return c.json({
         visualMatches: [],
         shoppingResults: [],
-        error: "Could not upload image for visual search. Try text search instead.",
-      }, 500);
+        searchQuery: "",
+        imageUrl: "",
+        error: "Image upload failed. The product will be identified using AI instead.",
+      }, 200);
     }
 
     const lensParams = new URLSearchParams({

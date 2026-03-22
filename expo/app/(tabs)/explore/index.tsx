@@ -39,7 +39,6 @@ import { useLocation } from "@/providers/LocationProvider";
 import { useSearchHistory } from "@/providers/SearchHistoryProvider";
 import { usePriceAlerts } from "@/providers/PriceAlertProvider";
 import { searchProducts, fetchDeals, SerpApiResult } from "@/lib/api";
-import { extractUniqueStores } from "@/lib/storeUtils";
 import SearchFilters, { FilterState, SortOption } from "@/components/SearchFilters";
 import { Product } from "@/types";
 
@@ -114,7 +113,7 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { allProducts, recentlyViewed } = useWishlistContext();
-  const { country, serpApiCountryCode, availableStores, confirmedStores, addConfirmedStores, isLoaded, format, getCurrencySymbol, currencyCode } = useLocation();
+  const { country, serpApiCountryCode, format, getCurrencySymbol, currencyCode } = useLocation();
   const { getRecentSearches, getSuggestions, addSearch, removeSearch, clearHistory } = useSearchHistory();
   const { activeAlertCount } = usePriceAlerts();
 
@@ -129,8 +128,6 @@ export default function ExploreScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [convertAmount, setConvertAmount] = useState("");
-  const [isVerifyingStores, setIsVerifyingStores] = useState(false);
-  const autoVerifiedRef = useRef<Set<string>>(new Set());
 
   const searchInputRef = useRef<TextInput>(null);
   const prevCountryRef = useRef<string>(serpApiCountryCode);
@@ -157,7 +154,7 @@ export default function ExploreScreen() {
   const searchMutation = useMutation({
     mutationFn: async ({ query, appliedFilters }: { query: string; appliedFilters?: FilterState }) => {
       const f = appliedFilters ?? filters;
-      console.log(`[Explore] Searching SerpAPI for: "${query}" in ${serpApiCountryCode}`, f);
+      console.log(`[Explore] Searching Google Shopping for: "${query}" in ${serpApiCountryCode}`, f);
       setSearchError(null);
       const { results, error } = await searchProducts(query, serpApiCountryCode, {
         minPrice: f.minPrice,
@@ -177,12 +174,12 @@ export default function ExploreScreen() {
       setShowSearchHistory(false);
       if (results.length > 0) {
         void addSearch(query, serpApiCountryCode, results.length);
-        addConfirmedStores(extractUniqueStores(results), serpApiCountryCode);
       }
       console.log(`[Explore] Got ${results.length} results. Error: ${error ?? "none"}`);
     },
-    onError: () => {
-      setSearchError("Search failed. Please check your connection.");
+    onError: (err) => {
+      console.log("[Explore] Search mutation error:", err);
+      setSearchError("Search failed. Please check your connection and try again.");
       setHasSearched(true);
       setShowSearchHistory(false);
     },
@@ -195,32 +192,10 @@ export default function ExploreScreen() {
     },
     onSuccess: (data) => {
       setDealResults(data.results);
-      if (data.results.length > 0) {
-        addConfirmedStores(extractUniqueStores(data.results), serpApiCountryCode);
-      }
       console.log(`[Explore] Got ${data.results.length} deal results`);
     },
-  });
-
-  const autoVerifyMutation = useMutation({
-    mutationFn: async () => {
-      console.log(`[Explore] Auto-loading deals for ${serpApiCountryCode}`);
-      setIsVerifyingStores(true);
-      return fetchDeals(serpApiCountryCode, "deals");
-    },
-    onSuccess: (data) => {
-      if (data.results.length > 0) {
-        addConfirmedStores(extractUniqueStores(data.results), serpApiCountryCode);
-        if (dealResults.length === 0) {
-          setDealResults(data.results);
-          setSelectedDealCategory("deals");
-        }
-        console.log(`[Explore] Auto-loaded ${data.results.length} deals for ${serpApiCountryCode}`);
-      }
-      setIsVerifyingStores(false);
-    },
-    onError: () => {
-      setIsVerifyingStores(false);
+    onError: (err) => {
+      console.log("[Explore] Deals fetch error:", err);
     },
   });
 
@@ -273,26 +248,11 @@ export default function ExploreScreen() {
 
   const handleCategoryPress = useCallback(
     (categoryName: string) => {
-      const countryName = country?.name ?? "";
-      const storeNames = availableStores.slice(0, 2).join(" OR ");
-      const storeQuery = storeNames
-        ? `${categoryName} ${storeNames} ${countryName}`
-        : `${categoryName} delivery ${countryName}`;
-      setSearchQuery(storeQuery);
-      searchMutation.mutate({ query: storeQuery });
-    },
-    [searchMutation, country, availableStores]
-  );
-
-  const handleStorePress = useCallback(
-    (storeName: string) => {
-      const countryName = country?.name ?? "";
-      const q = `${storeName} ${countryName} delivery`;
-      setSearchQuery(q);
+      setSearchQuery(categoryName);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      searchMutation.mutate({ query: q });
+      searchMutation.mutate({ query: categoryName });
     },
-    [searchMutation, country]
+    [searchMutation]
   );
 
   const handleDealCategoryPress = useCallback(
@@ -363,11 +323,6 @@ export default function ExploreScreen() {
     return results;
   }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter]);
 
-  const filteredDealResults = useMemo(
-    () => dealResults,
-    [dealResults]
-  );
-
   const [convertFromCurrency, setConvertFromCurrency] = useState<string>("USD");
 
   const convertedAmount = useMemo(() => {
@@ -375,23 +330,6 @@ export default function ExploreScreen() {
     if (!convertAmount || isNaN(num) || num <= 0) return null;
     return format(num, convertFromCurrency);
   }, [convertAmount, format, convertFromCurrency]);
-
-  const verifiedTrustedStores = useMemo(() => {
-    if (confirmedStores.length === 0) return availableStores;
-    const normalizedConfirmed = new Set(confirmedStores.map((s) => s.toLowerCase().trim()));
-    return availableStores.filter((s) =>
-      normalizedConfirmed.has(s.toLowerCase().trim()) ||
-      confirmedStores.some((cs) => cs.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(cs.toLowerCase()))
-    );
-  }, [availableStores, confirmedStores]);
-
-  useEffect(() => {
-    if (!isLoaded) return;
-    if (autoVerifiedRef.current.has(serpApiCountryCode)) return;
-    autoVerifiedRef.current.add(serpApiCountryCode);
-    autoVerifyMutation.mutate();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serpApiCountryCode, isLoaded]);
 
   const isSearchActive = searchQuery.length > 0 || hasSearched;
 
@@ -811,53 +749,6 @@ export default function ExploreScreen() {
             </View>
           </View>
 
-          {availableStores.length > 0 && (
-            <View style={styles.sectionContainer}>
-              <View style={styles.sectionRow}>
-                <Store size={16} color={colors.primary} />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                  Verified Stores in {country?.name ?? "your area"}
-                </Text>
-                {isVerifyingStores && (
-                  <View style={[styles.verifyingBadge, { backgroundColor: colors.primaryFaded }]}>
-                    <Text style={[styles.verifyingText, { color: colors.primary }]}>Checking…</Text>
-                  </View>
-                )}
-                {!isVerifyingStores && confirmedStores.length > 0 && (
-                  <View style={[styles.verifyingBadge, { backgroundColor: colors.success + "15" }]}>
-                    <Text style={[styles.verifyingText, { color: colors.success }]}>
-                      {verifiedTrustedStores.length} verified
-                    </Text>
-                  </View>
-                )}
-              </View>
-              {verifiedTrustedStores.length === 0 && isVerifyingStores && (
-                <Text style={[styles.verifyingSubtext, { color: colors.textTertiary }]}>
-                  Confirming which stores ship to {country?.name}...
-                </Text>
-              )}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.storesRow}
-              >
-                {verifiedTrustedStores.map((store, idx) => (
-                  <Pressable
-                    key={`store-${idx}`}
-                    onPress={() => handleStorePress(store)}
-                    style={[styles.storeChip, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
-                  >
-                    <View style={[styles.storeChipIcon, { backgroundColor: colors.primaryFaded }]}>
-                      <Store size={14} color={colors.primary} />
-                    </View>
-                    <Text style={[styles.storeChipText, { color: colors.text }]}>{store}</Text>
-                    <ArrowRight size={12} color={colors.textTertiary} />
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
           <View style={styles.sectionContainer}>
             <View style={styles.sectionRow}>
               <Zap size={16} color={colors.error} />
@@ -902,9 +793,9 @@ export default function ExploreScreen() {
               </View>
             )}
 
-            {filteredDealResults.length > 0 && !dealsMutation.isPending && (
+            {dealResults.length > 0 && !dealsMutation.isPending && (
               <View style={styles.dealsGrid}>
-                {filteredDealResults.slice(0, 6).map((deal, idx) => {
+                {dealResults.slice(0, 6).map((deal, idx) => {
                   const displayPrice = format(deal.price, deal.currency);
                   return (
                     <Pressable
