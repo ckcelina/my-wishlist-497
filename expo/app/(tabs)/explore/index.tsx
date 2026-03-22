@@ -40,6 +40,7 @@ import { useLocation } from "@/providers/LocationProvider";
 import { useSearchHistory } from "@/providers/SearchHistoryProvider";
 import { usePriceAlerts } from "@/providers/PriceAlertProvider";
 import { searchProducts, fetchDeals, SerpApiResult } from "@/lib/api";
+import { storeMatchesAvailable, extractUniqueStores } from "@/lib/storeUtils";
 import SearchFilters, { FilterState, SortOption } from "@/components/SearchFilters";
 import { Product } from "@/types";
 
@@ -114,7 +115,7 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { allProducts, trendingProducts, recentlyViewed } = useWishlistContext();
-  const { country, serpApiCountryCode, availableStores, format, getCurrencySymbol, currencyCode } = useLocation();
+  const { country, serpApiCountryCode, availableStores, confirmedStores, addConfirmedStores, isLoaded, format, getCurrencySymbol, currencyCode } = useLocation();
   const { getRecentSearches, getSuggestions, addSearch, removeSearch, clearHistory } = useSearchHistory();
   const { activeAlertCount } = usePriceAlerts();
 
@@ -129,6 +130,8 @@ export default function ExploreScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [convertAmount, setConvertAmount] = useState("");
+  const [isVerifyingStores, setIsVerifyingStores] = useState(false);
+  const autoVerifiedRef = useRef<Set<string>>(new Set());
 
   const searchInputRef = useRef<TextInput>(null);
   const prevCountryRef = useRef<string>(serpApiCountryCode);
@@ -175,6 +178,7 @@ export default function ExploreScreen() {
       setShowSearchHistory(false);
       if (results.length > 0) {
         void addSearch(query, serpApiCountryCode, results.length);
+        addConfirmedStores(extractUniqueStores(results), serpApiCountryCode);
       }
       console.log(`[Explore] Got ${results.length} results. Error: ${error ?? "none"}`);
     },
@@ -192,7 +196,28 @@ export default function ExploreScreen() {
     },
     onSuccess: (data) => {
       setDealResults(data.results);
+      if (data.results.length > 0) {
+        addConfirmedStores(extractUniqueStores(data.results), serpApiCountryCode);
+      }
       console.log(`[Explore] Got ${data.results.length} deal results`);
+    },
+  });
+
+  const autoVerifyMutation = useMutation({
+    mutationFn: async () => {
+      console.log(`[Explore] Auto-verifying stores for ${serpApiCountryCode}`);
+      setIsVerifyingStores(true);
+      return fetchDeals(serpApiCountryCode, "deals");
+    },
+    onSuccess: (data) => {
+      if (data.results.length > 0) {
+        addConfirmedStores(extractUniqueStores(data.results), serpApiCountryCode);
+        console.log(`[Explore] Auto-verified ${data.results.length} result stores for ${serpApiCountryCode}`);
+      }
+      setIsVerifyingStores(false);
+    },
+    onError: () => {
+      setIsVerifyingStores(false);
     },
   });
 
@@ -324,11 +349,7 @@ export default function ExploreScreen() {
   const matchesAvailableStores = useCallback(
     (storeName: string): boolean => {
       if (availableStores.length === 0) return true;
-      const lower = storeName.toLowerCase();
-      return availableStores.some((s) => {
-        const sLower = s.toLowerCase();
-        return lower.includes(sLower) || sLower.includes(lower);
-      });
+      return availableStores.some((s) => storeMatchesAvailable(storeName, s));
     },
     [availableStores]
   );
@@ -358,6 +379,25 @@ export default function ExploreScreen() {
     if (!convertAmount || isNaN(num) || num <= 0) return null;
     return format(num, currencyCode);
   }, [convertAmount, format, currencyCode]);
+
+  const verifiedTrustedStores = useMemo(() => {
+    if (confirmedStores.length === 0) return availableStores;
+    return availableStores.filter((s) =>
+      confirmedStores.some((cs) => storeMatchesAvailable(cs, s))
+    );
+  }, [availableStores, confirmedStores]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (autoVerifiedRef.current.has(serpApiCountryCode)) return;
+    if (confirmedStores.length > 0) {
+      autoVerifiedRef.current.add(serpApiCountryCode);
+      return;
+    }
+    autoVerifiedRef.current.add(serpApiCountryCode);
+    autoVerifyMutation.mutate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serpApiCountryCode, isLoaded]);
 
   const isSearchActive = searchQuery.length > 0 || hasSearched;
 
@@ -772,15 +812,32 @@ export default function ExploreScreen() {
               <View style={styles.sectionRow}>
                 <Store size={16} color={colors.primary} />
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                  Trusted Stores in {country?.name ?? "your area"}
+                  Verified Stores in {country?.name ?? "your area"}
                 </Text>
+                {isVerifyingStores && (
+                  <View style={[styles.verifyingBadge, { backgroundColor: colors.primaryFaded }]}>
+                    <Text style={[styles.verifyingText, { color: colors.primary }]}>Checking…</Text>
+                  </View>
+                )}
+                {!isVerifyingStores && confirmedStores.length > 0 && (
+                  <View style={[styles.verifyingBadge, { backgroundColor: colors.success + "15" }]}>
+                    <Text style={[styles.verifyingText, { color: colors.success }]}>
+                      {verifiedTrustedStores.length} verified
+                    </Text>
+                  </View>
+                )}
               </View>
+              {verifiedTrustedStores.length === 0 && isVerifyingStores && (
+                <Text style={[styles.verifyingSubtext, { color: colors.textTertiary }]}>
+                  Confirming which stores ship to {country?.name}...
+                </Text>
+              )}
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.storesRow}
               >
-                {availableStores.map((store, idx) => (
+                {verifiedTrustedStores.map((store, idx) => (
                   <Pressable
                     key={`store-${idx}`}
                     onPress={() => handleStorePress(store)}
@@ -1140,6 +1197,21 @@ const styles = StyleSheet.create({
   storeChipText: {
     fontSize: 13,
     fontWeight: "600" as const,
+  },
+  verifyingBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginLeft: 6,
+  },
+  verifyingText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+  },
+  verifyingSubtext: {
+    fontSize: 12,
+    paddingHorizontal: 20,
+    marginBottom: 10,
   },
   dealCategoryRow: {
     paddingHorizontal: 20,
