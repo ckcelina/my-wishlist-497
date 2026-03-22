@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -11,19 +11,24 @@ import {
   ActivityIndicator,
   Animated,
   Alert,
+  Modal,
+  FlatList,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Eye, EyeOff, Mail, Lock, UserRound } from "lucide-react-native";
+import { Eye, EyeOff, Mail, Lock, UserRound, Globe, Search, X, Check, ChevronRight } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useAuth } from "@/providers/AuthProvider";
+import { useLocation } from "@/providers/LocationProvider";
+import { CountryData } from "@/constants/countries";
 
 export default function SignUpScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signUp, isSigningUp } = useAuth();
+  const { allCountries, setCountry } = useLocation();
 
   const [fullName, setFullName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
@@ -31,17 +36,31 @@ export default function SignUpScreen() {
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirm, setShowConfirm] = useState<boolean>(false);
+  const [selectedCountry, setSelectedCountry] = useState<CountryData | null>(null);
+  const [showCountryPicker, setShowCountryPicker] = useState<boolean>(false);
+  const [countrySearch, setCountrySearch] = useState<string>("");
   const [errors, setErrors] = useState<{
     fullName?: string;
     email?: string;
     password?: string;
     confirmPassword?: string;
+    country?: string;
   }>({});
 
   const buttonScale = useRef(new Animated.Value(1)).current;
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
+
+  const filteredCountries = useMemo(() => {
+    if (!countrySearch.trim()) return allCountries;
+    const q = countrySearch.toLowerCase();
+    return allCountries.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.code.toLowerCase().includes(q)
+    );
+  }, [countrySearch, allCountries]);
 
   const validate = (): boolean => {
     const newErrors: typeof errors = {};
@@ -65,6 +84,9 @@ export default function SignUpScreen() {
     } else if (password !== confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match";
     }
+    if (!selectedCountry) {
+      newErrors.country = "Please select your country";
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -85,8 +107,13 @@ export default function SignUpScreen() {
       });
       console.log("[SignUp] Sign up successful, session:", result.session ? "exists" : "none");
 
+      if (selectedCountry) {
+        console.log("[SignUp] Saving country:", selectedCountry.name);
+        await setCountry(selectedCountry.code);
+      }
+
       if (result.session) {
-        console.log("[SignUp] Auto-signed in, AuthGate will redirect to home");
+        console.log("[SignUp] Auto-signed in, AuthGate will redirect");
       } else {
         Alert.alert(
           "Check Your Email",
@@ -100,6 +127,38 @@ export default function SignUpScreen() {
       Alert.alert("Sign Up Failed", message);
     }
   };
+
+  const handleSelectCountry = useCallback((c: CountryData) => {
+    setSelectedCountry(c);
+    setShowCountryPicker(false);
+    setCountrySearch("");
+    if (errors.country) setErrors((p) => ({ ...p, country: undefined }));
+  }, [errors.country]);
+
+  const renderCountryItem = useCallback(({ item }: { item: CountryData }) => {
+    const isSelected = selectedCountry?.code === item.code;
+    return (
+      <Pressable
+        onPress={() => handleSelectCountry(item)}
+        style={[
+          styles.countryItem,
+          { borderBottomColor: colors.borderLight },
+          isSelected && { backgroundColor: colors.primaryFaded },
+        ]}
+      >
+        <View style={styles.countryItemLeft}>
+          <Text style={styles.countryFlag}>{item.flag}</Text>
+          <View style={styles.countryItemInfo}>
+            <Text style={[styles.countryName, { color: colors.text }]}>{item.name}</Text>
+            <Text style={[styles.countryCurrency, { color: colors.textTertiary }]}>
+              {item.currency}
+            </Text>
+          </View>
+        </View>
+        {isSelected && <Check size={18} color={colors.primary} />}
+      </Pressable>
+    );
+  }, [selectedCountry, colors, handleSelectCountry]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -282,6 +341,47 @@ export default function SignUpScreen() {
               )}
             </View>
 
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
+                Your Country
+              </Text>
+              <Pressable
+                testID="signup-country-picker"
+                onPress={() => {
+                  setCountrySearch("");
+                  setShowCountryPicker(true);
+                }}
+                style={[
+                  styles.countryPickerBtn,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: errors.country ? colors.error : colors.border,
+                  },
+                ]}
+              >
+                <Globe size={18} color={colors.textTertiary} />
+                {selectedCountry ? (
+                  <View style={styles.selectedCountryRow}>
+                    <Text style={styles.selectedFlag}>{selectedCountry.flag}</Text>
+                    <Text style={[styles.selectedCountryName, { color: colors.text }]}>
+                      {selectedCountry.name}
+                    </Text>
+                    <Text style={[styles.selectedCurrencyCode, { color: colors.textTertiary }]}>
+                      {selectedCountry.currency}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.countryPlaceholder, { color: colors.textTertiary }]}>
+                    Select your country
+                  </Text>
+                )}
+                <ChevronRight size={16} color={colors.textTertiary} />
+              </Pressable>
+              {errors.country && (
+                <Text style={[styles.errorText, { color: colors.error }]}>{errors.country}</Text>
+              )}
+            </View>
+
             <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
               <Pressable
                 testID="signup-button"
@@ -323,6 +423,45 @@ export default function SignUpScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal visible={showCountryPicker} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Country</Text>
+              <Pressable onPress={() => setShowCountryPicker(false)} hitSlop={8}>
+                <X size={22} color={colors.text} />
+              </Pressable>
+            </View>
+            <View style={[styles.searchBar, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+              <Search size={16} color={colors.textTertiary} />
+              <TextInput
+                placeholder="Search countries..."
+                placeholderTextColor={colors.textTertiary}
+                style={[styles.searchInput, { color: colors.text }]}
+                value={countrySearch}
+                onChangeText={setCountrySearch}
+                autoFocus
+              />
+              {countrySearch.length > 0 && (
+                <Pressable onPress={() => setCountrySearch("")} hitSlop={8}>
+                  <X size={16} color={colors.textTertiary} />
+                </Pressable>
+              )}
+            </View>
+            <FlatList
+              data={filteredCountries}
+              keyExtractor={(item) => item.code}
+              renderItem={renderCountryItem}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              initialNumToRender={20}
+              maxToRenderPerBatch={30}
+              style={styles.modalList}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -391,6 +530,36 @@ const styles = StyleSheet.create({
     fontSize: 15,
     height: "100%" as const,
   },
+  countryPickerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 52,
+    gap: 10,
+  },
+  selectedCountryRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  selectedFlag: {
+    fontSize: 20,
+  },
+  selectedCountryName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "500" as const,
+  },
+  selectedCurrencyCode: {
+    fontSize: 13,
+  },
+  countryPlaceholder: {
+    flex: 1,
+    fontSize: 15,
+  },
   errorText: {
     fontSize: 12,
     marginLeft: 4,
@@ -435,5 +604,77 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 14,
     fontWeight: "700" as const,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "80%",
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700" as const,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+  },
+  modalList: {
+    paddingHorizontal: 12,
+  },
+  countryItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderRadius: 10,
+    marginBottom: 2,
+  },
+  countryItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  countryFlag: {
+    fontSize: 26,
+  },
+  countryItemInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  countryName: {
+    fontSize: 16,
+    fontWeight: "500" as const,
+  },
+  countryCurrency: {
+    fontSize: 12,
   },
 });

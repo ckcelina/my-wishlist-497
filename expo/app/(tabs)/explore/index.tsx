@@ -357,9 +357,17 @@ export default function ExploreScreen() {
       const sq = filters.storeFilter.toLowerCase();
       results = results.filter((r) => r.store.toLowerCase().includes(sq));
     }
+    if (availableStores.length > 0) {
+      const countryFiltered = results.filter((r) =>
+        availableStores.some((s) => storeMatchesAvailable(r.store, s))
+      );
+      if (countryFiltered.length > 0) {
+        results = countryFiltered;
+      }
+    }
     console.log(`[Explore] filteredSerpResults: ${results.length} of ${serpResults.length} total`);
     return results;
-  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter]);
+  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter, availableStores]);
 
   const filteredDealResults = useMemo(
     () => dealResults,
@@ -369,8 +377,8 @@ export default function ExploreScreen() {
   const convertedAmount = useMemo(() => {
     const num = parseFloat(convertAmount);
     if (!convertAmount || isNaN(num) || num <= 0) return null;
-    return format(num, currencyCode);
-  }, [convertAmount, format, currencyCode]);
+    return format(num, "USD");
+  }, [convertAmount, format]);
 
   const verifiedTrustedStores = useMemo(() => {
     if (confirmedStores.length === 0) return availableStores;

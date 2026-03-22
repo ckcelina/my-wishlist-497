@@ -1,70 +1,92 @@
-# Massively Expand Trusted Retailer Lists for Every Country
+# Full App Audit & Fix Plan
 
-## Status: COMPLETE ✅
 
----
-
-## What Was Done
-
-### Key Countries — Major Upgrades Complete
-
-**Jordan** — 225+ stores now included (fully comprehensive)
-- Food/Grocery: Talabat, Careem, Huna, Toters JO, Wolt JO, InstaShop JO, TSC JO, Safeway JO, Cozmo, Spinneys JO, Le Marche JO, Carrefour JO, SPAR JO, Mega Mart JO, Lulu Hypermarket JO
-- E-commerce: Amazon, Noon, AliExpress, Temu, Shein, Ubuy JO, Cart JO, Wadi, MarkaVIP, eBay, Souq JO, iMall JO, Opensooq
-- Electronics: Geedo, Electra JO, Hyper Planet JO, Giga Store JO, iStyle JO, Xcite JO, Jarir JO, Sharaf DG JO, BestBuy.jo, Samsung JO, Apple JO, Huawei JO, Xiaomi JO, HP Store JO, Dell JO, Lenovo JO, Asus JO, Anker JO, Logitech JO, Sony JO, LG JO, Bose JO, JBL JO, DJI JO, Canon JO, Nikon JO, Microsoft Store JO, GoPro JO
-- Telecom: Zain eShop, Orange Shop JO, Umniah Shop JO
-- Fashion: Zara JO, H&M JO, Mango JO, LC Waikiki JO, Defacto JO, Centrepoint JO, Max Fashion JO, Marks & Spencer JO, Next JO, Bershka JO, Pull&Bear JO, Stradivarius JO, Oysho JO, Massimo Dutti JO, Splash JO, Babyshop JO, Mothercare JO, Namshi, Ounass JO, Sivvi JO, 6th Street JO, Styli JO, Farfetch JO, ASOS JO, Modanisa, Jollychic JO, Tommy Hilfiger JO, Calvin Klein JO, Lacoste JO, Hugo Boss JO, Michael Kors JO, Coach JO, Ralph Lauren JO, Guess JO, Armani Exchange JO, Diesel JO, Superdry JO, Levi's JO, Jack & Jones JO, Only JO, Vero Moda JO, Pepe Jeans JO, G-Star Raw JO, Romwe JO, Zaful JO
-- Beauty: Sephora JO, Bath & Body Works JO, Victoria's Secret JO, iHerb, Faces JO, The Body Shop JO, Lush JO, LookFantastic JO, Watsons JO, MAC Cosmetics JO, Kiehl's JO, L'Occitane JO, Cult Beauty JO, BeautyBay JO, Flormar JO, NYX JO, Maybelline JO, Dyson JO, Fragrance Net JO
-- Sports: Nike JO, Adidas JO, Puma JO, Reebok JO, Under Armour JO, Decathlon JO, New Balance JO, Sun & Sand Sports JO, Al Dawliah JO, Intersport JO, Go Sport JO, Columbia JO, The North Face JO, Asics JO, Gymshark JO, Myprotein JO, Garmin JO
-- Shoes: Vans JO, Converse JO, Timberland JO, Skechers JO, Clarks JO, Steve Madden JO, Aldo JO, Charles & Keith JO, Bata JO, Shoe Mart JO, Shoe Palace JO, Pedro JO, Nine West JO, Crocs JO, Birkenstock JO, Dune London JO, Kurt Geiger JO
-- Jewelry/Watches: Pandora JO, Swarovski JO, Damas JO, Malabar Gold JO, Joyalukkas JO, Tiffany & Co JO, Cartier JO, Fossil JO, Casio JO, Daniel Wellington JO, Chrono24 JO
-- Home: IKEA JO, Home Centre JO, Pan Emirates JO, Pottery Barn JO, Crate & Barrel JO, West Elm JO, Zara Home JO, H&M Home JO, Homes R Us JO, Pottery Barn Kids JO, Tupperware JO, Tefal JO, De'Longhi JO, Nespresso JO, KitchenAid JO, Philips JO, Bosch Appliances JO
-- Toys: Toys R Us JO, LEGO JO, Hamleys JO, Mattel JO, Smyths JO, Gibca JO, Hasbro JO
-- Books/Entertainment: Virgin Megastore JO, Jazeera Books JO, Readers JO, iKitab JO
-- Pharmacy/Health: Pharmacy1 JO, Wellness JO, Care Plus JO, Meddy JO, Al-Dawaa JO
-- Luxury: Net-A-Porter JO, Mr Porter JO, Mytheresa JO, The Outnet JO, Harvey Nichols JO, Harrods JO, MatchesFashion JO, Ssense JO
-- Flowers/Gifts: Floward JO, Bloomingbox JO, Gifted JO
-- Baby/Kids: Mumzworld, Mamas & Papas JO, Chicco JO
-- Luggage: Samsonite JO, American Tourister JO, Delsey JO
-- Pets: Petzone JO, Animalia JO
-- Malls Online: Abdali Mall Online, City Mall JO, Mecca Mall JO, Taj Mall JO
-
-**Saudi Arabia** — 80+ stores now included
-- Noon, Amazon SA, Jarir, Talabat, HungerStation, Namshi, Extra Stores, Sharaf DG SA, LuLu Hypermarket SA, Panda, Tamimi Markets, Nana Direct, Virgin Megastore SA, Xcite SA, Styli, Ounass, Temu, Trendyol SA, Salla, Samsung SA, Apple SA, Centrepoint SA, iHerb, Al-Dawaa Pharmacy, Nahdi Online, Othaim Markets, Max Fashion SA, Mumzworld, Whites, Floward, Faces SA, Bath & Body Works SA, IKEA SA, Home Centre SA, Pottery Barn SA, Crate & Barrel SA, Sephora SA, ToYou, Mrsool, STC Shop, Zain Shop SA, Mobily Shop, Syarah SA, and more
-
-**Mexico** — 75+ stores now included
-- Amazon MX, MercadoLibre, Walmart MX, Liverpool, Palacio de Hierro, Coppel, Elektra, Soriana, Home Depot MX, Costco MX, Farmacias del Ahorro, Farmacias Guadalajara, Nike MX, Adidas MX, Zara MX, H&M MX, IKEA MX, Kavak, Privalia, Dafiti MX, Decathlon MX, Oxxo Online, Sephora MX, Pull&Bear MX, Bershka MX, and more
-
-### All Regions Completed
-
-- [x] **Middle East**: Jordan, Saudi Arabia, UAE, Qatar, Kuwait, Bahrain, Oman, Lebanon, Iraq, Egypt — all 30-80+ stores each
-- [x] **Latin America**: Mexico, Brazil, Argentina, Colombia, Chile, Peru, Ecuador, Central America, Caribbean
-- [x] **Africa**: Nigeria, Kenya, South Africa, Egypt, Morocco, Ghana, Tanzania, Ethiopia — Jumia, Kilimall, Takealot, Jiji, and local chains added
-- [x] **Southeast Asia**: Indonesia, Philippines, Vietnam, Thailand, Malaysia, Singapore — Shopee, Lazada, Grab, Tokopedia, Tiki, and local stores added
-- [x] **Central Asia**: Kazakhstan, Uzbekistan, Georgia, Azerbaijan — Kaspi, Uzum, Wildberries, local chains added
-- [x] **Europe**: All EU + non-EU countries reviewed — MediaMarkt, Zalando, Coolblue, local grocery & fashion added
-- [x] **Pacific Islands & small nations**: AliExpress, Temu, Shein + best regional platforms added
-- [x] **North America**: US (~100 stores), Canada (~50 stores) — fully comprehensive
-- [x] **South Asia**: India (~80 stores), Pakistan, Bangladesh, Sri Lanka, Nepal fully expanded
-- [x] **East Asia**: Japan (~70 stores), South Korea (~65 stores), China, Taiwan fully expanded
-
-### Final Pass — Top Markets
-
-- [x] United States: Added Kohl's, JCPenney, Gap, Old Navy, Victoria's Secret, StockX, GOAT, Poshmark, Mercari US, OfferUp, Facebook Marketplace, AutoZone, Hobby Lobby, Michaels, PetSmart, Crate & Barrel, Pottery Barn, West Elm, Revolve, SSENSE, Farfetch, Neiman Marcus, Saks Fifth Avenue, Bloomingdale's, Dick's Sporting Goods, Foot Locker, DSW, and more
-- [x] United Kingdom: Added Richer Sounds, Wickes, Dunelm, B&M, Boohoo, PrettyLittleThing, River Island, JD Sports UK, Foot Locker UK, Selfridges, Harrods, Harvey Nichols, Gymshark, Lookfantastic, Pets at Home, and more
-- [x] Germany: Added Conrad, Euronics DE, Westwing, Home24, OBI DE, Hornbach, Edeka Online, Bauhaus DE, Mytheresa, Flaschenpost, Picnic DE, and more
-- [x] France: Added Rakuten FR, Showroomprivé, Maje, Sandro, Yves Rocher, L'Occitane FR, Noticé, Conforama, Maisons du Monde, and more
-- [x] Spain: Added Mango ES, Massimo Dutti, Pull&Bear, Bershka, Stradivarius, Oysho, Camper ES, Pikolinos, Vinted ES, Hipercor, and more
-- [x] Italy: Added Subito.it, Luisaviaroma, Prada Online, Gucci Online, Armani Online, Calzedonia, Intimissimi, Bata IT, Geox, and more
-- [x] Japan: Added Softbank Shop, NTT Docomo, Qoo10 JP, ABC-Mart, Mitsukoshi Online, Takashimaya Online, Animate, Mandarake, Book-Off Online, and more
-- [x] South Korea: Added Kakao Gift, Ably, ZigZag, 29CM, Brandi, Laneige, Innisfree, Etude House, Decathlon KR, Kolon Sport, and more
-- [x] India: Added Boat, Noise, Fire-Boltt, Realme IN, Xiaomi IN, Bluestone, Caratlane, Tanishq Online, Apollo Pharmacy, MedPlus, NetMeds, HealthKart, Petsworld, and more
-- [x] Australia: Added Gumtree AU, Cotton On, General Pants, Amart Furniture, PETstock, Total Tools, Sydney Tools, Umart, PC Case Gear, Carsales, and more
+## Issues Found — Organized by Priority
 
 ---
 
-## Scope
+### 🔴 Critical Issues (Broken Core Flows)
 
-- Only the stores list in the country data file was modified
-- No changes to app functionality, design, or other features
-- All major markets: 50-100 stores | Smaller nations: 10-25 stores | Micro-states: 5-10 stores
+**1. No country/currency collected during signup**
+- The signup screen only asks for name, email, and password — country is never asked
+- The onboarding screen shows app features but never asks what country the user is in
+- After signup, the profile has no country stored, so the entire app defaults to US/USD
+
+**2. Default country is always hardcoded to USA**
+- Location system starts as "US / USD" with no way to know it's just a default
+- The wishlist system also independently defaults to "United States / USD" as fallback
+- Two separate systems hold country/currency data that can conflict with each other
+
+**3. Country from profile never syncs on app start**
+- Even if a user previously saved their country, the app starts as "US" every session
+- The sync logic only kicks in if there's no stored value at all — but the default "US" acts as if a value was already stored, blocking the sync
+
+**4. Stores not properly filtered by country**
+- Stores that don't ship to the selected country still appear in the Trusted Stores list and search results
+- Before the app has verified stores (first load), it falls back to showing ALL configured stores for that country regardless of whether they're confirmed as active
+- Home page trending section also shows unconfirmed stores as a fallback
+
+---
+
+### 🟠 High Priority Issues (Incorrect Behaviour)
+
+**5. Currency converter always shows USD as source**
+- The converter on the Explore page hardcodes "USD" as the "from" currency
+- It should use the user's actual selected currency as the base
+
+**6. Home page trending uses hardcoded "USD" currency fallback**
+- When a product's currency is missing, the home screen defaults to "USD" instead of the user's selected currency
+- The Explore page correctly uses the user's currency as fallback — these should be consistent
+
+**7. Search results not filtered to country-available stores**
+- Searching for products returns results from stores worldwide, including stores that don't ship to the selected country
+- Only the "Trusted Stores" chip list filters, but actual search result cards don't get filtered
+
+**8. Price display inconsistency**
+- Products added to wishlists store their original currency but aren't always converted to the user's selected currency on display
+- Switching countries mid-session doesn't refresh cached prices
+
+---
+
+### 🟡 Medium Priority Issues (Missing Features/Polish)
+
+**9. Onboarding doesn't ask for country**
+- After the 3 intro slides, the app jumps straight to the home screen
+- The country/city selection step is missing entirely from the first-run experience
+
+**10. Profile country stored as full name (fragile matching)**
+- Country is saved to the database as a full name string (e.g. "Jordan") instead of a short code (e.g. "JO")
+- Any slight mismatch in spelling, casing, or spacing between database and app will silently break the country sync
+
+**11. Wishlist system holds its own copy of country/currency (duplicate state)**
+- Both the location system and the wishlist system store country/currency separately
+- When the user changes their country, one system may update while the other remains stale
+
+---
+
+### ✅ What's Working Well
+- Country picker, city picker, and currency picker in Profile all work correctly
+- Switching country in Profile does update stores, search, and currency symbol properly
+- Price history, price alerts, product search, and visual/barcode/link scanning all connect correctly to the backend
+- Auth flow (login, logout, session persistence) is solid
+- Theme switching and dark mode work
+
+---
+
+## Proposed Fixes
+
+**Signup flow** — Add a country selection step at the end of signup (before the user reaches the home screen), saving their choice immediately to both the database profile and local storage
+
+**Onboarding** — Replace or add a 4th onboarding slide with an interactive country/currency picker so first-time users set their location before seeing the home screen
+
+**Remove all "US/USD" defaults** — Change the starting state from "US/USD" to empty, forcing the app to wait for a real selection from the user
+
+**Unify country/currency state** — Remove the duplicate country/currency fallbacks in the wishlist system so there's only one source of truth (the location system)
+
+**Store filtering** — Apply country-available store filtering directly to search results, not just the trusted stores list; hide stores that haven't been confirmed for the selected country
+
+**Currency converter** — Use the user's actual selected currency as the source side of the converter
+
+**Currency fallback consistency** — Replace all hardcoded "USD" fallbacks with the user's selected currency code
+
+**Country stored as code** — Save the country code (e.g. "JO") to the database profile instead of the full name to make syncing reliable

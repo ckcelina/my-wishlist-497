@@ -31,7 +31,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, myLists, sharedLists, trendingProducts, refreshWishlists } = useWishlistContext();
-  const { country, city, currency, serpApiCountryCode, availableStores, confirmedStores, addConfirmedStores, format } = useLocation();
+  const { country, city, currency, serpApiCountryCode, currencyCode, availableStores, confirmedStores, addConfirmedStores, format } = useLocation();
   const { unreadDropCount, activeAlertCount, checkPricesNow, isCheckingPrices } = usePriceAlerts();
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<"updated" | "name" | "items">("updated");
@@ -83,7 +83,7 @@ export default function HomeScreen() {
       title: result.title,
       image: result.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
       price: result.price,
-      currency: result.currency || "USD",
+      currency: result.currency || currencyCode,
       store: result.store,
       storeUrl: result.link,
       description: result.snippet,
@@ -93,7 +93,7 @@ export default function HomeScreen() {
       country: serpApiCountryCode.toUpperCase(),
       rating: result.rating,
     }),
-    [serpApiCountryCode]
+    [serpApiCountryCode, currencyCode]
   );
 
   const fadeAnim = useRef(new Animated.Value(0)).current;

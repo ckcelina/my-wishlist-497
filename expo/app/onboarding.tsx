@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,18 +7,23 @@ import {
   Animated,
   Dimensions,
   Platform,
+  FlatList,
+  TextInput,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
-import { ArrowRight, X } from "lucide-react-native";
+import { ArrowRight, X, Search, Check, Globe } from "lucide-react-native";
+import { useLocation } from "@/providers/LocationProvider";
+import { CountryData } from "@/constants/countries";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export const ONBOARDING_KEY = "has_onboarded_v1";
 
-const SLIDES = [
+const INFO_SLIDES = [
   {
     id: 1,
     emoji: "🛍️",
@@ -48,19 +53,41 @@ const SLIDES = [
   },
 ];
 
+const TOTAL_STEPS = INFO_SLIDES.length + 1;
+
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { allCountries, setCountry } = useLocation();
 
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [selectedCountry, setSelectedCountry] = useState<CountryData | null>(null);
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [countrySearch, setCountrySearch] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
+  const filteredCountries = useMemo(() => {
+    if (!countrySearch.trim()) return allCountries;
+    const q = countrySearch.toLowerCase();
+    return allCountries.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
+    );
+  }, [countrySearch, allCountries]);
+
   const handleComplete = useCallback(async () => {
+    if (isSaving) return;
+    setIsSaving(true);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (selectedCountry) {
+      console.log("[Onboarding] Saving country:", selectedCountry.name);
+      await setCountry(selectedCountry.code);
+    }
     await AsyncStorage.setItem(ONBOARDING_KEY, "true");
     router.replace("/");
-  }, [router]);
+  }, [router, selectedCountry, setCountry, isSaving]);
 
   const animateTransition = useCallback(
     (toIndex: number) => {
@@ -91,33 +118,67 @@ export default function OnboardingScreen() {
           }),
         ]),
       ]).start();
-      setCurrentSlide(toIndex);
+      setCurrentStep(toIndex);
     },
     [fadeAnim, scaleAnim]
   );
 
   const handleNext = useCallback(() => {
-    if (currentSlide < SLIDES.length - 1) {
-      animateTransition(currentSlide + 1);
+    if (currentStep < INFO_SLIDES.length - 1) {
+      animateTransition(currentStep + 1);
+    } else if (currentStep === INFO_SLIDES.length - 1) {
+      animateTransition(INFO_SLIDES.length);
     } else {
       void handleComplete();
     }
-  }, [currentSlide, animateTransition, handleComplete]);
+  }, [currentStep, animateTransition, handleComplete]);
 
-  const slide = SLIDES[currentSlide];
-  const isLast = currentSlide === SLIDES.length - 1;
+  const isCountryStep = currentStep === INFO_SLIDES.length;
+  const slide = !isCountryStep ? INFO_SLIDES[currentStep] : null;
+  const bg = slide?.bg ?? "#0d0818";
+  const accent = slide?.accent ?? "#4c2090";
+
+  const renderCountryItem = useCallback(
+    ({ item }: { item: CountryData }) => {
+      const isSelected = selectedCountry?.code === item.code;
+      return (
+        <Pressable
+          onPress={() => {
+            setSelectedCountry(item);
+            setShowCountryPicker(false);
+            setCountrySearch("");
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }}
+          style={[
+            styles.countryItem,
+            isSelected && styles.countryItemSelected,
+          ]}
+        >
+          <Text style={styles.countryFlag}>{item.flag}</Text>
+          <View style={styles.countryItemInfo}>
+            <Text style={styles.countryItemName}>{item.name}</Text>
+            <Text style={styles.countryItemCurrency}>{item.currency}</Text>
+          </View>
+          {isSelected && <Check size={18} color="#FFFFFF" />}
+        </Pressable>
+      );
+    },
+    [selectedCountry]
+  );
 
   return (
-    <View style={[styles.container, { backgroundColor: slide.bg }]}>
-      <View style={[styles.accentBg, { backgroundColor: slide.accent }]} />
+    <View style={[styles.container, { backgroundColor: bg }]}>
+      <View style={[styles.accentBg, { backgroundColor: accent }]} />
 
-      <Pressable
-        onPress={() => void handleComplete()}
-        style={[styles.skipBtn, { paddingTop: insets.top + 16 }]}
-        testID="onboarding-skip"
-      >
-        <X size={20} color="rgba(255,255,255,0.6)" />
-      </Pressable>
+      {!isCountryStep && (
+        <Pressable
+          onPress={() => void handleComplete()}
+          style={[styles.skipBtn, { paddingTop: insets.top + 16 }]}
+          testID="onboarding-skip"
+        >
+          <X size={20} color="rgba(255,255,255,0.6)" />
+        </Pressable>
+      )}
 
       <Animated.View
         style={[
@@ -125,24 +186,82 @@ export default function OnboardingScreen() {
           { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
         ]}
       >
-        <View style={styles.emojiContainer}>
-          <Text style={styles.emoji}>{slide.emoji}</Text>
-        </View>
-        <Text style={styles.title}>{slide.title}</Text>
-        <Text style={styles.subtitle}>{slide.subtitle}</Text>
+        {isCountryStep ? (
+          <View style={styles.countryStepContent}>
+            <Text style={styles.countryStepEmoji}>🌍</Text>
+            <Text style={styles.countryStepTitle}>Where are you{"\n"}shopping from?</Text>
+            <Text style={styles.countryStepSubtitle}>
+              We'll show you stores, prices, and deals that ship to you.
+            </Text>
+
+            <Pressable
+              onPress={() => {
+                setCountrySearch("");
+                setShowCountryPicker(true);
+              }}
+              style={[
+                styles.countrySelector,
+                selectedCountry ? styles.countrySelectorSelected : styles.countrySelectorEmpty,
+              ]}
+            >
+              <Globe
+                size={20}
+                color={selectedCountry ? "#FFFFFF" : "rgba(255,255,255,0.5)"}
+              />
+              {selectedCountry ? (
+                <View style={styles.selectedRow}>
+                  <Text style={styles.selectedFlag}>{selectedCountry.flag}</Text>
+                  <Text style={styles.selectedName}>{selectedCountry.name}</Text>
+                  <Text style={styles.selectedCurrency}>{selectedCountry.currency}</Text>
+                </View>
+              ) : (
+                <Text style={styles.countrySelectorPlaceholder}>
+                  Tap to select your country
+                </Text>
+              )}
+              <ArrowRight
+                size={16}
+                color={selectedCountry ? "#FFFFFF" : "rgba(255,255,255,0.5)"}
+              />
+            </Pressable>
+
+            {!selectedCountry && (
+              <Text style={styles.skipHint}>
+                You can change this anytime in settings
+              </Text>
+            )}
+          </View>
+        ) : (
+          slide !== null && (
+            <>
+              <View style={styles.emojiContainer}>
+                <Text style={styles.emoji}>{slide.emoji}</Text>
+              </View>
+              <Text style={styles.title}>{slide.title}</Text>
+              <Text style={styles.subtitle}>{slide.subtitle}</Text>
+            </>
+          )
+        )}
       </Animated.View>
 
       <View style={[styles.bottom, { paddingBottom: insets.bottom + 28 }]}>
         <View style={styles.dots}>
-          {SLIDES.map((_, i) => (
-            <Pressable key={i} onPress={() => animateTransition(i)}>
-              <Animated.View
+          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+            <Pressable
+              key={i}
+              onPress={() => {
+                if (i < currentStep || (i === currentStep + 1)) {
+                  animateTransition(i);
+                }
+              }}
+            >
+              <View
                 style={[
                   styles.dot,
                   {
-                    width: i === currentSlide ? 28 : 8,
+                    width: i === currentStep ? 28 : 8,
                     backgroundColor:
-                      i === currentSlide
+                      i === currentStep
                         ? "#FFFFFF"
                         : "rgba(255,255,255,0.35)",
                   },
@@ -154,15 +273,67 @@ export default function OnboardingScreen() {
 
         <Pressable
           onPress={handleNext}
-          style={styles.ctaButton}
+          style={[
+            styles.ctaButton,
+            isCountryStep && !selectedCountry && styles.ctaButtonSecondary,
+          ]}
           testID="onboarding-next"
+          disabled={isSaving}
         >
-          <Text style={[styles.ctaText, { color: slide.bg }]}>
-            {isLast ? "Get Started" : "Continue"}
+          <Text style={[styles.ctaText, { color: bg }]}>
+            {isCountryStep
+              ? selectedCountry
+                ? "Start Shopping"
+                : "Skip for now"
+              : currentStep === INFO_SLIDES.length - 1
+              ? "Choose My Country"
+              : "Continue"}
           </Text>
-          <ArrowRight size={20} color={slide.bg} />
+          <ArrowRight size={20} color={bg} />
         </Pressable>
       </View>
+
+      <Modal visible={showCountryPicker} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Country</Text>
+              <Pressable
+                onPress={() => setShowCountryPicker(false)}
+                hitSlop={8}
+              >
+                <X size={22} color="#FFFFFF" />
+              </Pressable>
+            </View>
+            <View style={styles.searchBar}>
+              <Search size={16} color="rgba(255,255,255,0.5)" />
+              <TextInput
+                placeholder="Search countries..."
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                style={styles.searchInput}
+                value={countrySearch}
+                onChangeText={setCountrySearch}
+                autoFocus
+              />
+              {countrySearch.length > 0 && (
+                <Pressable onPress={() => setCountrySearch("")} hitSlop={8}>
+                  <X size={16} color="rgba(255,255,255,0.5)" />
+                </Pressable>
+              )}
+            </View>
+            <FlatList
+              data={filteredCountries}
+              keyExtractor={(item) => item.code}
+              renderItem={renderCountryItem}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              initialNumToRender={20}
+              maxToRenderPerBatch={30}
+              style={styles.modalList}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -225,6 +396,80 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     maxWidth: SCREEN_WIDTH - 80,
   },
+  countryStepContent: {
+    alignItems: "center",
+    width: "100%",
+    gap: 20,
+  },
+  countryStepEmoji: {
+    fontSize: 80,
+    marginBottom: 4,
+  },
+  countryStepTitle: {
+    fontSize: 38,
+    fontWeight: "800" as const,
+    color: "#FFFFFF",
+    textAlign: "center" as const,
+    lineHeight: 46,
+    letterSpacing: -0.5,
+  },
+  countryStepSubtitle: {
+    fontSize: 16,
+    color: "rgba(255,255,255,0.72)",
+    textAlign: "center" as const,
+    lineHeight: 24,
+    maxWidth: SCREEN_WIDTH - 80,
+  },
+  countrySelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderRadius: 18,
+    gap: 12,
+    marginTop: 8,
+  },
+  countrySelectorEmpty: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  countrySelectorSelected: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.45)",
+  },
+  selectedRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  selectedFlag: {
+    fontSize: 22,
+  },
+  selectedName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: "#FFFFFF",
+  },
+  selectedCurrency: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.7)",
+  },
+  countrySelectorPlaceholder: {
+    flex: 1,
+    fontSize: 16,
+    color: "rgba(255,255,255,0.5)",
+  },
+  skipHint: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.45)",
+    textAlign: "center" as const,
+    marginTop: 4,
+  },
   bottom: {
     paddingHorizontal: 24,
     gap: 24,
@@ -248,8 +493,88 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 10,
   },
+  ctaButtonSecondary: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
   ctaText: {
     fontSize: 18,
     fontWeight: "700" as const,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#1a0a2e",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: "80%",
+    paddingBottom: 40,
+    borderTopWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700" as const,
+    color: "#FFFFFF",
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+    color: "#FFFFFF",
+  },
+  modalList: {
+    paddingHorizontal: 12,
+  },
+  countryItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 2,
+    gap: 12,
+  },
+  countryItemSelected: {
+    backgroundColor: "rgba(128, 50, 238, 0.35)",
+  },
+  countryFlag: {
+    fontSize: 26,
+  },
+  countryItemInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  countryItemName: {
+    fontSize: 15,
+    fontWeight: "500" as const,
+    color: "#FFFFFF",
+  },
+  countryItemCurrency: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.5)",
   },
 });

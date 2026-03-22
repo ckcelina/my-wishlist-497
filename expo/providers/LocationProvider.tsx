@@ -26,9 +26,9 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
   const queryClient = useQueryClient();
   const { profile, updateProfile } = useAuth();
 
-  const [countryCode, setCountryCodeState] = useState<string>("US");
+  const [countryCode, setCountryCodeState] = useState<string>("");
   const [city, setCityState] = useState<string>("");
-  const [currencyCode, setCurrencyCodeState] = useState<string>("USD");
+  const [currencyCode, setCurrencyCodeState] = useState<string>("");
   const [isLoaded, setIsLoaded] = useState(false);
   const [confirmedByCountry, setConfirmedByCountry] = useState<Record<string, string[]>>({});
 
@@ -70,29 +70,31 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
   useEffect(() => {
     if (!isLoaded || !profile) return;
 
-    const profileCountry = getCountryByName(profile.country);
-    if (profileCountry) {
-      const storedCheck = async () => {
-        const storedCountry = await AsyncStorage.getItem(LOCATION_COUNTRY_KEY);
-        if (!storedCountry) {
-          setCountryCodeState(profileCountry.code);
-          setCurrencyCodeState(profileCountry.currency);
-          void AsyncStorage.setItem(LOCATION_COUNTRY_KEY, profileCountry.code);
-          void AsyncStorage.setItem(LOCATION_CURRENCY_KEY, profileCountry.currency);
-          console.log("[Location] Synced from profile:", profileCountry.name);
-        }
-      };
-      void storedCheck();
-    }
+    const profileCountry = getCountryByCode(profile.country) ?? getCountryByName(profile.country);
+    if (!profileCountry) return;
+
+    const syncFromProfile = async () => {
+      const storedCountry = await AsyncStorage.getItem(LOCATION_COUNTRY_KEY);
+
+      if (!storedCountry || storedCountry !== profileCountry.code) {
+        console.log("[Location] Syncing from profile:", profileCountry.name);
+        setCountryCodeState(profileCountry.code);
+        setCurrencyCodeState(profileCountry.currency);
+        await AsyncStorage.setItem(LOCATION_COUNTRY_KEY, profileCountry.code);
+        await AsyncStorage.setItem(LOCATION_CURRENCY_KEY, profileCountry.currency);
+      }
+    };
+
+    void syncFromProfile();
   }, [profile, isLoaded]);
 
   const country = useMemo<CountryData | undefined>(
-    () => getCountryByCode(countryCode),
+    () => (countryCode ? getCountryByCode(countryCode) : undefined),
     [countryCode]
   );
 
   const currency = useMemo<CurrencyData | undefined>(
-    () => getCurrencyByCode(currencyCode),
+    () => (currencyCode ? getCurrencyByCode(currencyCode) : undefined),
     [currencyCode]
   );
 
@@ -110,7 +112,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
       }
 
       try {
-        await updateProfile({ country: c.name, currency: c.currency });
+        await updateProfile({ country: c.code, currency: c.currency });
       } catch {
         console.log("[Location] Profile sync skipped");
       }
@@ -145,18 +147,20 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
 
   const convert = useCallback(
     (amount: number, fromCurrency: string): number => {
-      return convertCurrency(amount, fromCurrency, currencyCode);
+      const toCurr = currencyCode || "USD";
+      return convertCurrency(amount, fromCurrency, toCurr);
     },
     [currencyCode]
   );
 
   const format = useCallback(
     (amount: number, fromCurrency?: string): string => {
-      if (fromCurrency && fromCurrency !== currencyCode) {
-        const converted = convertCurrency(amount, fromCurrency, currencyCode);
-        return formatPrice(converted, currencyCode);
+      const toCurr = currencyCode || "USD";
+      if (fromCurrency && fromCurrency !== toCurr) {
+        const converted = convertCurrency(amount, fromCurrency, toCurr);
+        return formatPrice(converted, toCurr);
       }
-      return formatPrice(amount, currencyCode);
+      return formatPrice(amount, toCurr);
     },
     [currencyCode]
   );
@@ -199,14 +203,17 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     []
   );
 
+  const hasCountry = useMemo(() => Boolean(countryCode), [countryCode]);
+
   return useMemo(
     () => ({
       countryCode,
       country,
       city,
-      currencyCode,
+      currencyCode: currencyCode || "USD",
       currency,
       isLoaded,
+      hasCountry,
       serpApiCountryCode,
       availableStores,
       availableCities,
@@ -223,7 +230,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
       getCurrencySymbol,
     }),
     [
-      countryCode, country, city, currencyCode, currency, isLoaded,
+      countryCode, country, city, currencyCode, currency, isLoaded, hasCountry,
       serpApiCountryCode, availableStores, availableCities,
       confirmedStores, addConfirmedStores,
       setCountry, setCity, setCurrency, convert, format,
