@@ -109,8 +109,13 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
     },
   });
 
+  const sharedWishlistIds = useMemo(
+    () => wishlists.filter((w) => w.isShared).map((w) => w.id),
+    [wishlists]
+  );
+
   const chatQuery = useQuery({
-    queryKey: ["chatMessages", user.id],
+    queryKey: ["chatMessages", user.id, sharedWishlistIds],
     queryFn: async () => {
       if (user.id === "guest") {
         const stored = await AsyncStorage.getItem(CHAT_KEY);
@@ -120,26 +125,25 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       }
 
       try {
-        const sharedIds = wishlists.filter((w) => w.isShared).map((w) => w.id);
-        if (sharedIds.length > 0) {
-          const msgs = await db.fetchChatMessages(sharedIds);
-          if (msgs.length > 0) return msgs;
+        if (sharedWishlistIds.length > 0) {
+          const msgs = await db.fetchChatMessages(sharedWishlistIds);
+          console.log(`[WishlistProvider] Fetched ${msgs.length} chat messages from Supabase`);
+          return msgs;
         }
-
+        return [];
+      } catch (err) {
+        console.log("[WishlistProvider] Chat fetch failed:", err);
         const stored = await AsyncStorage.getItem(CHAT_KEY);
         if (stored) return JSON.parse(stored) as ChatMessage[];
-        return mockChatMessages;
-      } catch {
-        const stored = await AsyncStorage.getItem(CHAT_KEY);
-        if (stored) return JSON.parse(stored) as ChatMessage[];
-        return mockChatMessages;
+        return [];
       }
     },
-    enabled: user.id !== "",
+    enabled: user.id !== "" && !wishlistsQuery.isLoading,
+    refetchInterval: 10000,
   });
 
   const assignmentsQuery = useQuery({
-    queryKey: ["assignments", user.id],
+    queryKey: ["assignments", user.id, sharedWishlistIds],
     queryFn: async () => {
       if (user.id === "guest") {
         const stored = await AsyncStorage.getItem(ASSIGNMENTS_KEY);
@@ -149,22 +153,21 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       }
 
       try {
-        const sharedIds = wishlists.filter((w) => w.isShared).map((w) => w.id);
-        if (sharedIds.length > 0) {
-          const result = await db.fetchItemAssignments(sharedIds);
-          if (result.length > 0) return result;
+        if (sharedWishlistIds.length > 0) {
+          const result = await db.fetchItemAssignments(sharedWishlistIds);
+          console.log(`[WishlistProvider] Fetched ${result.length} assignments from Supabase`);
+          return result;
         }
-
+        return [];
+      } catch (err) {
+        console.log("[WishlistProvider] Assignments fetch failed:", err);
         const stored = await AsyncStorage.getItem(ASSIGNMENTS_KEY);
         if (stored) return JSON.parse(stored) as ItemAssignment[];
-        return mockAssignments;
-      } catch {
-        const stored = await AsyncStorage.getItem(ASSIGNMENTS_KEY);
-        if (stored) return JSON.parse(stored) as ItemAssignment[];
-        return mockAssignments;
+        return [];
       }
     },
-    enabled: user.id !== "",
+    enabled: user.id !== "" && !wishlistsQuery.isLoading,
+    refetchInterval: 10000,
   });
 
   const recentlyViewedQuery = useQuery({
@@ -445,7 +448,14 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
 
   const refreshWishlists = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["wishlists", user.id] });
+    void queryClient.invalidateQueries({ queryKey: ["chatMessages"] });
+    void queryClient.invalidateQueries({ queryKey: ["assignments"] });
   }, [queryClient, user.id]);
+
+  const refreshChat = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["chatMessages"] });
+    void queryClient.invalidateQueries({ queryKey: ["assignments"] });
+  }, [queryClient]);
 
   const addToRecentlyViewed = useCallback((product: Product) => {
     setRecentlyViewed((prev) => {
@@ -524,6 +534,7 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       toggleShareWishlist,
       deleteWishlistById,
       refreshWishlists,
+      refreshChat,
       recentlyViewed,
       addToRecentlyViewed,
       updateProductInWishlist,
@@ -535,7 +546,7 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       addWishlist, addProductToWishlist, removeProductFromWishlist,
       togglePurchased, markNotificationRead,
       sendMessage, assignItem, unassignItem, toggleShareWishlist,
-      deleteWishlistById, refreshWishlists,
+      deleteWishlistById, refreshWishlists, refreshChat,
       recentlyViewed, addToRecentlyViewed, updateProductInWishlist,
     ]
   );

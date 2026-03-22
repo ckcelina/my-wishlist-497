@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   Animated,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -61,14 +62,21 @@ export default function WishlistChatScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const wishlist = useWishlistById(id ?? "");
-  const { user, sendMessage, assignItem, assignments } = useWishlistContext();
+  const { user, sendMessage, assignItem, assignments, refreshChat } = useWishlistContext();
   const messages = useWishlistMessages(id ?? "");
   const itemAssignments = useItemAssignments(id ?? "");
 
   const [text, setText] = useState("");
   const [showClaimPanel, setShowClaimPanel] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const claimPanelAnim = useRef(new Animated.Value(0)).current;
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    refreshChat();
+    setTimeout(() => setRefreshing(false), 1200);
+  }, [refreshChat]);
 
   const isOwner = wishlist?.collaborators.find((c) => c.id === user.id)?.role === "owner";
 
@@ -179,6 +187,14 @@ export default function WishlistChatScreen() {
           style={styles.messagesList}
           contentContainerStyle={styles.messagesContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         >
           {messages.length === 0 ? (
             <View style={styles.chatEmpty}>

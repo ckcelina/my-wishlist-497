@@ -1,15 +1,17 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   Pressable,
+  RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { ChevronRight } from "lucide-react-native";
+import { ChevronRight, MessageCircle, Users } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 
@@ -34,11 +36,18 @@ export default function ChatsScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { wishlists, chatMessages, user } = useWishlistContext();
+  const { wishlists, chatMessages, user, refreshChat, isLoading } = useWishlistContext();
+  const [refreshing, setRefreshing] = useState(false);
 
   const sharedWishlists = wishlists.filter((w) => w.isShared);
 
-  const getLastMessage = (wishlistId: string) => {
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    refreshChat();
+    setTimeout(() => setRefreshing(false), 1200);
+  }, [refreshChat]);
+
+  const getLastMessage = useCallback((wishlistId: string) => {
     const wishlist = wishlists.find((w) => w.id === wishlistId);
     const isOwner = wishlist?.collaborators.find((c) => c.id === user.id)?.role === "owner";
     const msgs = chatMessages
@@ -49,11 +58,11 @@ export default function ChatsScreen() {
       })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     return msgs[0] ?? null;
-  };
+  }, [wishlists, chatMessages, user.id]);
 
-  const getMessageCount = (wishlistId: string) => {
+  const getMessageCount = useCallback((wishlistId: string) => {
     return chatMessages.filter((m) => m.wishlistId === wishlistId && m.senderId !== user.id && m.type !== "assignment").length;
-  };
+  }, [chatMessages, user.id]);
 
   const sortedWishlists = [...sharedWishlists].sort((a, b) => {
     const lastA = getLastMessage(a.id);
@@ -130,13 +139,27 @@ export default function ChatsScreen() {
         </Text>
       </View>
 
-      {sharedWishlists.length === 0 ? (
+      {isLoading && sharedWishlists.length === 0 ? (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading chats...</Text>
+        </View>
+      ) : sharedWishlists.length === 0 ? (
         <View style={styles.emptyState}>
-          <Image source={appLogo} style={styles.emptyLogo} contentFit="contain" />
+          <View style={[styles.emptyIconCircle, { backgroundColor: colors.primaryFaded }]}>
+            <MessageCircle size={40} color={colors.primary} />
+          </View>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>No shared wishlists yet</Text>
           <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-            Share a wishlist to start group chats with friends and family
+            Share a wishlist to start group chats with friends and family. Toggle sharing on any wishlist to enable chat.
           </Text>
+          <Pressable
+            onPress={() => router.push("/create-list")}
+            style={[styles.emptyBtn, { backgroundColor: colors.primaryFaded }]}
+          >
+            <Users size={16} color={colors.primary} />
+            <Text style={[styles.emptyBtnText, { color: colors.primary }]}>Create a Shared List</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList
@@ -146,6 +169,14 @@ export default function ChatsScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={ChatSeparator}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         />
       )}
     </View>
@@ -257,6 +288,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginLeft: 2,
   },
+  loadingState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+  },
   emptyState: {
     flex: 1,
     justifyContent: "center",
@@ -264,12 +304,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     gap: 12,
   },
-  emptyLogo: {
+  emptyIconCircle: {
     width: 80,
     height: 80,
-    borderRadius: 20,
+    borderRadius: 40,
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 8,
-    opacity: 0.8,
   },
   emptyTitle: {
     fontSize: 20,
@@ -279,5 +320,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center" as const,
     lineHeight: 20,
+  },
+  emptyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 14,
+    marginTop: 8,
+  },
+  emptyBtnText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
   },
 });

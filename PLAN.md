@@ -79,6 +79,11 @@
 - Search uses Google Shopping directly (no intermediate store filtering)
 - Visual search has improved error handling with fallback to AI detection
 - Backend image upload tries multiple hosts with graceful fallback
+- Chat system polls for new messages every 10 seconds
+- Chat queries depend on wishlists being loaded (no race condition)
+- Pull-to-refresh on chat list and chat screens
+- Authenticated users get real data from Supabase (no mock fallback)
+- Home page shows skeleton loading while trending items load
 
 ---
 
@@ -97,3 +102,10 @@
 - [x] **Image search error handling** — AI detection works as fallback when visual search fails
 - [x] **Category search fix** — Categories search by name only, no store names appended
 - [x] **Explore page cleanup** — Removed Verified Stores section, removed auto-deal-loading on mount
+- [x] **Chat query race condition** — Chat/assignment queries now depend on wishlists being loaded, use shared wishlist IDs in query key
+- [x] **Chat mock data removal** — Authenticated users no longer fall back to mock messages; empty state shown instead
+- [x] **Chat polling** — Messages and assignments auto-refresh every 10 seconds
+- [x] **Chat pull-to-refresh** — Added RefreshControl to chat list and individual chat screens
+- [x] **Chat empty state** — Improved empty state with action button to create shared list
+- [x] **Home trending loading** — Skeleton cards shown while trending items load
+- [x] **Explore dead code cleanup** — Removed unused store-related styles from explore page

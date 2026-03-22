@@ -1015,45 +1015,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600" as const,
   },
-  storesRow: {
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  storeChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 8,
-  },
-  storeChipIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  storeChipText: {
-    fontSize: 13,
-    fontWeight: "600" as const,
-  },
-  verifyingBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    marginLeft: 6,
-  },
-  verifyingText: {
-    fontSize: 11,
-    fontWeight: "600" as const,
-  },
-  verifyingSubtext: {
-    fontSize: 12,
-    paddingHorizontal: 20,
-    marginBottom: 10,
-  },
+
   dealCategoryRow: {
     paddingHorizontal: 20,
     gap: 8,

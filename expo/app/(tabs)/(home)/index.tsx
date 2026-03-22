@@ -405,6 +405,28 @@ export default function HomeScreen() {
           </>
         )}
 
+        {trendingMutation.isPending && liveTrending.length === 0 && serpApiCountryCode && (
+          <View style={styles.trendingLoadingCard}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <TrendingUp size={18} color={colors.primary} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Trending in {country?.name ?? "your area"}</Text>
+              </View>
+            </View>
+            <View style={styles.trendingLoadingRow}>
+              {[0, 1, 2].map((i) => (
+                <View key={`skel-${i}`} style={[styles.trendingSkeleton, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderLight }]}>
+                  <View style={[styles.trendingSkeletonImage, { backgroundColor: colors.border }]} />
+                  <View style={styles.trendingSkeletonInfo}>
+                    <View style={[styles.trendingSkeletonLine, { backgroundColor: colors.border, width: "80%" }]} />
+                    <View style={[styles.trendingSkeletonLine, { backgroundColor: colors.border, width: "50%" }]} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {liveTrending.length === 0 && !trendingMutation.isPending && serpApiCountryCode && (
           <View style={styles.emptyTrendingCard}>
             <TrendingUp size={24} color={colors.textTertiary} />
@@ -719,5 +741,31 @@ const styles = StyleSheet.create({
   retryBtnText: {
     fontSize: 13,
     fontWeight: "600" as const,
+  },
+  trendingLoadingCard: {
+    marginTop: 8,
+  },
+  trendingLoadingRow: {
+    flexDirection: "row" as const,
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  trendingSkeleton: {
+    width: 160,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden" as const,
+  },
+  trendingSkeletonImage: {
+    width: "100%" as const,
+    height: 120,
+  },
+  trendingSkeletonInfo: {
+    padding: 10,
+    gap: 8,
+  },
+  trendingSkeletonLine: {
+    height: 10,
+    borderRadius: 5,
   },
 });
