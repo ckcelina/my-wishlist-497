@@ -321,8 +321,20 @@ export default function ExploreScreen() {
     [serpApiCountryCode]
   );
 
+  const matchesAvailableStores = useCallback(
+    (storeName: string): boolean => {
+      if (availableStores.length === 0) return true;
+      const lower = storeName.toLowerCase();
+      return availableStores.some((s) => {
+        const sLower = s.toLowerCase();
+        return lower.includes(sLower) || sLower.includes(lower);
+      });
+    },
+    [availableStores]
+  );
+
   const filteredSerpResults = useMemo(() => {
-    let results = serpResults;
+    let results = serpResults.filter((r) => matchesAvailableStores(r.store));
     if (filters.freeDeliveryOnly) {
       results = results.filter(
         (r) => r.delivery?.toLowerCase().includes("free") || !r.delivery
@@ -332,11 +344,14 @@ export default function ExploreScreen() {
       const sq = filters.storeFilter.toLowerCase();
       results = results.filter((r) => r.store.toLowerCase().includes(sq));
     }
-    console.log(`[Explore] filteredSerpResults: ${results.length} of ${serpResults.length} total`);
+    console.log(`[Explore] filteredSerpResults: ${results.length} of ${serpResults.length} total (country filter: ${availableStores.length} stores)`);
     return results;
-  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter]);
+  }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter, matchesAvailableStores, availableStores.length]);
 
-  const filteredDealResults = useMemo(() => dealResults, [dealResults]);
+  const filteredDealResults = useMemo(
+    () => dealResults.filter((r) => matchesAvailableStores(r.store)),
+    [dealResults, matchesAvailableStores]
+  );
 
   const convertedAmount = useMemo(() => {
     const num = parseFloat(convertAmount);
