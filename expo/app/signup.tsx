@@ -216,9 +216,9 @@ export default function SignUpScreen() {
                   onSubmitEditing={() => emailRef.current?.focus()}
                 />
               </View>
-              {errors.fullName && (
+              {errors.fullName ? (
                 <Text style={[styles.errorText, { color: colors.error }]}>{errors.fullName}</Text>
-              )}
+              ) : null}
             </View>
 
             <View style={styles.inputGroup}>
@@ -251,9 +251,9 @@ export default function SignUpScreen() {
                   onSubmitEditing={() => passwordRef.current?.focus()}
                 />
               </View>
-              {errors.email && (
+              {errors.email ? (
                 <Text style={[styles.errorText, { color: colors.error }]}>{errors.email}</Text>
-              )}
+              ) : null}
             </View>
 
             <View style={styles.inputGroup}>
@@ -291,9 +291,9 @@ export default function SignUpScreen() {
                   )}
                 </Pressable>
               </View>
-              {errors.password && (
+              {errors.password ? (
                 <Text style={[styles.errorText, { color: colors.error }]}>{errors.password}</Text>
-              )}
+              ) : null}
             </View>
 
             <View style={styles.inputGroup}>
@@ -334,11 +334,11 @@ export default function SignUpScreen() {
                   )}
                 </Pressable>
               </View>
-              {errors.confirmPassword && (
+              {errors.confirmPassword ? (
                 <Text style={[styles.errorText, { color: colors.error }]}>
                   {errors.confirmPassword}
                 </Text>
-              )}
+              ) : null}
             </View>
 
             <View style={styles.inputGroup}>
@@ -377,9 +377,9 @@ export default function SignUpScreen() {
                 )}
                 <ChevronRight size={16} color={colors.textTertiary} />
               </Pressable>
-              {errors.country && (
+              {errors.country ? (
                 <Text style={[styles.errorText, { color: colors.error }]}>{errors.country}</Text>
-              )}
+              ) : null}
             </View>
 
             <Animated.View style={{ transform: [{ scale: buttonScale }] }}>

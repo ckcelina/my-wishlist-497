@@ -1149,7 +1149,7 @@ export default function AddScreen() {
             </>
           )}
 
-          {barcodeImage && (
+          {!!barcodeImage && (
             <View style={styles.detectionArea}>
               <View style={styles.imagePreviewRow}>
                 <Image source={{ uri: barcodeImage }} style={styles.previewImage} contentFit="cover" />
@@ -1258,7 +1258,7 @@ export default function AddScreen() {
             </View>
           )}
 
-          {textImage && (
+          {!!textImage && (
             <View style={styles.detectionArea}>
               <View style={styles.imagePreviewRow}>
                 <Image source={{ uri: textImage }} style={styles.previewImage} contentFit="cover" />
@@ -1551,7 +1551,7 @@ export default function AddScreen() {
                     <Text style={[styles.detectedTitle, { color: colors.primary }]}>AI Detection</Text>
                   </View>
                   <Text style={[styles.detectedName, { color: colors.text }]}>{detectedProduct.title}</Text>
-                  {detectedProduct.brand && (
+                  {!!detectedProduct.brand && (
                     <Text style={[styles.detectedMeta, { color: colors.textSecondary }]}>
                       Brand: {detectedProduct.brand}
                     </Text>

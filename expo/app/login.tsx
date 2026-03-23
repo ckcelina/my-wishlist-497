@@ -123,9 +123,9 @@ export default function LoginScreen() {
                   onSubmitEditing={() => passwordRef.current?.focus()}
                 />
               </View>
-              {errors.email && (
+              {errors.email ? (
                 <Text style={[styles.errorText, { color: colors.error }]}>{errors.email}</Text>
-              )}
+              ) : null}
             </View>
 
             <View style={styles.inputGroup}>
@@ -167,9 +167,9 @@ export default function LoginScreen() {
                   )}
                 </Pressable>
               </View>
-              {errors.password && (
+              {errors.password ? (
                 <Text style={[styles.errorText, { color: colors.error }]}>{errors.password}</Text>
-              )}
+              ) : null}
             </View>
 
             <Animated.View style={{ transform: [{ scale: buttonScale }] }}>

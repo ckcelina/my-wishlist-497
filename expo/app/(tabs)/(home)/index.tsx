@@ -405,7 +405,7 @@ export default function HomeScreen() {
           </>
         )}
 
-        {trendingMutation.isPending && liveTrending.length === 0 && serpApiCountryCode && (
+        {trendingMutation.isPending && liveTrending.length === 0 && !!serpApiCountryCode && (
           <View style={styles.trendingLoadingCard}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
@@ -427,7 +427,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {liveTrending.length === 0 && !trendingMutation.isPending && serpApiCountryCode && (
+        {liveTrending.length === 0 && !trendingMutation.isPending && !!serpApiCountryCode && (
           <View style={styles.emptyTrendingCard}>
             <TrendingUp size={24} color={colors.textTertiary} />
             <Text style={[styles.emptyTrendingText, { color: colors.textSecondary }]}>

@@ -554,7 +554,7 @@ export default function ExploreScreen() {
                             <Text style={[styles.resultPrice, { color: colors.primary }]}>
                               {displayPrice}
                             </Text>
-                            {result.delivery && (
+                            {!!result.delivery && (
                               <View style={[styles.deliveryTag, { backgroundColor: colors.success + "12" }]}>
                                 <Text style={[styles.resultDelivery, { color: colors.success }]}>
                                   {result.delivery}
