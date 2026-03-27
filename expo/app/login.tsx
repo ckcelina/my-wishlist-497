@@ -87,7 +87,6 @@ export default function LoginScreen() {
               style={styles.logo}
               contentFit="contain"
             />
-            <Text style={[styles.appName, { color: colors.text }]}>My Wishlist</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Welcome back! Sign in to continue
             </Text>
@@ -230,18 +229,12 @@ const styles = StyleSheet.create({
   },
   logoSection: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 36,
   },
   logo: {
-    width: 180,
-    height: 72,
-    marginBottom: 16,
-  },
-  appName: {
-    fontSize: 28,
-    fontWeight: "800" as const,
-    letterSpacing: -0.5,
-    marginBottom: 6,
+    width: 240,
+    height: 100,
+    marginBottom: 12,
   },
   subtitle: {
     fontSize: 15,
