@@ -9,7 +9,16 @@ import {
   mockChatMessages,
   mockAssignments,
 } from "@/mocks/data";
+import {
+  demoUser,
+  demoWishlists,
+  demoChatMessages,
+  demoAssignments,
+  demoNotifications,
+  demoRecentlyViewed,
+} from "@/mocks/demoData";
 import { useAuth } from "@/providers/AuthProvider";
+import { useDemoMode } from "@/providers/DemoModeProvider";
 import * as db from "@/lib/database";
 import { supabase } from "@/lib/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -24,6 +33,7 @@ const LAST_READ_KEY = "chat_last_read_v1";
 export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
   const queryClient = useQueryClient();
   const { user: authUser, profile } = useAuth();
+  const { isDemoMode } = useDemoMode();
 
   const [wishlists, setWishlists] = useState<Wishlist[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -673,6 +683,103 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
     });
     return total;
   }, [wishlists, getUnreadCountForWishlist]);
+
+  const demoMyLists = useMemo(
+    () => demoWishlists.filter((w) => !w.isShared),
+    []
+  );
+
+  const demoSharedLists = useMemo(
+    () => demoWishlists.filter((w) => w.isShared),
+    []
+  );
+
+  const demoUnreadCount = useMemo(
+    () => demoNotifications.filter((n) => !n.isRead).length,
+    []
+  );
+
+  const demoGetUnreadCountForWishlist = useCallback(
+    (wishlistId: string) => {
+      return demoChatMessages.filter(
+        (m) =>
+          m.wishlistId === wishlistId &&
+          m.senderId !== demoUser.id &&
+          m.type !== "assignment"
+      ).length;
+    },
+    []
+  );
+
+  const demoUnreadChatCount = useMemo(() => {
+    const sharedIds = demoWishlists.filter((w) => w.isShared).map((w) => w.id);
+    let total = 0;
+    sharedIds.forEach((id) => {
+      total += demoGetUnreadCountForWishlist(id);
+    });
+    return total;
+  }, [demoGetUnreadCountForWishlist]);
+
+  const noopWishlist = useCallback(() => {
+    console.log("[DemoMode] Action blocked in preview mode");
+  }, []);
+  const noopWishlistArg = useCallback((_w: Wishlist) => {
+    console.log("[DemoMode] Action blocked in preview mode");
+  }, []);
+  const noopTwoArgs = useCallback((_a: string, _b: string) => {
+    console.log("[DemoMode] Action blocked in preview mode");
+  }, []);
+  const noopProduct = useCallback((_a: string, _b: Product) => {
+    console.log("[DemoMode] Action blocked in preview mode");
+  }, []);
+  const noopSendMessage = useCallback((_a: string, _b: string, _c?: ChatMessage["type"], _d?: string) => {
+    console.log("[DemoMode] Action blocked in preview mode");
+  }, []);
+  const noopAssignItem = useCallback((_a: string, _b: string, _c: string) => {
+    console.log("[DemoMode] Action blocked in preview mode");
+  }, []);
+  const noopUpdateProduct = useCallback((_a: string, _b: string, _c: Partial<Product>) => {
+    console.log("[DemoMode] Action blocked in preview mode");
+  }, []);
+  const noopAddRecentlyViewed = useCallback((_p: Product) => {
+    console.log("[DemoMode] Action blocked in preview mode");
+  }, []);
+  const noopMarkRead = useCallback((_id: string) => {
+    console.log("[DemoMode] Action blocked in preview mode");
+  }, []);
+
+  if (isDemoMode) {
+    return {
+      wishlists: demoWishlists,
+      myLists: demoMyLists,
+      sharedLists: demoSharedLists,
+      notifications: demoNotifications,
+      unreadCount: demoUnreadCount,
+      user: demoUser,
+      allProducts: demoWishlists.flatMap((w) => w.items),
+      chatMessages: demoChatMessages,
+      assignments: demoAssignments,
+      unreadChatCount: demoUnreadChatCount,
+      markChatAsRead: noopMarkRead,
+      getUnreadCountForWishlist: demoGetUnreadCountForWishlist,
+      isLoading: false,
+      addWishlist: noopWishlistArg,
+      addProductToWishlist: noopProduct,
+      removeProductFromWishlist: noopTwoArgs,
+      togglePurchased: noopTwoArgs,
+      markNotificationRead: noopMarkRead,
+      sendMessage: noopSendMessage,
+      assignItem: noopAssignItem,
+      unassignItem: noopTwoArgs,
+      toggleShareWishlist: noopMarkRead,
+      deleteWishlistById: noopMarkRead,
+      refreshWishlists: noopWishlist,
+      refreshChat: noopWishlist,
+      recentlyViewed: demoRecentlyViewed,
+      addToRecentlyViewed: noopAddRecentlyViewed,
+      updateProductInWishlist: noopUpdateProduct,
+    };
+  }
 
   return useMemo(
     () => ({
