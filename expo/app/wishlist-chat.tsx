@@ -40,7 +40,7 @@ import {
 import { useLocation } from "@/providers/LocationProvider";
 import * as db from "@/lib/database";
 
-const appLogo = require("@/assets/images/icon.png");
+const appLogo = require("@/assets/images/logo.png");
 
 function formatChatTime(timestamp: string): string {
   const date = new Date(timestamp);

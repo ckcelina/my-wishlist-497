@@ -15,7 +15,7 @@ import { ChevronRight, MessageCircle, Users } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
 
-const appLogo = require("@/assets/images/icon.png");
+const appLogo = require("@/assets/images/logo.png");
 
 const ChatSeparator = () => <View style={{ height: 10 }} />;
 

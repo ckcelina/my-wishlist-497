@@ -82,14 +82,11 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.logoSection}>
-            <View style={[styles.logoCircle, { backgroundColor: colors.primaryFaded }]}>
-              <Image
-                source={require("@/assets/images/icon.png")}
-                style={styles.logoIcon}
-                contentFit="contain"
-              />
-            </View>
-            <Text style={[styles.appTitle, { color: colors.text }]}>My Wishlist</Text>
+            <Image
+              source={require("@/assets/images/logo.png")}
+              style={styles.logo}
+              contentFit="contain"
+            />
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Welcome back! Sign in to continue
             </Text>
@@ -234,24 +231,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 36,
   },
-  logoCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 24,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
+  logo: {
+    width: 200,
+    height: 160,
     marginBottom: 16,
-  },
-  logoIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 14,
-  },
-  appTitle: {
-    fontSize: 28,
-    fontWeight: "800" as const,
-    letterSpacing: -0.5,
-    marginBottom: 6,
   },
   subtitle: {
     fontSize: 15,
