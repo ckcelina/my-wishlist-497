@@ -36,6 +36,8 @@ import {
   Store,
   ArrowLeftRight,
   Trash2,
+  Eye,
+  Smartphone,
 } from "lucide-react-native";
 import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
@@ -43,6 +45,7 @@ import { useWishlistContext } from "@/providers/WishlistProvider";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTheme, ThemeMode } from "@/providers/ThemeProvider";
 import { useLocation } from "@/providers/LocationProvider";
+import { useDemoMode } from "@/providers/DemoModeProvider";
 import { checkDatabaseHealth, DbHealthResult } from "@/lib/api";
 import { CountryData, CurrencyData } from "@/constants/countries";
 
@@ -52,6 +55,7 @@ export default function ProfileScreen() {
   const { user, wishlists, sharedLists, allProducts } = useWishlistContext();
   const { profile, signOut, isSigningOut, deleteAccount, isDeletingAccount, updateProfile, isUpdatingProfile } = useAuth();
   const { themeMode, setThemeMode } = useTheme();
+  const { isDemoMode, toggleDemoMode } = useDemoMode();
   const {
     country, city, currency, countryCode, currencyCode,
     availableStores, availableCities,
@@ -388,7 +392,7 @@ export default function ProfileScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>APPEARANCE</Text>
           <View style={[styles.sectionCards, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
             <Pressable
-              style={styles.settingRow}
+              style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
               onPress={() => setShowThemePicker(true)}
             >
               <View style={styles.settingLeft}>
@@ -402,8 +406,52 @@ export default function ProfileScreen() {
                 <ChevronRight size={18} color={colors.textTertiary} />
               </View>
             </Pressable>
+            <Pressable
+              style={styles.settingRow}
+              onPress={() => void toggleDemoMode()}
+            >
+              <View style={styles.settingLeft}>
+                <Eye size={20} color={colors.primary} />
+                <View style={styles.settingLabelGroup}>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>Preview Mode</Text>
+                  <Text style={[styles.settingHint, { color: colors.textTertiary }]}>
+                    {isDemoMode ? "Showing demo data for marketing" : "Using live functional app"}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.settingRight}>
+                <View
+                  style={[
+                    styles.toggleTrack,
+                    { backgroundColor: isDemoMode ? colors.primary : colors.border },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.toggleThumb,
+                      {
+                        backgroundColor: "#FFFFFF",
+                        transform: [{ translateX: isDemoMode ? 18 : 2 }],
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+            </Pressable>
           </View>
         </View>
+
+        {isDemoMode && (
+          <View style={[styles.demoBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}>
+            <Smartphone size={18} color={colors.primary} />
+            <View style={styles.demoBannerContent}>
+              <Text style={[styles.demoBannerTitle, { color: colors.primary }]}>Preview Mode Active</Text>
+              <Text style={[styles.demoBannerDesc, { color: colors.textSecondary }]}>
+                App is showing sample data to demonstrate features. Toggle off to use your real wishlists and live product search.
+              </Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>ACCOUNT</Text>
@@ -1104,5 +1152,46 @@ const styles = StyleSheet.create({
     fontSize: 11,
     width: 20,
     textAlign: "right" as const,
+  },
+  settingLabelGroup: {
+    flex: 1,
+    gap: 2,
+  },
+  settingHint: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  toggleTrack: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: "center" as const,
+  },
+  toggleThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+  },
+  demoBanner: {
+    flexDirection: "row" as const,
+    marginHorizontal: 20,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 12,
+    alignItems: "flex-start" as const,
+  },
+  demoBannerContent: {
+    flex: 1,
+    gap: 4,
+  },
+  demoBannerTitle: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+  },
+  demoBannerDesc: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

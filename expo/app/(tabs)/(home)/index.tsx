@@ -21,8 +21,22 @@ import { usePriceAlerts } from "@/providers/PriceAlertProvider";
 import { fetchTrendingProducts, SerpApiResult } from "@/lib/api";
 import WishlistCard from "@/components/WishlistCard";
 import { Product } from "@/types";
+import { trendingProducts, mockWishlists } from "@/mocks/data";
+import { SerpApiResult } from "@/lib/api";
+import { useDemoMode } from "@/providers/DemoModeProvider";
 
-const appLogo = require("@/assets/images/logo.png");
+const FALLBACK_TRENDING: SerpApiResult[] = trendingProducts.map((p) => ({
+  title: p.title,
+  price: p.price,
+  currency: p.currency,
+  store: p.store,
+  link: p.storeUrl ?? "",
+  image: p.image,
+  rating: p.rating,
+  snippet: p.description ?? "",
+}));
+
+
 
 export default function HomeScreen() {
   const colors = useAppColors();
@@ -30,6 +44,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user, myLists, sharedLists, refreshWishlists } = useWishlistContext();
   const { country, city, currency, serpApiCountryCode, currencyCode, format } = useLocation();
+  const { isDemoMode } = useDemoMode();
   const { unreadDropCount, activeAlertCount, checkPricesNow, isCheckingPrices } = usePriceAlerts();
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<"updated" | "name" | "items">("updated");
@@ -46,21 +61,31 @@ export default function HomeScreen() {
         console.log(
           `[Home] Got ${data.results.length} trending for ${serpApiCountryCode}`
         );
+      } else {
+        console.log("[Home] No live trending results, using fallback mock data");
+        setLiveTrending(FALLBACK_TRENDING);
       }
     },
     onError: (err) => {
-      console.log("[Home] Trending fetch error:", err);
+      console.log("[Home] Trending fetch error, using fallback:", err);
+      setLiveTrending(FALLBACK_TRENDING);
     },
   });
 
   useEffect(() => {
+    if (isDemoMode) {
+      console.log("[Home] Demo mode active, showing fallback trending");
+      setLiveTrending(FALLBACK_TRENDING);
+      return;
+    }
     if (serpApiCountryCode) {
       trendingMutation.mutate();
     } else {
-      setLiveTrending([]);
+      console.log("[Home] No country set, showing fallback trending");
+      setLiveTrending(FALLBACK_TRENDING);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serpApiCountryCode]);
+  }, [serpApiCountryCode, isDemoMode]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -159,7 +184,7 @@ export default function HomeScreen() {
         >
           <View style={styles.greetingRow}>
             <View style={styles.greetingLeft}>
-              <Image source={appLogo} style={styles.logo} contentFit="contain" />
+              <Text style={[styles.appTitle, { color: colors.text }]}>My Wishlist</Text>
             </View>
             <View style={styles.headerRightActions}>
               <Pressable
@@ -466,9 +491,10 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
-  logo: {
-    width: 160,
-    height: 44,
+  appTitle: {
+    fontSize: 22,
+    fontWeight: "800" as const,
+    letterSpacing: -0.3,
   },
   headerRightActions: {
     flexDirection: "row",

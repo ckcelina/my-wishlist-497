@@ -55,21 +55,22 @@ export default function ProductDetailScreen() {
     { country: string; results: { title: string; price: number; currency: string; store: string; link: string }[] }[]
   >([]);
 
-  const allLocalProducts = [...mockProducts];
   const wishlistItems = wishlists.flatMap((w) => w.items);
+  const allLocalProducts = [...mockProducts, ...wishlistItems];
 
   let product: Product | undefined;
   let serpProductId: string | undefined;
 
   if (serpData) {
     try {
-      const parsed = JSON.parse(serpData);
+      const decoded = decodeURIComponent(serpData);
+      const parsed = JSON.parse(decoded);
       serpProductId = parsed.productId;
       product = {
         id: id ?? `serp_${Date.now()}`,
         title: parsed.title || "Unknown Product",
         image: parsed.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
-        price: parsed.price || 0,
+        price: typeof parsed.price === "number" ? parsed.price : parseFloat(parsed.price) || 0,
         currency: parsed.currency || (currencyCode ? currencyCode : "USD"),
         store: parsed.store || "Unknown Store",
         storeUrl: parsed.link || "",
@@ -80,13 +81,37 @@ export default function ProductDetailScreen() {
         country: serpApiCountryCode.toUpperCase(),
         rating: parsed.rating,
       };
-    } catch {
-      console.log("[ProductDetail] Failed to parse serpData");
+      console.log("[ProductDetail] Parsed serpData product:", product.title);
+    } catch (e) {
+      console.log("[ProductDetail] Failed to parse serpData, trying raw:", e);
+      try {
+        const parsed = JSON.parse(serpData);
+        serpProductId = parsed.productId;
+        product = {
+          id: id ?? `serp_${Date.now()}`,
+          title: parsed.title || "Unknown Product",
+          image: parsed.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
+          price: typeof parsed.price === "number" ? parsed.price : parseFloat(parsed.price) || 0,
+          currency: parsed.currency || (currencyCode ? currencyCode : "USD"),
+          store: parsed.store || "Unknown Store",
+          storeUrl: parsed.link || "",
+          description: parsed.snippet || "",
+          category: "Search Result",
+          isPurchased: false,
+          addedAt: new Date().toISOString().split("T")[0],
+          country: serpApiCountryCode.toUpperCase(),
+          rating: parsed.rating,
+        };
+        console.log("[ProductDetail] Parsed raw serpData product:", product.title);
+      } catch {
+        console.log("[ProductDetail] Both parse attempts failed");
+      }
     }
   }
 
   if (!product) {
-    product = allLocalProducts.find((p) => p.id === id) || wishlistItems.find((p) => p.id === id);
+    product = allLocalProducts.find((p) => p.id === id);
+    console.log(`[ProductDetail] Local lookup for id="${id}": ${product ? "found" : "not found"}`);
   }
 
   const productDetailMutation = useMutation({

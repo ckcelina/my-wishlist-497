@@ -10,6 +10,7 @@ import { ThemeProvider } from "@/providers/ThemeProvider";
 import { LocationProvider } from "@/providers/LocationProvider";
 import { SearchHistoryProvider } from "@/providers/SearchHistoryProvider";
 import { PriceAlertProvider } from "@/providers/PriceAlertProvider";
+import { DemoModeProvider } from "@/providers/DemoModeProvider";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -154,9 +155,11 @@ export default function RootLayout() {
               <LocationProvider>
                 <SearchHistoryProvider>
                   <PriceAlertProvider>
-                    <WishlistProvider>
-                      <RootLayoutNav />
-                    </WishlistProvider>
+                    <DemoModeProvider>
+                      <WishlistProvider>
+                        <RootLayoutNav />
+                      </WishlistProvider>
+                    </DemoModeProvider>
                   </PriceAlertProvider>
                 </SearchHistoryProvider>
               </LocationProvider>

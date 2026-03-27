@@ -29,7 +29,6 @@ import {
   ArrowRight,
   Zap,
   Eye,
-  ArrowLeftRight,
 } from "lucide-react-native";
 import { useMutation } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
@@ -127,7 +126,7 @@ export default function ExploreScreen() {
   const [filters, setFilters] = useState<FilterState>({ sortBy: "relevance" as SortOption });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [convertAmount, setConvertAmount] = useState("");
+
 
   const searchInputRef = useRef<TextInput>(null);
   const prevCountryRef = useRef<string>(serpApiCountryCode);
@@ -242,7 +241,6 @@ export default function ExploreScreen() {
     setLastSearchedQuery("");
     setShowSearchHistory(false);
     setSearchError(null);
-    setConvertAmount("");
     setFilters({ sortBy: "relevance" as SortOption });
   }, []);
 
@@ -323,13 +321,7 @@ export default function ExploreScreen() {
     return results;
   }, [serpResults, filters.freeDeliveryOnly, filters.storeFilter]);
 
-  const [convertFromCurrency, setConvertFromCurrency] = useState<string>("USD");
 
-  const convertedAmount = useMemo(() => {
-    const num = parseFloat(convertAmount);
-    if (!convertAmount || isNaN(num) || num <= 0) return null;
-    return format(num, convertFromCurrency);
-  }, [convertAmount, format, convertFromCurrency]);
 
   const isSearchActive = searchQuery.length > 0 || hasSearched;
 
@@ -708,46 +700,6 @@ export default function ExploreScreen() {
               </ScrollView>
             </View>
           )}
-
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionRow}>
-              <ArrowLeftRight size={16} color={colors.primary} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Currency Converter</Text>
-            </View>
-            <View style={[styles.converterCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-              <View style={styles.converterRow}>
-                <View style={styles.converterSide}>
-                  <Pressable
-                    onPress={() => {
-                      const common = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD"];
-                      const idx = common.indexOf(convertFromCurrency);
-                      setConvertFromCurrency(common[(idx + 1) % common.length]);
-                    }}
-                    style={styles.converterCurrencyToggle}
-                  >
-                    <Text style={[styles.converterLabel, { color: colors.textTertiary }]}>{convertFromCurrency}</Text>
-                    <ArrowLeftRight size={12} color={colors.textTertiary} />
-                  </Pressable>
-                  <TextInput
-                    value={convertAmount}
-                    onChangeText={setConvertAmount}
-                    placeholder="0"
-                    keyboardType="numeric"
-                    style={[styles.converterInputField, { color: colors.text }]}
-                    placeholderTextColor={colors.textTertiary}
-                    testID="currency-converter-input"
-                  />
-                </View>
-                <ArrowRight size={20} color={colors.textTertiary} />
-                <View style={[styles.converterSide, styles.converterOutput, { backgroundColor: colors.primaryFaded }]}>
-                  <Text style={[styles.converterLabel, { color: colors.primary }]}>{currencyCode || "USD"}</Text>
-                  <Text style={[styles.converterResult, { color: colors.primary }]}>
-                    {convertedAmount ?? "—"}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
 
           <View style={styles.sectionContainer}>
             <View style={styles.sectionRow}>
@@ -1339,43 +1291,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600" as const,
   },
-  converterCard: {
-    marginHorizontal: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-  },
-  converterRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 12,
-  },
-  converterSide: {
-    flex: 1,
-    gap: 6,
-  },
-  converterLabel: {
-    fontSize: 11,
-    fontWeight: "700" as const,
-    letterSpacing: 0.5,
-  },
-  converterInputField: {
-    fontSize: 26,
-    fontWeight: "700" as const,
-    padding: 0,
-  },
-  converterOutput: {
-    padding: 12,
-    borderRadius: 12,
-    alignItems: "flex-start" as const,
-  },
-  converterResult: {
-    fontSize: 24,
-    fontWeight: "800" as const,
-  },
-  converterCurrencyToggle: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 4,
-  },
+
 });
