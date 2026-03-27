@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 40,
-    backgroundColor: "#faf7fe",
+    backgroundColor: "#F8FAFB",
   },
   emoji: {
     fontSize: 48,
@@ -69,18 +69,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: "700" as const,
-    color: "#1a1025",
+    color: "#0F172A",
     marginBottom: 8,
   },
   message: {
     fontSize: 14,
-    color: "#6b5f7a",
+    color: "#475569",
     textAlign: "center" as const,
     lineHeight: 20,
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: "#8032ee",
+    backgroundColor: "#0D9488",
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 14,

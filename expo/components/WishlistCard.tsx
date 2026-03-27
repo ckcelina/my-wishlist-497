@@ -99,8 +99,8 @@ export default React.memo(function WishlistCard({
             <Text style={styles.gridEmoji}>{wishlist.emoji}</Text>
           </View>
           {wishlist.isShared && (
-            <View style={[styles.sharedBadge, { backgroundColor: "#00B89420" }]}>
-              <Users size={10} color="#00B894" />
+            <View style={[styles.sharedBadge, { backgroundColor: colors.primary + "20" }]}>
+              <Users size={10} color={colors.primary} />
             </View>
           )}
         </View>

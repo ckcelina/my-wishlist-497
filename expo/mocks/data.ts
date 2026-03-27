@@ -115,7 +115,7 @@ export const mockWishlists: Wishlist[] = [
     title: "Tech Essentials",
     description: "Must-have gadgets and electronics",
     emoji: "\u{1F4BB}",
-    color: "#8032ee",
+    color: "#0D9488",
     itemCount: 3,
     collaborators: [
       { id: "u1", name: "Alex", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop", role: "owner" },
@@ -163,7 +163,7 @@ export const mockWishlists: Wishlist[] = [
     title: "Summer Wardrobe",
     description: "Clothes and accessories for summer",
     emoji: "\u{1F457}",
-    color: "#4c2090",
+    color: "#0F766E",
     itemCount: 1,
     collaborators: [
       { id: "u1", name: "Alex", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop", role: "owner" },

@@ -30,8 +30,8 @@ const INFO_SLIDES = [
     title: "Your Global\nShopping List",
     subtitle:
       "Save products from any store worldwide and organize them in beautiful wishlists.",
-    bg: "#1a0a2e",
-    accent: "#4c2090",
+    bg: "#0A1A1F",
+    accent: "#0D9488",
   },
   {
     id: 2,
@@ -39,8 +39,8 @@ const INFO_SLIDES = [
     title: "Search\nWorldwide",
     subtitle:
       "Find products in your country and compare prices across 190+ countries instantly.",
-    bg: "#110b1d",
-    accent: "#8032ee",
+    bg: "#0C1117",
+    accent: "#14B8A6",
   },
   {
     id: 3,
@@ -48,8 +48,8 @@ const INFO_SLIDES = [
     title: "Never Miss\na Price Drop",
     subtitle:
       "Set price alerts and get notified the moment your saved products go on sale.",
-    bg: "#0d0818",
-    accent: "#4c2090",
+    bg: "#091215",
+    accent: "#0D9488",
   },
 ];
 
@@ -135,8 +135,8 @@ export default function OnboardingScreen() {
 
   const isCountryStep = currentStep === INFO_SLIDES.length;
   const slide = !isCountryStep ? INFO_SLIDES[currentStep] : null;
-  const bg = slide?.bg ?? "#0d0818";
-  const accent = slide?.accent ?? "#4c2090";
+  const bg = slide?.bg ?? "#091215";
+  const accent = slide?.accent ?? "#0D9488";
 
   const renderCountryItem = useCallback(
     ({ item }: { item: CountryData }) => {
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   modalContent: {
-    backgroundColor: "#1a0a2e",
+    backgroundColor: "#0A1A1F",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     maxHeight: "80%",
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   countryItemSelected: {
-    backgroundColor: "rgba(128, 50, 238, 0.35)",
+    backgroundColor: "rgba(13, 148, 136, 0.35)",
   },
   countryFlag: {
     fontSize: 26,

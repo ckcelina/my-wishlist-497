@@ -482,16 +482,16 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
+    width: 84,
+    height: 84,
+    borderRadius: 24,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
     marginBottom: 14,
   },
   logo: {
-    width: 56,
-    height: 56,
+    width: 58,
+    height: 58,
     borderRadius: 14,
   },
   appName: {
