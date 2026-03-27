@@ -11,6 +11,8 @@ import {
   Animated,
   Alert,
   RefreshControl,
+  Modal,
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,8 +24,12 @@ import {
   X,
   Check,
   ShieldCheck,
+  UserPlus,
+  Mail,
+  Users,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import { useMutation } from "@tanstack/react-query";
 import { useAppColors } from "@/hooks/useColorScheme";
 import {
   useWishlistById,
@@ -32,6 +38,7 @@ import {
   useItemAssignments,
 } from "@/providers/WishlistProvider";
 import { useLocation } from "@/providers/LocationProvider";
+import * as db from "@/lib/database";
 
 const appLogo = require("@/assets/images/logo.png");
 
@@ -62,15 +69,18 @@ export default function WishlistChatScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const wishlist = useWishlistById(id ?? "");
-  const { user, sendMessage, assignItem, assignments, refreshChat } = useWishlistContext();
+  const { user, sendMessage, assignItem, assignments, refreshChat, markChatAsRead, refreshWishlists } = useWishlistContext();
   const messages = useWishlistMessages(id ?? "");
   const itemAssignments = useItemAssignments(id ?? "");
 
   const [text, setText] = useState("");
   const [showClaimPanel, setShowClaimPanel] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
   const scrollRef = useRef<ScrollView>(null);
   const claimPanelAnim = useRef(new Animated.Value(0)).current;
+  const prevMessageCount = useRef(0);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -79,6 +89,20 @@ export default function WishlistChatScreen() {
   }, [refreshChat]);
 
   const isOwner = wishlist?.collaborators.find((c) => c.id === user.id)?.role === "owner";
+
+  useEffect(() => {
+    if (id) {
+      markChatAsRead(id);
+      console.log("[WishlistChat] Marked chat as read:", id);
+    }
+  }, [id, markChatAsRead]);
+
+  useEffect(() => {
+    if (id && messages.length > prevMessageCount.current) {
+      markChatAsRead(id);
+    }
+    prevMessageCount.current = messages.length;
+  }, [messages.length, id, markChatAsRead]);
 
   useEffect(() => {
     Animated.timing(claimPanelAnim, {
@@ -93,7 +117,49 @@ export default function WishlistChatScreen() {
       scrollRef.current?.scrollToEnd({ animated: false });
     }, 200);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      const timer = setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
   }, [messages.length]);
+
+  const inviteMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const foundUser = await db.findUserByEmail(email.trim().toLowerCase());
+      if (!foundUser) {
+        throw new Error("No user found with that email. They need to sign up first.");
+      }
+      if (!wishlist) throw new Error("Wishlist not found");
+      const alreadyCollab = wishlist.collaborators.some((c) => c.id === foundUser.id);
+      if (alreadyCollab) {
+        throw new Error("This user is already a collaborator.");
+      }
+      const success = await db.addCollaborator(
+        wishlist.id,
+        foundUser.id,
+        foundUser.full_name,
+        foundUser.avatar_url ?? "",
+        "editor"
+      );
+      if (!success) throw new Error("Failed to add collaborator.");
+      return foundUser;
+    },
+    onSuccess: (foundUser) => {
+      Alert.alert("Invited!", `${foundUser.full_name} has been added to this chat.`);
+      setInviteEmail("");
+      setShowInviteModal(false);
+      refreshWishlists();
+    },
+    onError: (err: Error) => {
+      Alert.alert("Invite Failed", err.message);
+    },
+  });
 
   if (!wishlist) {
     return (
@@ -161,11 +227,25 @@ export default function WishlistChatScreen() {
               {wishlist.title}
             </Text>
             <Text style={[styles.chatMembers, { color: colors.textTertiary }]}>
-              {wishlist.collaborators.length} members
+              {wishlist.collaborators.length} {wishlist.collaborators.length === 1 ? "member" : "members"}
             </Text>
           </View>
         </View>
-        <Image source={appLogo} style={styles.topBarLogo} contentFit="contain" />
+        <View style={styles.topBarRight}>
+          {isOwner && (
+            <Pressable
+              onPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowInviteModal(true);
+              }}
+              style={[styles.inviteBtn, { backgroundColor: colors.primaryFaded }]}
+              testID="invite-btn"
+            >
+              <UserPlus size={16} color={colors.primary} />
+            </Pressable>
+          )}
+          <Image source={appLogo} style={styles.topBarLogo} contentFit="contain" />
+        </View>
       </View>
 
       {isOwner && (
@@ -203,6 +283,15 @@ export default function WishlistChatScreen() {
               <Text style={[styles.chatEmptySubtitle, { color: colors.textSecondary }]}>
                 Coordinate with your group about this wishlist
               </Text>
+              {isOwner && wishlist.collaborators.length <= 1 && (
+                <Pressable
+                  onPress={() => setShowInviteModal(true)}
+                  style={[styles.inviteBannerBtn, { backgroundColor: colors.primaryFaded }]}
+                >
+                  <Users size={16} color={colors.primary} />
+                  <Text style={[styles.inviteBannerText, { color: colors.primary }]}>Invite people to chat</Text>
+                </Pressable>
+              )}
             </View>
           ) : (
             messages.map((msg) => {
@@ -215,6 +304,7 @@ export default function WishlistChatScreen() {
 
               const isMe = msg.senderId === user.id;
               const isAssignment = msg.type === "assignment";
+              const isFailed = msg.id.startsWith("failed_");
 
               return (
                 <View key={msg.id}>
@@ -242,7 +332,7 @@ export default function WishlistChatScreen() {
                     <View style={[styles.messageRow, isMe && styles.messageRowMe]}>
                       {!isMe && (
                         <Image
-                          source={{ uri: msg.senderAvatar }}
+                          source={msg.senderAvatar ? { uri: msg.senderAvatar } : require("@/assets/images/icon.png")}
                           style={styles.msgAvatar}
                         />
                       )}
@@ -256,7 +346,7 @@ export default function WishlistChatScreen() {
                           style={[
                             styles.msgBubble,
                             isMe
-                              ? { backgroundColor: colors.primary }
+                              ? { backgroundColor: isFailed ? colors.error : colors.primary }
                               : { backgroundColor: colors.surface, borderColor: colors.borderLight, borderWidth: 1 },
                           ]}
                         >
@@ -269,9 +359,21 @@ export default function WishlistChatScreen() {
                             {msg.text}
                           </Text>
                         </View>
-                        <Text style={[styles.msgTime, { color: colors.textTertiary }, isMe && styles.msgTimeMe]}>
-                          {formatChatTime(msg.timestamp)}
-                        </Text>
+                        <View style={styles.msgTimeRow}>
+                          <Text style={[styles.msgTime, { color: colors.textTertiary }, isMe && styles.msgTimeMe]}>
+                            {formatChatTime(msg.timestamp)}
+                          </Text>
+                          {isFailed && (
+                            <Text style={[styles.failedText, { color: colors.error }]}>
+                              Failed to send
+                            </Text>
+                          )}
+                          {isMe && msg.id.startsWith("msg_") && !isFailed && (
+                            <Text style={[styles.sendingText, { color: colors.textTertiary }]}>
+                              Sending...
+                            </Text>
+                          )}
+                        </View>
                       </View>
                     </View>
                   )}
@@ -376,6 +478,84 @@ export default function WishlistChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <Modal visible={showInviteModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowInviteModal(false)} />
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Invite People</Text>
+              <Pressable onPress={() => setShowInviteModal(false)}>
+                <X size={22} color={colors.text} />
+              </Pressable>
+            </View>
+
+            <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>Email Address</Text>
+            <View style={[styles.inviteInputRow, { borderColor: colors.border, backgroundColor: colors.surfaceSecondary }]}>
+              <Mail size={18} color={colors.textTertiary} />
+              <TextInput
+                value={inviteEmail}
+                onChangeText={setInviteEmail}
+                placeholder="friend@example.com"
+                placeholderTextColor={colors.textTertiary}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[styles.inviteInput, { color: colors.text }]}
+              />
+            </View>
+            <Text style={[styles.inviteHint, { color: colors.textTertiary }]}>
+              The person must have an account to be added as a collaborator.
+            </Text>
+
+            {wishlist.collaborators.length > 0 && (
+              <View style={styles.currentMembers}>
+                <Text style={[styles.membersLabel, { color: colors.textSecondary }]}>Current Members</Text>
+                {wishlist.collaborators.map((c) => (
+                  <View key={c.id} style={[styles.memberRow, { borderBottomColor: colors.borderLight }]}>
+                    <Image
+                      source={c.avatar ? { uri: c.avatar } : require("@/assets/images/icon.png")}
+                      style={styles.memberAvatar}
+                    />
+                    <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
+                      {c.name || "Unknown"}
+                    </Text>
+                    <Text style={[styles.memberRole, { color: colors.textTertiary }]}>
+                      {c.role}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() => { setShowInviteModal(false); setInviteEmail(""); }}
+                style={[styles.modalBtn, { backgroundColor: colors.surfaceSecondary }]}
+              >
+                <Text style={[styles.modalBtnText, { color: colors.text }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => inviteMutation.mutate(inviteEmail)}
+                disabled={!inviteEmail.trim() || inviteMutation.isPending}
+                style={[
+                  styles.modalBtn,
+                  {
+                    backgroundColor: inviteEmail.trim() ? colors.primary : colors.surfaceSecondary,
+                    opacity: inviteMutation.isPending ? 0.7 : 1,
+                  },
+                ]}
+              >
+                {inviteMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={[styles.modalBtnText, { color: inviteEmail.trim() ? "#FFFFFF" : colors.textTertiary }]}>Invite</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -404,6 +584,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  topBarRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  inviteBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: "center",
+    alignItems: "center",
   },
   chatEmoji: {
     width: 36,
@@ -473,6 +665,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: "center" as const,
   },
+  inviteBannerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 14,
+    marginTop: 12,
+  },
+  inviteBannerText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+  },
   dateSeparator: {
     flexDirection: "row",
     alignItems: "center",
@@ -524,6 +729,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
   },
+  msgTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   msgTime: {
     fontSize: 10,
     marginLeft: 4,
@@ -531,6 +741,14 @@ const styles = StyleSheet.create({
   msgTimeMe: {
     marginRight: 4,
     marginLeft: 0,
+  },
+  failedText: {
+    fontSize: 10,
+    fontWeight: "500" as const,
+  },
+  sendingText: {
+    fontSize: 10,
+    fontStyle: "italic" as const,
   },
   assignmentBubble: {
     flexDirection: "column",
@@ -660,5 +878,99 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: "700" as const,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  modalContent: {
+    width: "88%" as unknown as number,
+    borderRadius: 24,
+    padding: 24,
+    maxHeight: "80%" as unknown as number,
+  },
+  modalHeader: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700" as const,
+  },
+  modalLabel: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    marginBottom: 8,
+    marginLeft: 2,
+  },
+  inviteInputRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  inviteInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+  },
+  inviteHint: {
+    fontSize: 12,
+    marginTop: 8,
+    marginLeft: 2,
+    lineHeight: 16,
+  },
+  currentMembers: {
+    marginTop: 20,
+    gap: 4,
+  },
+  membersLabel: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    marginBottom: 8,
+    marginLeft: 2,
+  },
+  memberRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
+  memberAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  memberName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "500" as const,
+  },
+  memberRole: {
+    fontSize: 12,
+    textTransform: "capitalize" as const,
+  },
+  modalActions: {
+    flexDirection: "row" as const,
+    gap: 12,
+    marginTop: 20,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center" as const,
+  },
+  modalBtnText: {
+    fontSize: 16,
+    fontWeight: "600" as const,
   },
 });

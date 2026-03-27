@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
@@ -11,12 +11,15 @@ import {
 } from "@/mocks/data";
 import { useAuth } from "@/providers/AuthProvider";
 import * as db from "@/lib/database";
+import { supabase } from "@/lib/supabase";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 const WISHLISTS_KEY = "wishlists_data";
 const NOTIFICATIONS_KEY = "notifications_data";
 const CHAT_KEY = "chat_messages_v2";
 const ASSIGNMENTS_KEY = "item_assignments_v2";
 const RECENTLY_VIEWED_KEY = "recently_viewed_v1";
+const LAST_READ_KEY = "chat_last_read_v1";
 
 export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
   const queryClient = useQueryClient();
@@ -27,6 +30,9 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [assignments, setAssignments] = useState<ItemAssignment[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<Product[]>([]);
+  const [lastReadTimestamps, setLastReadTimestamps] = useState<Record<string, string>>({});
+  const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
+  const sharedIdsRef = useRef<string>("");
 
   const user = useMemo<UserProfile>(() => {
     const base = {
@@ -138,7 +144,7 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       }
     },
     enabled: user.id !== "" && !wishlistsQuery.isLoading,
-    refetchInterval: 10000,
+    refetchInterval: 30000,
   });
 
   const assignmentsQuery = useQuery({
@@ -166,8 +172,133 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       }
     },
     enabled: user.id !== "" && !wishlistsQuery.isLoading,
-    refetchInterval: 10000,
+    refetchInterval: 30000,
   });
+
+  const sharedIdsJoined = sharedWishlistIds.join(",");
+
+  useEffect(() => {
+    if (user.id === "guest" || sharedWishlistIds.length === 0) {
+      if (realtimeChannelRef.current) {
+        console.log("[WishlistProvider] Removing realtime channel (no shared wishlists)");
+        void supabase.removeChannel(realtimeChannelRef.current);
+        realtimeChannelRef.current = null;
+      }
+      return;
+    }
+
+    if (sharedIdsRef.current === sharedIdsJoined && realtimeChannelRef.current) {
+      return;
+    }
+    sharedIdsRef.current = sharedIdsJoined;
+
+    if (realtimeChannelRef.current) {
+      void supabase.removeChannel(realtimeChannelRef.current);
+      realtimeChannelRef.current = null;
+    }
+
+    console.log("[WishlistProvider] Setting up realtime subscription for", sharedWishlistIds.length, "wishlists");
+
+    const channel = supabase
+      .channel(`chat-realtime-${Date.now()}`)
+      .on(
+        "postgres_changes" as any,
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+        },
+        (payload: any) => {
+          const m = payload.new;
+          if (!m) return;
+          console.log("[Realtime] New chat_message INSERT:", m.id, "from:", m.sender_name);
+
+          const currentSharedIds = sharedIdsRef.current.split(",");
+          if (!currentSharedIds.includes(m.wishlist_id)) return;
+
+          const newMsg: ChatMessage = {
+            id: m.id,
+            wishlistId: m.wishlist_id,
+            senderId: m.sender_id,
+            senderName: m.sender_name,
+            senderAvatar: m.sender_avatar,
+            text: m.text,
+            timestamp: m.created_at,
+            type: m.type,
+            assignedItemId: m.assigned_item_id ?? undefined,
+            assignedTo: m.assigned_to ?? undefined,
+          };
+
+          setChatMessages((prev) => {
+            const exists = prev.some((msg) => msg.id === newMsg.id);
+            if (exists) return prev;
+            const withoutTemp = m.sender_id === user.id
+              ? prev.filter((msg) => !(msg.id.startsWith("msg_") && msg.senderId === user.id && msg.text === newMsg.text))
+              : prev;
+            return [...withoutTemp, newMsg];
+          });
+        }
+      )
+      .on(
+        "postgres_changes" as any,
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "item_assignments",
+        },
+        (payload: any) => {
+          const a = payload.new;
+          if (!a) return;
+          console.log("[Realtime] New item_assignment INSERT:", a.id);
+
+          const currentSharedIds = sharedIdsRef.current.split(",");
+          if (!currentSharedIds.includes(a.wishlist_id)) return;
+
+          const newAssignment: ItemAssignment = {
+            productId: a.product_id,
+            assignedTo: a.assigned_to,
+            assignedToName: a.assigned_to_name,
+            assignedBy: a.assigned_by,
+            wishlistId: a.wishlist_id,
+            timestamp: a.created_at,
+          };
+
+          setAssignments((prev) => {
+            const exists = prev.some(
+              (x) => x.wishlistId === newAssignment.wishlistId && x.productId === newAssignment.productId && x.assignedTo === newAssignment.assignedTo
+            );
+            if (exists) return prev;
+            return [...prev, newAssignment];
+          });
+        }
+      )
+      .subscribe((status: string) => {
+        console.log("[Realtime] Subscription status:", status);
+      });
+
+    realtimeChannelRef.current = channel;
+
+    return () => {
+      console.log("[WishlistProvider] Cleaning up realtime channel");
+      if (realtimeChannelRef.current) {
+        void supabase.removeChannel(realtimeChannelRef.current);
+        realtimeChannelRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id, sharedIdsJoined]);
+
+  const lastReadQuery = useQuery({
+    queryKey: ["lastRead"],
+    queryFn: async () => {
+      const stored = await AsyncStorage.getItem(LAST_READ_KEY);
+      return stored ? (JSON.parse(stored) as Record<string, string>) : {};
+    },
+  });
+
+  useEffect(() => {
+    if (lastReadQuery.data) setLastReadTimestamps(lastReadQuery.data);
+  }, [lastReadQuery.data]);
 
   const recentlyViewedQuery = useQuery({
     queryKey: ["recentlyViewed"],
@@ -225,16 +356,16 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       syncWishlists.mutate(updated);
 
       if (user.id !== "guest") {
-        db.createWishlist(user.id, wishlist).then((result) => {
+        db.createWishlistWithIdentity(user.id, wishlist, user.name, user.avatar).then((result) => {
           if (result) {
-            console.log("[WishlistProvider] Wishlist saved to Supabase");
+            console.log("[WishlistProvider] Wishlist saved to Supabase with identity");
           }
         }).catch((err) => {
           console.log("[WishlistProvider] Failed to save wishlist to Supabase:", err);
         });
       }
     },
-    [wishlists, syncWishlists, user.id]
+    [wishlists, syncWishlists, user.id, user.name, user.avatar]
   );
 
   const addProductToWishlist = useCallback(
@@ -332,8 +463,9 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
 
   const sendMessage = useCallback(
     (wishlistId: string, text: string, type: ChatMessage["type"] = "message", assignedItemId?: string) => {
+      const tempId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
       const newMsg: ChatMessage = {
-        id: `msg_${Date.now()}`,
+        id: tempId,
         wishlistId,
         senderId: user.id,
         senderName: user.name,
@@ -344,9 +476,7 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
         assignedItemId,
         assignedTo: type === "assignment" ? user.id : undefined,
       };
-      const updated = [...chatMessages, newMsg];
-      setChatMessages(updated);
-      syncChat.mutate(updated);
+      setChatMessages((prev) => [...prev, newMsg]);
 
       if (user.id !== "guest") {
         db.sendChatMessage({
@@ -359,9 +489,21 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
           type: newMsg.type,
           assignedItemId: newMsg.assignedItemId,
           assignedTo: newMsg.assignedTo,
+        }).then((result) => {
+          if (result) {
+            setChatMessages((prev) =>
+              prev.map((m) => (m.id === tempId ? { ...m, id: result.id, timestamp: result.timestamp } : m))
+            );
+            console.log("[WishlistProvider] Message ID synced:", tempId, "->", result.id);
+          }
         }).catch((err) => {
           console.log("[WishlistProvider] Failed to send message to Supabase:", err);
+          setChatMessages((prev) =>
+            prev.map((m) => (m.id === tempId ? { ...m, id: `failed_${tempId}` } : m))
+          );
         });
+      } else {
+        syncChat.mutate([...chatMessages, newMsg]);
       }
     },
     [chatMessages, user, syncChat]
@@ -497,16 +639,40 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
     [wishlists]
   );
 
+  const markChatAsRead = useCallback(
+    (wishlistId: string) => {
+      const now = new Date().toISOString();
+      setLastReadTimestamps((prev) => {
+        const updated = { ...prev, [wishlistId]: now };
+        void AsyncStorage.setItem(LAST_READ_KEY, JSON.stringify(updated));
+        return updated;
+      });
+    },
+    []
+  );
+
+  const getUnreadCountForWishlist = useCallback(
+    (wishlistId: string) => {
+      const lastRead = lastReadTimestamps[wishlistId];
+      return chatMessages.filter(
+        (m) =>
+          m.wishlistId === wishlistId &&
+          m.senderId !== user.id &&
+          m.type !== "assignment" &&
+          (!lastRead || new Date(m.timestamp).getTime() > new Date(lastRead).getTime())
+      ).length;
+    },
+    [chatMessages, lastReadTimestamps, user.id]
+  );
+
   const unreadChatCount = useMemo(() => {
-    const sharedIds = new Set(wishlists.filter((w) => w.isShared).map((w) => w.id));
-    const uniqueWishlists = new Set<string>();
-    chatMessages.forEach((m) => {
-      if (sharedIds.has(m.wishlistId) && m.senderId !== user.id && m.type !== "assignment") {
-        uniqueWishlists.add(m.wishlistId);
-      }
+    const sharedIds = wishlists.filter((w) => w.isShared).map((w) => w.id);
+    let total = 0;
+    sharedIds.forEach((id) => {
+      total += getUnreadCountForWishlist(id);
     });
-    return uniqueWishlists.size;
-  }, [chatMessages, wishlists, user.id]);
+    return total;
+  }, [wishlists, getUnreadCountForWishlist]);
 
   return useMemo(
     () => ({
@@ -521,6 +687,8 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       chatMessages,
       assignments,
       unreadChatCount,
+      markChatAsRead,
+      getUnreadCountForWishlist,
       isLoading: wishlistsQuery.isLoading,
       addWishlist,
       addProductToWishlist,
@@ -540,7 +708,7 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
     }),
     [
       wishlists, myLists, sharedLists, notifications, unreadCount, user,
-      chatMessages, assignments, unreadChatCount,
+      chatMessages, assignments, unreadChatCount, markChatAsRead, getUnreadCountForWishlist,
       wishlistsQuery.isLoading,
       addWishlist, addProductToWishlist, removeProductFromWishlist,
       togglePurchased, markNotificationRead,

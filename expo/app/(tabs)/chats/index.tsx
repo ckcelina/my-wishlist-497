@@ -36,7 +36,7 @@ export default function ChatsScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { wishlists, chatMessages, user, refreshChat, isLoading } = useWishlistContext();
+  const { wishlists, chatMessages, user, refreshChat, isLoading, getUnreadCountForWishlist } = useWishlistContext();
   const [refreshing, setRefreshing] = useState(false);
 
   const sharedWishlists = wishlists.filter((w) => w.isShared);
@@ -61,8 +61,8 @@ export default function ChatsScreen() {
   }, [wishlists, chatMessages, user.id]);
 
   const getMessageCount = useCallback((wishlistId: string) => {
-    return chatMessages.filter((m) => m.wishlistId === wishlistId && m.senderId !== user.id && m.type !== "assignment").length;
-  }, [chatMessages, user.id]);
+    return getUnreadCountForWishlist(wishlistId);
+  }, [getUnreadCountForWishlist]);
 
   const sortedWishlists = [...sharedWishlists].sort((a, b) => {
     const lastA = getLastMessage(a.id);

@@ -231,6 +231,71 @@ export async function createWishlist(
   }
 }
 
+export async function createWishlistWithIdentity(
+  userId: string,
+  wishlist: Omit<Wishlist, "items" | "itemCount" | "collaborators">,
+  ownerName: string,
+  ownerAvatar: string
+): Promise<Wishlist | null> {
+  try {
+    console.log("[DB] Creating wishlist with identity:", wishlist.title);
+
+    const { data, error } = await supabase
+      .from("wishlists")
+      .insert({
+        id: wishlist.id,
+        user_id: userId,
+        title: wishlist.title,
+        description: wishlist.description,
+        emoji: wishlist.emoji,
+        color: wishlist.color,
+        is_shared: wishlist.isShared,
+        created_at: wishlist.createdAt,
+        updated_at: wishlist.updatedAt,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.log("[DB] Error creating wishlist:", error.message);
+      return null;
+    }
+
+    const dbW = data as DbWishlist;
+
+    const { error: collabError } = await supabase
+      .from("collaborators")
+      .insert({
+        wishlist_id: dbW.id,
+        user_id: userId,
+        name: ownerName,
+        avatar: ownerAvatar,
+        role: "owner",
+      });
+
+    if (collabError) {
+      console.log("[DB] Error adding owner collaborator:", collabError.message);
+    }
+
+    return {
+      id: dbW.id,
+      title: dbW.title,
+      description: dbW.description,
+      emoji: dbW.emoji,
+      color: dbW.color,
+      itemCount: 0,
+      isShared: dbW.is_shared,
+      createdAt: dbW.created_at,
+      updatedAt: dbW.updated_at,
+      items: [],
+      collaborators: [{ id: userId, name: ownerName, avatar: ownerAvatar, role: "owner" }],
+    };
+  } catch (err) {
+    console.error("[DB] createWishlistWithIdentity error:", err);
+    return null;
+  }
+}
+
 export async function addItemToWishlist(wishlistId: string, product: Product): Promise<boolean> {
   try {
     console.log("[DB] Adding item to wishlist:", wishlistId, product.title);
