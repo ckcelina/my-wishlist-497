@@ -21,8 +21,7 @@ import { usePriceAlerts } from "@/providers/PriceAlertProvider";
 import { fetchTrendingProducts, SerpApiResult } from "@/lib/api";
 import WishlistCard from "@/components/WishlistCard";
 import { Product } from "@/types";
-import { trendingProducts, mockWishlists } from "@/mocks/data";
-import { SerpApiResult } from "@/lib/api";
+import { trendingProducts } from "@/mocks/data";
 import { useDemoMode } from "@/providers/DemoModeProvider";
 
 const FALLBACK_TRENDING: SerpApiResult[] = trendingProducts.map((p) => ({
