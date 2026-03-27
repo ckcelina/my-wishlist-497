@@ -748,15 +748,20 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
     console.log("[DemoMode] Action blocked in preview mode");
   }, []);
 
-  if (isDemoMode) {
-    return {
+  const demoAllProducts = useMemo(
+    () => demoWishlists.flatMap((w) => w.items),
+    []
+  );
+
+  const demoValue = useMemo(
+    () => ({
       wishlists: demoWishlists,
       myLists: demoMyLists,
       sharedLists: demoSharedLists,
       notifications: demoNotifications,
       unreadCount: demoUnreadCount,
       user: demoUser,
-      allProducts: demoWishlists.flatMap((w) => w.items),
+      allProducts: demoAllProducts,
       chatMessages: demoChatMessages,
       assignments: demoAssignments,
       unreadChatCount: demoUnreadChatCount,
@@ -778,7 +783,18 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       recentlyViewed: demoRecentlyViewed,
       addToRecentlyViewed: noopAddRecentlyViewed,
       updateProductInWishlist: noopUpdateProduct,
-    };
+    }),
+    [
+      demoMyLists, demoSharedLists, demoUnreadCount, demoAllProducts,
+      demoUnreadChatCount, demoGetUnreadCountForWishlist,
+      noopMarkRead, noopWishlistArg, noopProduct, noopTwoArgs,
+      noopSendMessage, noopAssignItem, noopWishlist,
+      noopAddRecentlyViewed, noopUpdateProduct,
+    ]
+  );
+
+  if (isDemoMode) {
+    return demoValue;
   }
 
   return useMemo(
