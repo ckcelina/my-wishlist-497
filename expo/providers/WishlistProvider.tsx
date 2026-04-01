@@ -753,6 +753,54 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
     []
   );
 
+  const liveAllProducts = useMemo(
+    () => wishlists.flatMap((w) => w.items),
+    [wishlists]
+  );
+
+  const liveValue = useMemo(
+    () => ({
+      wishlists,
+      myLists,
+      sharedLists,
+      notifications,
+      unreadCount,
+      user,
+      allProducts: liveAllProducts,
+      chatMessages,
+      assignments,
+      unreadChatCount,
+      markChatAsRead,
+      getUnreadCountForWishlist,
+      isLoading: wishlistsQuery.isLoading,
+      addWishlist,
+      addProductToWishlist,
+      removeProductFromWishlist,
+      togglePurchased,
+      markNotificationRead,
+      sendMessage,
+      assignItem,
+      unassignItem,
+      toggleShareWishlist,
+      deleteWishlistById,
+      refreshWishlists,
+      refreshChat,
+      recentlyViewed,
+      addToRecentlyViewed,
+      updateProductInWishlist,
+    }),
+    [
+      wishlists, myLists, sharedLists, notifications, unreadCount, user,
+      liveAllProducts, chatMessages, assignments, unreadChatCount, markChatAsRead, getUnreadCountForWishlist,
+      wishlistsQuery.isLoading,
+      addWishlist, addProductToWishlist, removeProductFromWishlist,
+      togglePurchased, markNotificationRead,
+      sendMessage, assignItem, unassignItem, toggleShareWishlist,
+      deleteWishlistById, refreshWishlists, refreshChat,
+      recentlyViewed, addToRecentlyViewed, updateProductInWishlist,
+    ]
+  );
+
   const demoValue = useMemo(
     () => ({
       wishlists: demoWishlists,
@@ -793,53 +841,7 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
     ]
   );
 
-  if (isDemoMode) {
-    return demoValue;
-  }
-
-  return useMemo(
-    () => ({
-      wishlists,
-      myLists,
-      sharedLists,
-      notifications,
-      unreadCount,
-      user,
-      allProducts: wishlists.flatMap((w) => w.items),
-
-      chatMessages,
-      assignments,
-      unreadChatCount,
-      markChatAsRead,
-      getUnreadCountForWishlist,
-      isLoading: wishlistsQuery.isLoading,
-      addWishlist,
-      addProductToWishlist,
-      removeProductFromWishlist,
-      togglePurchased,
-      markNotificationRead,
-      sendMessage,
-      assignItem,
-      unassignItem,
-      toggleShareWishlist,
-      deleteWishlistById,
-      refreshWishlists,
-      refreshChat,
-      recentlyViewed,
-      addToRecentlyViewed,
-      updateProductInWishlist,
-    }),
-    [
-      wishlists, myLists, sharedLists, notifications, unreadCount, user,
-      chatMessages, assignments, unreadChatCount, markChatAsRead, getUnreadCountForWishlist,
-      wishlistsQuery.isLoading,
-      addWishlist, addProductToWishlist, removeProductFromWishlist,
-      togglePurchased, markNotificationRead,
-      sendMessage, assignItem, unassignItem, toggleShareWishlist,
-      deleteWishlistById, refreshWishlists, refreshChat,
-      recentlyViewed, addToRecentlyViewed, updateProductInWishlist,
-    ]
-  );
+  return isDemoMode ? demoValue : liveValue;
 });
 
 export function useWishlistById(id: string) {
