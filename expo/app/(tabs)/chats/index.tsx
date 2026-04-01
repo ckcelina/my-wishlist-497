@@ -53,7 +53,7 @@ export default function ChatsScreen() {
     const msgs = chatMessages
       .filter((m) => m.wishlistId === wishlistId)
       .filter((m) => {
-        if (isOwner && m.type === "assignment") return false;
+        if (isOwner && m.type === "assignment" && m.senderId !== user.id) return false;
         return true;
       })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

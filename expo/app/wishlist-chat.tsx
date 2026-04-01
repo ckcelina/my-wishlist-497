@@ -23,7 +23,6 @@ import {
   Gift,
   X,
   Check,
-  ShieldCheck,
   UserPlus,
   Mail,
   Users,
@@ -248,14 +247,7 @@ export default function WishlistChatScreen() {
         </View>
       </View>
 
-      {isOwner && (
-        <View style={[styles.ownerNotice, { backgroundColor: colors.primaryFaded, borderColor: colors.primary + "30" }]}>
-          <ShieldCheck size={14} color={colors.primary} />
-          <Text style={[styles.ownerNoticeText, { color: colors.primary }]}>
-            Gift assignments are hidden from you to keep the surprise!
-          </Text>
-        </View>
-      )}
+
 
       <KeyboardAvoidingView
         style={styles.chatArea}

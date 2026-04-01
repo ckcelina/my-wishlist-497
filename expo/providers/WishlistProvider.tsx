@@ -857,7 +857,7 @@ export function useWishlistMessages(wishlistId: string) {
     return chatMessages
       .filter((m) => m.wishlistId === wishlistId)
       .filter((m) => {
-        if (isOwner && m.type === "assignment") return false;
+        if (isOwner && m.type === "assignment" && m.senderId !== user.id) return false;
         return true;
       })
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
@@ -872,7 +872,11 @@ export function useItemAssignments(wishlistId: string) {
     if (isOwner) {
       return assignments
         .filter((a) => a.wishlistId === wishlistId)
-        .map((a) => ({ ...a, assignedToName: "Someone", assignedTo: "hidden" }));
+        .map((a) =>
+          a.assignedTo !== user.id
+            ? a
+            : { ...a, assignedToName: "Someone", assignedTo: "hidden" }
+        );
     }
     return assignments.filter((a) => a.wishlistId === wishlistId);
   }, [assignments, wishlistId, user, wishlists]);
