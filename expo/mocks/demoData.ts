@@ -399,7 +399,7 @@ export const demoSurpriseChatMessages: ChatMessage[] = [
     senderId: "demo_u2",
     senderName: "Max",
     senderAvatar: demoCollaborators.max.avatar,
-    text: "I'll get "Sony WH-1000XM5 Wireless Headphones" 🎁",
+    text: "I'll get \"Sony WH-1000XM5 Wireless Headphones\" 🎁",
     timestamp: "2026-03-20T10:12:00Z",
     type: "assignment",
     assignedItemId: "dp1",
