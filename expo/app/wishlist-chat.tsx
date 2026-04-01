@@ -87,7 +87,16 @@ export default function WishlistChatScreen() {
     setTimeout(() => setRefreshing(false), 1200);
   }, [refreshChat]);
 
+  const chatType = wishlist?.chatType;
+  const isOpenChat = chatType === "open";
+  const isSurpriseChat = chatType === "surprise";
+  const subjectName = (() => {
+    if (!wishlist?.subjectUserId) return "the recipient";
+    const found = wishlist.collaborators.find((c) => c.id === wishlist.subjectUserId);
+    return found?.name ?? "the recipient";
+  })();
   const isOwner = wishlist?.collaborators.find((c) => c.id === user.id)?.role === "owner";
+  const canClaim = isOpenChat || isSurpriseChat || !isOwner;
 
   useEffect(() => {
     if (id) {
@@ -249,6 +258,23 @@ export default function WishlistChatScreen() {
 
 
 
+      {isOpenChat && (
+        <View style={[styles.chatTypeBanner, { backgroundColor: "#10B98112", borderColor: "#10B98130" }]}>
+          <Text style={styles.chatTypeBannerEmoji}>👥</Text>
+          <Text style={[styles.chatTypeBannerText, { color: "#10B981" }]}>
+            Open Group — everyone can see all activity & assignments
+          </Text>
+        </View>
+      )}
+      {isSurpriseChat && (
+        <View style={[styles.chatTypeBanner, { backgroundColor: "#F59E0B12", borderColor: "#F59E0B30" }]}>
+          <Text style={styles.chatTypeBannerEmoji}>🤫</Text>
+          <Text style={[styles.chatTypeBannerText, { color: "#F59E0B" }]}>
+            Surprise! {subjectName.charAt(0).toUpperCase() + subjectName.slice(1)} can’t see this chat
+          </Text>
+        </View>
+      )}
+
       <KeyboardAvoidingView
         style={styles.chatArea}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -394,7 +420,11 @@ export default function WishlistChatScreen() {
             </Pressable>
           </View>
           <Text style={[styles.claimPanelSubtitle, { color: colors.textSecondary }]}>
-            {"The wishlist owner won't see your claim"}
+            {isOpenChat
+              ? "Everyone in this group can see who claimed what"
+              : isSurpriseChat
+              ? `${subjectName.charAt(0).toUpperCase() + subjectName.slice(1)} won't see your claim 🤫`
+              : "The wishlist owner won't see your claim"}
           </Text>
           <ScrollView showsVerticalScrollIndicator={false}>
             {wishlist.items.map((item) => {
@@ -439,7 +469,7 @@ export default function WishlistChatScreen() {
         </Animated.View>
 
         <View style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.borderLight, paddingBottom: insets.bottom + 8 }]}>
-          {!isOwner && (
+          {canClaim && (
             <Pressable
               onPress={() => {
                 void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -608,20 +638,24 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 6,
   },
-  ownerNotice: {
+  chatTypeBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     marginHorizontal: 16,
     marginTop: 8,
+    marginBottom: 2,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderRadius: 12,
     borderWidth: 1,
   },
-  ownerNoticeText: {
+  chatTypeBannerEmoji: {
+    fontSize: 15,
+  },
+  chatTypeBannerText: {
     fontSize: 12,
-    fontWeight: "500" as const,
+    fontWeight: "600" as const,
     flex: 1,
   },
   chatArea: {

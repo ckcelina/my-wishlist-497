@@ -9,6 +9,8 @@ export interface DbWishlist {
   emoji: string;
   color: string;
   is_shared: boolean;
+  chat_type?: string;
+  subject_user_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -133,6 +135,8 @@ export async function fetchUserWishlists(userId: string): Promise<Wishlist[]> {
         color: dbW.color,
         itemCount: wItems.length,
         isShared: dbW.is_shared,
+        chatType: (dbW.chat_type as "open" | "surprise" | undefined) ?? undefined,
+        subjectUserId: dbW.subject_user_id ?? undefined,
         createdAt: dbW.created_at,
         updatedAt: dbW.updated_at,
         items: wItems.map((item) => ({

@@ -11,9 +11,10 @@ import {
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { ChevronRight, MessageCircle, Users } from "lucide-react-native";
+import { ChevronRight, MessageCircle, Users, EyeOff } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useWishlistContext } from "@/providers/WishlistProvider";
+import { Wishlist } from "@/types";
 
 const appLogo = require("@/assets/images/logo.png");
 
@@ -48,17 +49,11 @@ export default function ChatsScreen() {
   }, [refreshChat]);
 
   const getLastMessage = useCallback((wishlistId: string) => {
-    const wishlist = wishlists.find((w) => w.id === wishlistId);
-    const isOwner = wishlist?.collaborators.find((c) => c.id === user.id)?.role === "owner";
     const msgs = chatMessages
       .filter((m) => m.wishlistId === wishlistId)
-      .filter((m) => {
-        if (isOwner && m.type === "assignment" && m.senderId !== user.id) return false;
-        return true;
-      })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     return msgs[0] ?? null;
-  }, [wishlists, chatMessages, user.id]);
+  }, [chatMessages]);
 
   const getMessageCount = useCallback((wishlistId: string) => {
     return getUnreadCountForWishlist(wishlistId);
@@ -73,9 +68,21 @@ export default function ChatsScreen() {
     return new Date(lastB.timestamp).getTime() - new Date(lastA.timestamp).getTime();
   });
 
+  const getChatTypeBadge = (wishlist: Wishlist) => {
+    if (wishlist.chatType === "open") {
+      return { label: "Open Group", color: "#10B981", bg: "#10B98115" };
+    }
+    if (wishlist.chatType === "surprise") {
+      return { label: "Surprise", color: "#F59E0B", bg: "#F59E0B15" };
+    }
+    return null;
+  };
+
   const renderChatThread = ({ item }: { item: typeof sharedWishlists[0] }) => {
     const lastMessage = getLastMessage(item.id);
     const msgCount = getMessageCount(item.id);
+    const badge = getChatTypeBadge(item);
+    const isSurprise = item.chatType === "surprise";
 
     return (
       <Pressable
@@ -85,6 +92,11 @@ export default function ChatsScreen() {
       >
         <View style={[styles.threadEmoji, { backgroundColor: item.color + "18" }]}>
           <Text style={styles.threadEmojiText}>{item.emoji}</Text>
+          {isSurprise && (
+            <View style={[styles.surpriseOverlay, { backgroundColor: colors.surface }]}>
+              <EyeOff size={10} color={colors.textTertiary} />
+            </View>
+          )}
         </View>
         <View style={styles.threadContent}>
           <View style={styles.threadHeader}>
@@ -97,6 +109,15 @@ export default function ChatsScreen() {
               </Text>
             )}
           </View>
+
+          {badge && (
+            <View style={[styles.typeBadge, { backgroundColor: badge.bg }]}>
+              <Text style={[styles.typeBadgeText, { color: badge.color }]}>
+                {isSurprise ? "🤫" : "👥"} {badge.label}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.threadFooter}>
             <Text style={[styles.threadPreview, { color: colors.textSecondary }]} numberOfLines={1}>
               {lastMessage
@@ -118,7 +139,7 @@ export default function ChatsScreen() {
               />
             ))}
             <Text style={[styles.memberCount, { color: colors.textTertiary }]}>
-              {item.collaborators.length} members
+              {item.collaborators.length} {item.collaborators.length === 1 ? "member" : "members"}
             </Text>
           </View>
         </View>
@@ -228,13 +249,26 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
+    position: "relative",
   },
   threadEmojiText: {
     fontSize: 26,
   },
+  surpriseOverlay: {
+    position: "absolute",
+    bottom: -3,
+    right: -3,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#F59E0B",
+  },
   threadContent: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
   threadHeader: {
     flexDirection: "row",
@@ -249,6 +283,16 @@ const styles = StyleSheet.create({
   threadTime: {
     fontSize: 12,
     marginLeft: 8,
+  },
+  typeBadge: {
+    alignSelf: "flex-start" as const,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  typeBadgeText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
   },
   threadFooter: {
     flexDirection: "row",
@@ -275,7 +319,7 @@ const styles = StyleSheet.create({
   threadMembers: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 2,
     gap: 6,
   },
   memberAvatar: {

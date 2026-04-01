@@ -13,7 +13,9 @@ import {
   demoUser,
   demoWishlists,
   demoChatMessages,
+  demoSurpriseChatMessages,
   demoAssignments,
+  demoSurpriseAssignments,
   demoNotifications,
   demoRecentlyViewed,
 } from "@/mocks/demoData";
@@ -639,14 +641,19 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
     [notifications]
   );
 
+  const visibleWishlists = useMemo(
+    () => wishlists.filter((w) => !(w.chatType === "surprise" && w.subjectUserId === user.id)),
+    [wishlists, user.id]
+  );
+
   const myLists = useMemo(
-    () => wishlists.filter((w) => !w.isShared),
-    [wishlists]
+    () => visibleWishlists.filter((w) => !w.isShared),
+    [visibleWishlists]
   );
 
   const sharedLists = useMemo(
-    () => wishlists.filter((w) => w.isShared),
-    [wishlists]
+    () => visibleWishlists.filter((w) => w.isShared),
+    [visibleWishlists]
   );
 
   const markChatAsRead = useCallback(
@@ -676,21 +683,36 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
   );
 
   const unreadChatCount = useMemo(() => {
-    const sharedIds = wishlists.filter((w) => w.isShared).map((w) => w.id);
+    const sharedIds = visibleWishlists.filter((w) => w.isShared).map((w) => w.id);
     let total = 0;
     sharedIds.forEach((id) => {
       total += getUnreadCountForWishlist(id);
     });
     return total;
-  }, [wishlists, getUnreadCountForWishlist]);
+  }, [visibleWishlists, getUnreadCountForWishlist]);
 
-  const demoMyLists = useMemo(
-    () => demoWishlists.filter((w) => !w.isShared),
+  const demoVisibleWishlists = useMemo(
+    () => demoWishlists.filter((w) => !(w.chatType === "surprise" && w.subjectUserId === demoUser.id)),
     []
   );
 
+  const demoMyLists = useMemo(
+    () => demoVisibleWishlists.filter((w) => !w.isShared),
+    [demoVisibleWishlists]
+  );
+
   const demoSharedLists = useMemo(
-    () => demoWishlists.filter((w) => w.isShared),
+    () => demoVisibleWishlists.filter((w) => w.isShared),
+    [demoVisibleWishlists]
+  );
+
+  const demoAllChatMessages = useMemo(
+    () => [...demoChatMessages, ...demoSurpriseChatMessages],
+    []
+  );
+
+  const demoAllAssignments = useMemo(
+    () => [...demoAssignments, ...demoSurpriseAssignments],
     []
   );
 
@@ -701,24 +723,24 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
 
   const demoGetUnreadCountForWishlist = useCallback(
     (wishlistId: string) => {
-      return demoChatMessages.filter(
+      return demoAllChatMessages.filter(
         (m) =>
           m.wishlistId === wishlistId &&
           m.senderId !== demoUser.id &&
           m.type !== "assignment"
       ).length;
     },
-    []
+    [demoAllChatMessages]
   );
 
   const demoUnreadChatCount = useMemo(() => {
-    const sharedIds = demoWishlists.filter((w) => w.isShared).map((w) => w.id);
+    const sharedIds = demoVisibleWishlists.filter((w) => w.isShared).map((w) => w.id);
     let total = 0;
     sharedIds.forEach((id) => {
       total += demoGetUnreadCountForWishlist(id);
     });
     return total;
-  }, [demoGetUnreadCountForWishlist]);
+  }, [demoVisibleWishlists, demoGetUnreadCountForWishlist]);
 
   const noopWishlist = useCallback(() => {
     console.log("[DemoMode] Action blocked in preview mode");
@@ -754,13 +776,13 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
   );
 
   const liveAllProducts = useMemo(
-    () => wishlists.flatMap((w) => w.items),
-    [wishlists]
+    () => visibleWishlists.flatMap((w) => w.items),
+    [visibleWishlists]
   );
 
   const liveValue = useMemo(
     () => ({
-      wishlists,
+      wishlists: visibleWishlists,
       myLists,
       sharedLists,
       notifications,
@@ -790,7 +812,7 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       updateProductInWishlist,
     }),
     [
-      wishlists, myLists, sharedLists, notifications, unreadCount, user,
+      visibleWishlists, myLists, sharedLists, notifications, unreadCount, user,
       liveAllProducts, chatMessages, assignments, unreadChatCount, markChatAsRead, getUnreadCountForWishlist,
       wishlistsQuery.isLoading,
       addWishlist, addProductToWishlist, removeProductFromWishlist,
@@ -803,15 +825,15 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
 
   const demoValue = useMemo(
     () => ({
-      wishlists: demoWishlists,
+      wishlists: demoVisibleWishlists,
       myLists: demoMyLists,
       sharedLists: demoSharedLists,
       notifications: demoNotifications,
       unreadCount: demoUnreadCount,
       user: demoUser,
       allProducts: demoAllProducts,
-      chatMessages: demoChatMessages,
-      assignments: demoAssignments,
+      chatMessages: demoAllChatMessages,
+      assignments: demoAllAssignments,
       unreadChatCount: demoUnreadChatCount,
       markChatAsRead: noopMarkRead,
       getUnreadCountForWishlist: demoGetUnreadCountForWishlist,
@@ -833,8 +855,8 @@ export const [WishlistProvider, useWishlistContext] = createContextHook(() => {
       updateProductInWishlist: noopUpdateProduct,
     }),
     [
-      demoMyLists, demoSharedLists, demoUnreadCount, demoAllProducts,
-      demoUnreadChatCount, demoGetUnreadCountForWishlist,
+      demoVisibleWishlists, demoMyLists, demoSharedLists, demoUnreadCount, demoAllProducts,
+      demoAllChatMessages, demoAllAssignments, demoUnreadChatCount, demoGetUnreadCountForWishlist,
       noopMarkRead, noopWishlistArg, noopProduct, noopTwoArgs,
       noopSendMessage, noopAssignItem, noopWishlist,
       noopAddRecentlyViewed, noopUpdateProduct,
@@ -853,10 +875,12 @@ export function useWishlistMessages(wishlistId: string) {
   const { chatMessages, user, wishlists } = useWishlistContext();
   return useMemo(() => {
     const wishlist = wishlists.find((w) => w.id === wishlistId);
+    const chatType = wishlist?.chatType;
     const isOwner = wishlist?.collaborators.find((c) => c.id === user.id)?.role === "owner";
     return chatMessages
       .filter((m) => m.wishlistId === wishlistId)
       .filter((m) => {
+        if (chatType === "open" || chatType === "surprise") return true;
         if (isOwner && m.type === "assignment" && m.senderId !== user.id) return false;
         return true;
       })
@@ -868,7 +892,11 @@ export function useItemAssignments(wishlistId: string) {
   const { assignments, user, wishlists } = useWishlistContext();
   return useMemo(() => {
     const wishlist = wishlists.find((w) => w.id === wishlistId);
+    const chatType = wishlist?.chatType;
     const isOwner = wishlist?.collaborators.find((c) => c.id === user.id)?.role === "owner";
+    if (chatType === "open" || chatType === "surprise") {
+      return assignments.filter((a) => a.wishlistId === wishlistId);
+    }
     if (isOwner) {
       return assignments
         .filter((a) => a.wishlistId === wishlistId)

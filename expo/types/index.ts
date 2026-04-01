@@ -39,6 +39,8 @@ export interface Wishlist {
   createdAt: string;
   updatedAt: string;
   items: Product[];
+  chatType?: "open" | "surprise";
+  subjectUserId?: string;
 }
 
 export interface Collaborator {
