@@ -220,13 +220,17 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           "chat_messages_v2",
           "item_assignments_v2",
           "recently_viewed_v1",
-          "search_history_v2",
-          "price_alerts_data",
+          "search_history_v1",
+          "price_alerts_v2",
+          "price_history_v2",
+          "price_drops_v2",
+          "price_last_check_v2",
+          "chat_last_read_v1",
           "has_onboarded_v1",
           "user_country_code",
           "user_currency_code",
           "user_city",
-          "theme_mode",
+          "theme_preference",
         ]);
       } catch (e) {
         console.log("[Auth] Error clearing AsyncStorage:", e);
