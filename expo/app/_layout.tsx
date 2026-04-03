@@ -10,7 +10,7 @@ import { ThemeProvider } from "@/providers/ThemeProvider";
 import { LocationProvider } from "@/providers/LocationProvider";
 import { SearchHistoryProvider } from "@/providers/SearchHistoryProvider";
 import { PriceAlertProvider } from "@/providers/PriceAlertProvider";
-import { DemoModeProvider } from "@/providers/DemoModeProvider";
+import { DemoModeProvider, useDemoMode } from "@/providers/DemoModeProvider";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -21,6 +21,7 @@ const queryClient = new QueryClient();
 
 function AuthGate() {
   const { isAuthenticated, isInitialized, isLoading } = useAuth();
+  const { isDemoMode, isLoaded: isDemoLoaded } = useDemoMode();
   const segments = useSegments();
   const router = useRouter();
   const colors = useAppColors();
@@ -34,6 +35,15 @@ function AuthGate() {
   }, []);
 
   useEffect(() => {
+    if (!isDemoLoaded) return;
+
+    // In demo/preview mode, skip all auth-based redirects
+    if (isDemoMode) {
+      console.log("[AuthGate] Preview mode active, skipping auth redirects");
+      hasRedirected.current = false;
+      return;
+    }
+
     if (!isInitialized || hasOnboarded === null) return;
 
     const inAuthGroup = segments[0] === "login" || segments[0] === "signup";
@@ -54,7 +64,19 @@ function AuthGate() {
     } else {
       hasRedirected.current = false;
     }
-  }, [isAuthenticated, isInitialized, segments, router, hasOnboarded]);
+  }, [isAuthenticated, isInitialized, segments, router, hasOnboarded, isDemoMode, isDemoLoaded]);
+
+  // Wait for demo mode preference to load from storage
+  if (!isDemoLoaded) {
+    return (
+      <View style={[authStyles.loadingOverlay, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  // In preview/demo mode, show the app immediately without auth checks
+  if (isDemoMode) return null;
 
   if (!isInitialized || isLoading || hasOnboarded === null) {
     return (

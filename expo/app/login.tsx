@@ -15,15 +15,18 @@ import {
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Eye, EyeOff, Mail, Lock } from "lucide-react-native";
+import { Eye, EyeOff, Mail, Lock, Play } from "lucide-react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useAuth } from "@/providers/AuthProvider";
+import { useDemoMode } from "@/providers/DemoModeProvider";
 
 export default function LoginScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signIn, isSigningIn } = useAuth();
+  const { setDemoMode } = useDemoMode();
 
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -32,6 +35,17 @@ export default function LoginScreen() {
 
   const buttonScale = useRef(new Animated.Value(1)).current;
   const passwordRef = useRef<TextInput>(null);
+
+  const handlePreviewDemo = async () => {
+    try {
+      await AsyncStorage.setItem("has_onboarded_v1", "true");
+      await setDemoMode(true);
+      console.log("[Login] Preview demo mode enabled");
+      router.replace("/");
+    } catch (err) {
+      console.log("[Login] Failed to enable preview demo:", err);
+    }
+  };
 
   const validate = (): boolean => {
     const newErrors: { email?: string; password?: string } = {};
@@ -209,6 +223,17 @@ export default function LoginScreen() {
                 Create an Account
               </Text>
             </Pressable>
+
+            <Pressable
+              testID="preview-demo"
+              style={[styles.demoButton, { borderColor: colors.borderLight }]}
+              onPress={handlePreviewDemo}
+            >
+              <Play size={14} color={colors.textSecondary} />
+              <Text style={[styles.demoButtonText, { color: colors.textSecondary }]}>
+                Preview Demo
+              </Text>
+            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -309,5 +334,18 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 15,
     fontWeight: "700" as const,
+  },
+  demoButton: {
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  demoButtonText: {
+    fontSize: 14,
+    fontWeight: "500" as const,
   },
 });
