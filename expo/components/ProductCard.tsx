@@ -7,7 +7,7 @@ import {
   Animated,
   Platform,
 } from "react-native";
-import { Image } from "expo-image";
+import SafeImage from "@/components/SafeImage";
 import { Heart, ExternalLink, Check } from "lucide-react-native";
 import { useAppColors } from "@/hooks/useColorScheme";
 import { useLocation } from "@/providers/LocationProvider";
@@ -56,8 +56,8 @@ export default React.memo(function ProductCard({
             },
           ]}
         >
-          <Image
-            source={{ uri: product.image }}
+          <SafeImage
+            uri={product.image}
             style={styles.horizontalImage}
             contentFit="cover"
           />
@@ -98,8 +98,8 @@ export default React.memo(function ProductCard({
         ]}
       >
         <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: product.image }}
+          <SafeImage
+            uri={product.image}
             style={variant === "full" ? styles.fullImage : styles.compactImage}
             contentFit="cover"
           />

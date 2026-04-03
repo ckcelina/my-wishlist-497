@@ -9,7 +9,7 @@ import {
   RefreshControl,
   Platform,
 } from "react-native";
-import { Image } from "expo-image";
+import SafeImage from "@/components/SafeImage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Plus, ChevronRight, MapPin, Bell, TrendingUp, ShoppingBag } from "lucide-react-native";
@@ -198,8 +198,8 @@ export default function HomeScreen() {
                 )}
               </Pressable>
               <Pressable onPress={() => router.push("/(tabs)/profile")}>
-                <Image
-                  source={user.avatar ? { uri: user.avatar } : require("@/assets/images/icon.png")}
+                <SafeImage
+                  uri={user.avatar}
                   style={[styles.avatar, { borderColor: colors.primary + "40" }]}
                 />
               </Pressable>
@@ -409,7 +409,7 @@ export default function HomeScreen() {
                       index > 0 ? { marginLeft: 12 } : undefined,
                     ]}
                   >
-                    <Image source={{ uri: item.image }} style={styles.trendingImage} contentFit="cover" />
+                    <SafeImage uri={item.image} style={styles.trendingImage} contentFit="cover" />
                     <View style={styles.trendingInfo}>
                       <Text style={[styles.trendingTitle, { color: colors.text }]} numberOfLines={2}>
                         {item.title}

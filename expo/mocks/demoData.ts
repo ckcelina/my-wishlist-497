@@ -65,7 +65,7 @@ const demoProducts: Product[] = [
   {
     id: "dp4",
     title: "Le Creuset Dutch Oven 5.5 Qt",
-    image: "https://images.unsplash.com/photo-1585837146751-a44118595680?w=400&h=400&fit=crop",
+    image: "https://images.unsplash.com/photo-1612152328957-5a18b00f6a80?w=400&h=400&fit=crop",
     price: 370.00,
     currency: "USD",
     store: "Williams Sonoma",
@@ -80,7 +80,7 @@ const demoProducts: Product[] = [
   {
     id: "dp5",
     title: "Kindle Paperwhite Signature Edition",
-    image: "https://images.unsplash.com/photo-1594377157609-5c996118ac7f?w=400&h=400&fit=crop",
+    image: "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400&h=400&fit=crop",
     price: 189.99,
     currency: "USD",
     store: "Amazon",
@@ -96,7 +96,7 @@ const demoProducts: Product[] = [
   {
     id: "dp6",
     title: "Aesop Resurrection Aromatique Hand Wash",
-    image: "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=400&h=400&fit=crop",
+    image: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&h=400&fit=crop",
     price: 40.00,
     currency: "USD",
     store: "Aesop",
@@ -111,7 +111,7 @@ const demoProducts: Product[] = [
   {
     id: "dp7",
     title: "Dyson Airwrap Complete Long",
-    image: "https://images.unsplash.com/photo-1522338242992-e1a54f0e2b63?w=400&h=400&fit=crop",
+    image: "https://images.unsplash.com/photo-1519415510236-718bdfcd89c8?w=400&h=400&fit=crop",
     price: 599.99,
     currency: "USD",
     store: "Dyson",
@@ -127,7 +127,7 @@ const demoProducts: Product[] = [
   {
     id: "dp8",
     title: "Stanley Adventure Quencher 40oz",
-    image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=400&fit=crop",
+    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=400&fit=crop",
     price: 45.00,
     currency: "USD",
     store: "Stanley",
@@ -142,7 +142,7 @@ const demoProducts: Product[] = [
   {
     id: "dp9",
     title: "Lego Botanicals Flower Bouquet",
-    image: "https://images.unsplash.com/photo-1587654780291-39c9404d7dd0?w=400&h=400&fit=crop",
+    image: "https://images.unsplash.com/photo-1560961911-ba7ef651a56c?w=400&h=400&fit=crop",
     price: 49.99,
     currency: "USD",
     store: "Lego",
@@ -188,7 +188,7 @@ const demoProducts: Product[] = [
   {
     id: "dp12",
     title: "Muji Aroma Diffuser",
-    image: "https://images.unsplash.com/photo-1602928298849-325cec8771c0?w=400&h=400&fit=crop",
+    image: "https://images.unsplash.com/photo-1608181831718-c9fcd76d7186?w=400&h=400&fit=crop",
     price: 79.00,
     currency: "USD",
     store: "Muji",
@@ -203,7 +203,7 @@ const demoProducts: Product[] = [
   {
     id: "dp13",
     title: "Tom Ford Lost Cherry EDP 50ml",
-    image: "https://images.unsplash.com/photo-1541643600914-78b084683601?w=400&h=400&fit=crop",
+    image: "https://images.unsplash.com/photo-1588405748880-12d1d2a59f75?w=400&h=400&fit=crop",
     price: 375.00,
     currency: "USD",
     store: "Sephora",
@@ -251,7 +251,7 @@ const demoProducts: Product[] = [
   {
     id: "dp16",
     title: "Diptyque Baies Candle 190g",
-    image: "https://images.unsplash.com/photo-1572726729207-a78d6feb18d7?w=400&h=400&fit=crop",
+    image: "https://images.unsplash.com/photo-1602607279929-f81b5db58fe4?w=400&h=400&fit=crop",
     price: 72.00,
     currency: "USD",
     store: "Nordstrom",

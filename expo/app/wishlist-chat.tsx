@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
+import SafeImage from "@/components/SafeImage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -349,8 +350,8 @@ export default function WishlistChatScreen() {
                   ) : (
                     <View style={[styles.messageRow, isMe && styles.messageRowMe]}>
                       {!isMe && (
-                        <Image
-                          source={msg.senderAvatar ? { uri: msg.senderAvatar } : require("@/assets/images/icon.png")}
+                        <SafeImage
+                          uri={msg.senderAvatar}
                           style={styles.msgAvatar}
                         />
                       )}
@@ -441,7 +442,7 @@ export default function WishlistChatScreen() {
                     { borderColor: colors.borderLight, opacity: isClaimed && !isClaimedByMe ? 0.5 : 1 },
                   ]}
                 >
-                  <Image source={{ uri: item.image }} style={styles.claimItemImage} contentFit="cover" />
+                  <SafeImage uri={item.image} style={styles.claimItemImage} contentFit="cover" />
                   <View style={styles.claimItemContent}>
                     <Text style={[styles.claimItemTitle, { color: colors.text }]} numberOfLines={1}>
                       {item.title}
@@ -535,8 +536,8 @@ export default function WishlistChatScreen() {
                 <Text style={[styles.membersLabel, { color: colors.textSecondary }]}>Current Members</Text>
                 {wishlist.collaborators.map((c) => (
                   <View key={c.id} style={[styles.memberRow, { borderBottomColor: colors.borderLight }]}>
-                    <Image
-                      source={c.avatar ? { uri: c.avatar } : require("@/assets/images/icon.png")}
+                    <SafeImage
+                      uri={c.avatar}
                       style={styles.memberAvatar}
                     />
                     <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
