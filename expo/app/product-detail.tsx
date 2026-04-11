@@ -60,12 +60,14 @@ export default function ProductDetailScreen() {
 
   let product: Product | undefined;
   let serpProductId: string | undefined;
+  let immersivePageToken: string | undefined;
 
   if (serpData) {
     try {
       const decoded = decodeURIComponent(serpData);
       const parsed = JSON.parse(decoded);
       serpProductId = parsed.productId;
+      immersivePageToken = parsed.immersiveProductPageToken;
       product = {
         id: id ?? `serp_${Date.now()}`,
         title: parsed.title || "Unknown Product",
@@ -81,12 +83,13 @@ export default function ProductDetailScreen() {
         country: serpApiCountryCode.toUpperCase(),
         rating: parsed.rating,
       };
-      console.log("[ProductDetail] Parsed serpData product:", product.title);
+      console.log("[ProductDetail] Parsed serpData product:", product.title, "hasToken:", !!immersivePageToken);
     } catch (e) {
       console.log("[ProductDetail] Failed to parse serpData, trying raw:", e);
       try {
         const parsed = JSON.parse(serpData);
         serpProductId = parsed.productId;
+        immersivePageToken = parsed.immersiveProductPageToken;
         product = {
           id: id ?? `serp_${Date.now()}`,
           title: parsed.title || "Unknown Product",
@@ -102,7 +105,7 @@ export default function ProductDetailScreen() {
           country: serpApiCountryCode.toUpperCase(),
           rating: parsed.rating,
         };
-        console.log("[ProductDetail] Parsed raw serpData product:", product.title);
+        console.log("[ProductDetail] Parsed raw serpData product:", product.title, "hasToken:", !!immersivePageToken);
       } catch {
         console.log("[ProductDetail] Both parse attempts failed");
       }
@@ -115,9 +118,9 @@ export default function ProductDetailScreen() {
   }
 
   const productDetailMutation = useMutation({
-    mutationFn: async (productIdParam: string) => {
-      console.log("[ProductDetail] Fetching product detail for:", productIdParam);
-      return getProductDetail(productIdParam, serpApiCountryCode);
+    mutationFn: async ({ productIdParam, token }: { productIdParam: string; token?: string }) => {
+      console.log("[ProductDetail] Fetching product detail for:", token ? "immersive token" : productIdParam);
+      return getProductDetail(productIdParam, serpApiCountryCode, token);
     },
     onSuccess: (data) => {
       if (data.sellers && data.sellers.length > 0) {
@@ -157,8 +160,8 @@ export default function ProductDetailScreen() {
   }, [fadeAnim, slideAnim]);
 
   useEffect(() => {
-    if (serpProductId) {
-      productDetailMutation.mutate(serpProductId);
+    if (immersivePageToken || serpProductId) {
+      productDetailMutation.mutate({ productIdParam: serpProductId || product?.title || "", token: immersivePageToken });
     }
     if (product?.title) {
       priceComparisonMutation.mutate(product.title);

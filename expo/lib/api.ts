@@ -29,6 +29,7 @@ export interface SerpApiResult {
   snippet: string;
   productId?: string;
   delivery?: string;
+  immersiveProductPageToken?: string;
 }
 
 export interface ScrapeResult {
@@ -186,7 +187,8 @@ export async function searchProducts(
 
 export async function getProductDetail(
   productId: string,
-  country: string
+  country: string,
+  pageToken?: string
 ): Promise<ProductDetailResult> {
   try {
     const baseUrl = getBaseUrl();
@@ -194,11 +196,11 @@ export async function getProductDetail(
       return { title: "", description: "", prices: null, images: [], highlights: [], sellers: [], error: "API URL not configured" };
     }
 
-    console.log(`[API] Getting product detail: ${productId}`);
+    console.log(`[API] Getting product detail: ${pageToken ? "via immersive token" : productId}`);
     const response = await fetch(`${baseUrl}/api/search/product-detail`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId, country }),
+      body: JSON.stringify({ productId, country, pageToken }),
     });
 
     if (!response.ok) {

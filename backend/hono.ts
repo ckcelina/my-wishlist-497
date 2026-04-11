@@ -28,14 +28,71 @@ function getCurrencyForCountry(gl: string): string {
   return GL_TO_CURRENCY[gl.toLowerCase()] ?? "";
 }
 
+const COUNTRY_LOCATION_MAP: Record<string, string> = {
+  jo: "Amman,Amman Governorate,Jordan",
+  sa: "Riyadh,Riyadh Region,Saudi Arabia",
+  ae: "Dubai,Dubai,United Arab Emirates",
+  eg: "Cairo,Cairo Governorate,Egypt",
+  kw: "Kuwait City,Al Asimah,Kuwait",
+  qa: "Doha,Doha,Qatar",
+  bh: "Manama,Capital Governorate,Bahrain",
+  om: "Muscat,Muscat Governorate,Oman",
+  lb: "Beirut,Beirut Governorate,Lebanon",
+  iq: "Baghdad,Baghdad Governorate,Iraq",
+  pk: "Karachi,Sindh,Pakistan",
+  bd: "Dhaka,Dhaka Division,Bangladesh",
+  ng: "Lagos,Lagos,Nigeria",
+  ke: "Nairobi,Nairobi County,Kenya",
+  za: "Johannesburg,Gauteng,South Africa",
+  gh: "Accra,Greater Accra,Ghana",
+  tz: "Dar es Salaam,Dar es Salaam,Tanzania",
+  et: "Addis Ababa,Addis Ababa,Ethiopia",
+  ma: "Casablanca,Casablanca-Settat,Morocco",
+  tn: "Tunis,Tunis,Tunisia",
+  in: "Mumbai,Maharashtra,India",
+  tr: "Istanbul,Istanbul,Turkey",
+  us: "New York,New York,United States",
+  uk: "London,England,United Kingdom",
+  gb: "London,England,United Kingdom",
+  ca: "Toronto,Ontario,Canada",
+  au: "Sydney,New South Wales,Australia",
+  de: "Berlin,Berlin,Germany",
+  fr: "Paris,Ile-de-France,France",
+  jp: "Tokyo,Tokyo,Japan",
+  kr: "Seoul,Seoul,South Korea",
+  br: "Sao Paulo,State of Sao Paulo,Brazil",
+  mx: "Mexico City,Mexico City,Mexico",
+  sg: "Singapore,Singapore",
+  my: "Kuala Lumpur,Federal Territory of Kuala Lumpur,Malaysia",
+  th: "Bangkok,Bangkok,Thailand",
+  id: "Jakarta,Jakarta,Indonesia",
+  ph: "Manila,Metro Manila,Philippines",
+  vn: "Ho Chi Minh City,Ho Chi Minh City,Vietnam",
+};
+
+const GOOGLE_SHOPPING_SUPPORTED_GL: Set<string> = new Set([
+  "us", "uk", "gb", "ca", "au", "nz", "de", "fr", "it", "es", "nl", "be",
+  "at", "pt", "ie", "ch", "se", "no", "dk", "fi", "pl", "cz", "hu", "ro",
+  "bg", "hr", "sk", "si", "ee", "lv", "lt", "gr", "cy", "mt", "lu",
+  "jp", "kr", "in", "br", "mx", "ar", "cl", "co", "pe",
+  "sa", "ae", "tr", "il", "za", "ng", "ke", "eg",
+  "sg", "my", "th", "id", "ph", "vn", "tw", "hk",
+  "ru", "ua", "pk",
+]);
+
+function getLocationForCountry(countryCode: string): string | undefined {
+  return COUNTRY_LOCATION_MAP[countryCode.toLowerCase()];
+}
+
 function mapShoppingItem(item: Record<string, unknown>, countryCode: string) {
   const currency = (item.currency as string) || getCurrencyForCountry(countryCode);
-  const link = (item.link as string) || (item.product_link as string) || (item.url as string) || "";
+  const merchantLink = (item.link as string) || "";
   const store = (item.source as string) || (item.merchant as string) || "Unknown";
   const title = (item.title as string) || "";
+  const immersiveToken = (item.immersive_product_page_token as string) || "";
 
-  if (!link) {
-    console.log(`[Normalize] WARNING: No URL for item "${title}" from "${store}"`);
+  if (!merchantLink) {
+    console.log(`[Normalize] WARNING: No merchant URL for item "${title}" from "${store}" (product_link ignored)`);
   }
 
   return {
@@ -43,13 +100,14 @@ function mapShoppingItem(item: Record<string, unknown>, countryCode: string) {
     price: typeof item.extracted_price === "number" ? item.extracted_price : 0,
     currency,
     store,
-    link,
+    link: merchantLink,
     image: (item.thumbnail as string) || "",
     rating: typeof item.rating === "number" ? item.rating : undefined,
     reviews: typeof item.reviews === "number" ? item.reviews : undefined,
     snippet: (item.snippet as string) || "",
     productId: (item.product_id as string) || "",
     delivery: (item.delivery as string) || "",
+    immersiveProductPageToken: immersiveToken,
   };
 }
 
@@ -180,14 +238,21 @@ app.post("/search/products", async (c) => {
       );
     }
 
+    const glCountry = GOOGLE_SHOPPING_SUPPORTED_GL.has(country.toLowerCase()) ? country : "us";
+    const location = getLocationForCountry(country);
+
     const params = new URLSearchParams({
       engine: "google_shopping",
       q: query,
       api_key: apiKey,
-      gl: country,
+      gl: glCountry,
       hl: "en",
       num: "20",
     });
+
+    if (location) {
+      params.set("location", location);
+    }
 
     if (minPrice !== undefined) {
       params.set("min_price", String(minPrice));
@@ -200,7 +265,7 @@ app.post("/search/products", async (c) => {
     }
 
     const serpUrl = `https://serpapi.com/search.json?${params.toString()}`;
-    console.log(`[SerpAPI] Searching: "${query}" in ${country}`);
+    console.log(`[SerpAPI] Searching: "${query}" in ${country} (gl=${glCountry}, location=${location || "none"})`);
     console.log(`[SerpAPI] URL: ${serpUrl.replace(apiKey, "***")}`);
 
     const response = await fetch(serpUrl);
@@ -250,13 +315,14 @@ app.post("/search/products", async (c) => {
 app.post("/search/product-detail", async (c) => {
   try {
     const body = await c.req.json();
-    const { productId, country = "us" } = body as {
-      productId: string;
+    const { productId, pageToken, country = "us" } = body as {
+      productId?: string;
+      pageToken?: string;
       country?: string;
     };
 
-    if (!productId) {
-      return c.json({ error: "productId is required" }, 400);
+    if (!pageToken && !productId) {
+      return c.json({ error: "pageToken or productId is required" }, 400);
     }
 
     const apiKey = process.env.SERPAPI_KEY;
@@ -264,88 +330,141 @@ app.post("/search/product-detail", async (c) => {
       return c.json({ error: "SerpAPI key not configured" }, 500);
     }
 
-    const params = new URLSearchParams({
-      engine: "google_product",
-      product_id: productId,
+    if (pageToken) {
+      const params = new URLSearchParams({
+        engine: "google_immersive_product",
+        page_token: pageToken,
+        api_key: apiKey,
+        more_stores: "true",
+      });
+
+      console.log(`[SerpAPI] Fetching immersive product detail (token length: ${pageToken.length})`);
+      const response = await fetch(
+        `https://serpapi.com/search.json?${params.toString()}`
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log(
+          `[SerpAPI] Immersive product error ${response.status}: ${errorText.substring(0, 200)}`
+        );
+        return c.json(
+          { error: `SerpAPI returned ${response.status}` },
+          502
+        );
+      }
+
+      const data = (await response.json()) as Record<string, unknown>;
+
+      if (data.error) {
+        console.log(`[SerpAPI] Immersive product API error: ${data.error}`);
+        return c.json({ error: `SerpAPI error: ${data.error}` }, 502);
+      }
+
+      const productResults = data.product_results as Record<string, unknown> | null;
+      const stores = (productResults?.stores as Record<string, unknown>[]) || [];
+
+      const allSellers = stores.map(
+        (store: Record<string, unknown>) => {
+          const storeLink = (store.link as string) || "";
+          const storeName = (store.name as string) || "";
+          const storePrice = (store.price as string) || "";
+          const storeTotal = (store.total as string) || "";
+          const extractedPrice = typeof store.extracted_price === "number" ? store.extracted_price : 0;
+          const extractedTotal = typeof store.extracted_total === "number" ? store.extracted_total : extractedPrice;
+          const shipping = (store.shipping as string) || "";
+          const detailsOffers = (store.details_and_offers as string[]) || [];
+          const deliveryInfo = detailsOffers.join(", ") || shipping;
+
+          return {
+            name: storeName,
+            link: storeLink,
+            basePrice: storePrice,
+            totalPrice: storeTotal || storePrice,
+            price: extractedTotal > 0 ? extractedTotal : extractedPrice,
+            delivery: deliveryInfo,
+          };
+        }
+      );
+
+      const sellers = allSellers.filter((s) => s.link);
+      console.log(`[SerpAPI] Immersive product stores: ${stores.length} raw, ${stores.length - sellers.length} missing URL, ${sellers.length} returned`);
+
+      const title = (productResults?.title as string) || "";
+      const description = (productResults?.description as string) || "";
+      const priceRange = (productResults?.price_range as string) || "";
+      const images: string[] = [];
+      const media = (productResults?.media as Record<string, unknown>[]) || [];
+      for (const m of media) {
+        if (m.link && typeof m.link === "string") images.push(m.link);
+      }
+
+      const reviewsData = productResults?.reviews as Record<string, unknown> | undefined;
+      const ratingVal = typeof reviewsData?.rating === "number" ? reviewsData.rating : undefined;
+      const reviewsVal = typeof reviewsData?.count === "number" ? reviewsData.count : undefined;
+
+      const result = {
+        title,
+        description,
+        prices: priceRange,
+        rating: ratingVal,
+        reviews: reviewsVal,
+        images,
+        highlights: [] as string[],
+        sellers,
+        error: null,
+      };
+
+      console.log(
+        `[SerpAPI] Immersive product found: "${result.title}" with ${sellers.length} sellers`
+      );
+      return c.json(result);
+    }
+
+    console.log(`[SerpAPI] No immersive token, falling back to google_shopping search for productId: ${productId}`);
+    const searchParams = new URLSearchParams({
+      engine: "google_shopping",
+      q: productId || "",
       api_key: apiKey,
-      gl: country,
+      gl: GOOGLE_SHOPPING_SUPPORTED_GL.has(country.toLowerCase()) ? country : "us",
       hl: "en",
+      num: "10",
     });
 
-    console.log(`[SerpAPI] Fetching product detail: ${productId}`);
-    const response = await fetch(
-      `https://serpapi.com/search.json?${params.toString()}`
-    );
+    const loc = getLocationForCountry(country);
+    if (loc) searchParams.set("location", loc);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.log(
-        `[SerpAPI] Product detail error ${response.status}: ${errorText.substring(0, 200)}`
-      );
-      return c.json(
-        { error: `SerpAPI returned ${response.status}` },
-        502
-      );
+    const searchResp = await fetch(`https://serpapi.com/search.json?${searchParams.toString()}`);
+    if (!searchResp.ok) {
+      return c.json({ error: `Fallback search failed: ${searchResp.status}` }, 502);
     }
 
-    const data = (await response.json()) as Record<string, unknown>;
+    const searchData = (await searchResp.json()) as Record<string, unknown>;
+    const shoppingResults = (searchData.shopping_results as Record<string, unknown>[]) || [];
 
-    if (data.error) {
-      console.log(`[SerpAPI] Product detail API error: ${data.error}`);
-      return c.json({ error: `SerpAPI error: ${data.error}` }, 502);
-    }
+    const fallbackSellers = shoppingResults.slice(0, 10).map((item: Record<string, unknown>) => {
+      const mapped = mapShoppingItem(item, country);
+      return {
+        name: mapped.store,
+        link: mapped.link,
+        basePrice: mapped.price > 0 ? `${mapped.currency} ${mapped.price}` : "",
+        totalPrice: mapped.price > 0 ? `${mapped.currency} ${mapped.price}` : "",
+        price: mapped.price,
+        delivery: mapped.delivery,
+      };
+    }).filter(s => s.link);
 
-    const productResults = data.product_results as Record<
-      string,
-      unknown
-    > | null;
-    const sellersResults = data.sellers_results as Record<
-      string,
-      unknown
-    > | null;
+    console.log(`[SerpAPI] Fallback search found ${fallbackSellers.length} sellers`);
 
-    const onlineSellers =
-      (sellersResults?.online_sellers as Record<string, unknown>[]) || [];
-
-    const allSellers = onlineSellers.map(
-      (seller: Record<string, unknown>) => ({
-        name: (seller.name as string) || "",
-        link: (seller.link as string) || (seller.url as string) || "",
-        basePrice: (seller.base_price as string) || "",
-        totalPrice: (seller.total_price as string) || "",
-        price:
-          typeof seller.extracted_price === "number"
-            ? seller.extracted_price
-            : 0,
-        delivery: (seller.delivery as string) || "",
-      })
-    );
-
-    const sellers = allSellers.filter((s) => s.link);
-    console.log(`[SerpAPI] Product sellers: ${onlineSellers.length} raw, ${allSellers.length - sellers.length} missing URL, ${sellers.length} returned`);
-
-    const result = {
-      title: (productResults?.title as string) || "",
-      description: (productResults?.description as string) || "",
-      prices: productResults?.prices as unknown,
-      rating:
-        typeof productResults?.rating === "number"
-          ? productResults.rating
-          : undefined,
-      reviews:
-        typeof productResults?.reviews === "number"
-          ? productResults.reviews
-          : undefined,
-      images: (productResults?.images as string[]) || [],
-      highlights: (productResults?.highlights as string[]) || [],
-      sellers,
+    return c.json({
+      title: "",
+      description: "",
+      prices: null,
+      images: [],
+      highlights: [],
+      sellers: fallbackSellers,
       error: null,
-    };
-
-    console.log(
-      `[SerpAPI] Product detail found: "${result.title}" with ${sellers.length} sellers`
-    );
-    return c.json(result);
+    });
   } catch (err) {
     console.error("[SerpAPI] Product detail failed:", err);
     return c.json({ error: "Product detail fetch failed" }, 500);
@@ -402,7 +521,7 @@ app.post("/search/compare-prices", async (c) => {
                 : 0,
             currency: (item.currency as string) || getCurrencyForCountry(country),
             store: (item.source as string) || "Unknown",
-            link: (item.link as string) || (item.product_link as string) || "",
+            link: (item.link as string) || "",
             image: (item.thumbnail as string) || "",
           })
         );
