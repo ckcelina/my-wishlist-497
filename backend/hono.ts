@@ -30,12 +30,20 @@ function getCurrencyForCountry(gl: string): string {
 
 function mapShoppingItem(item: Record<string, unknown>, countryCode: string) {
   const currency = (item.currency as string) || getCurrencyForCountry(countryCode);
+  const link = (item.link as string) || (item.product_link as string) || (item.url as string) || "";
+  const store = (item.source as string) || (item.merchant as string) || "Unknown";
+  const title = (item.title as string) || "";
+
+  if (!link) {
+    console.log(`[Normalize] WARNING: No URL for item "${title}" from "${store}"`);
+  }
+
   return {
-    title: (item.title as string) || "",
+    title,
     price: typeof item.extracted_price === "number" ? item.extracted_price : 0,
     currency,
-    store: (item.source as string) || "Unknown",
-    link: (item.link as string) || (item.product_link as string) || "",
+    store,
+    link,
     image: (item.thumbnail as string) || "",
     rating: typeof item.rating === "number" ? item.rating : undefined,
     reviews: typeof item.reviews === "number" ? item.reviews : undefined,
@@ -221,14 +229,18 @@ app.post("/search/products", async (c) => {
     const shoppingResults =
       (data.shopping_results as Record<string, unknown>[]) || [];
 
-    const results = shoppingResults.slice(0, 20).map(
+    const rawCount = shoppingResults.length;
+    const allResults = shoppingResults.slice(0, 20).map(
       (item: Record<string, unknown>) => mapShoppingItem(item, country)
     );
 
+    const withUrl = allResults.filter((r) => r.link);
+    const withoutUrl = allResults.length - withUrl.length;
+
     console.log(
-      `[SerpAPI] Found ${results.length} shopping results for "${query}"`
+      `[SerpAPI] Search "${query}" in ${country}: ${rawCount} raw, ${allResults.length} normalized, ${withoutUrl} missing URL, ${withUrl.length} returned`
     );
-    return c.json({ results, error: null });
+    return c.json({ results: withUrl, error: null });
   } catch (err) {
     console.error("[SerpAPI] Search failed:", err);
     return c.json({ results: [], error: "Search failed" }, 500);
@@ -295,10 +307,10 @@ app.post("/search/product-detail", async (c) => {
     const onlineSellers =
       (sellersResults?.online_sellers as Record<string, unknown>[]) || [];
 
-    const sellers = onlineSellers.map(
+    const allSellers = onlineSellers.map(
       (seller: Record<string, unknown>) => ({
         name: (seller.name as string) || "",
-        link: (seller.link as string) || "",
+        link: (seller.link as string) || (seller.url as string) || "",
         basePrice: (seller.base_price as string) || "",
         totalPrice: (seller.total_price as string) || "",
         price:
@@ -308,6 +320,9 @@ app.post("/search/product-detail", async (c) => {
         delivery: (seller.delivery as string) || "",
       })
     );
+
+    const sellers = allSellers.filter((s) => s.link);
+    console.log(`[SerpAPI] Product sellers: ${onlineSellers.length} raw, ${allSellers.length - sellers.length} missing URL, ${sellers.length} returned`);
 
     const result = {
       title: (productResults?.title as string) || "",
@@ -378,21 +393,26 @@ app.post("/search/compare-prices", async (c) => {
         const shoppingResults =
           (data.shopping_results as Record<string, unknown>[]) || [];
 
+        const mapped = shoppingResults.slice(0, 5).map(
+          (item: Record<string, unknown>) => ({
+            title: (item.title as string) || "",
+            price:
+              typeof item.extracted_price === "number"
+                ? item.extracted_price
+                : 0,
+            currency: (item.currency as string) || getCurrencyForCountry(country),
+            store: (item.source as string) || "Unknown",
+            link: (item.link as string) || (item.product_link as string) || "",
+            image: (item.thumbnail as string) || "",
+          })
+        );
+
+        const withUrl = mapped.filter((r) => r.link);
+        console.log(`[SerpAPI] Compare ${country}: ${shoppingResults.length} raw, ${withUrl.length} with URL`);
+
         return {
           country,
-          results: shoppingResults.slice(0, 5).map(
-            (item: Record<string, unknown>) => ({
-              title: (item.title as string) || "",
-              price:
-                typeof item.extracted_price === "number"
-                  ? item.extracted_price
-                  : 0,
-              currency: (item.currency as string) || "USD",
-              store: (item.source as string) || "Unknown",
-              link: (item.link as string) || "",
-              image: (item.thumbnail as string) || "",
-            })
-          ),
+          results: withUrl,
         };
       })
     );
@@ -550,14 +570,15 @@ app.post("/search/trending", async (c) => {
     const shoppingResults =
       (data.shopping_results as Record<string, unknown>[]) || [];
 
-    const results = shoppingResults.slice(0, 10).map(
+    const allResults = shoppingResults.slice(0, 10).map(
       (item: Record<string, unknown>) => ({
         ...mapShoppingItem(item, country),
         category: trendingQuery,
       })
     );
+    const results = allResults.filter((r) => r.link);
 
-    console.log(`[SerpAPI] Trending: ${results.length} results for "${trendingQuery}"`);
+    console.log(`[SerpAPI] Trending: ${allResults.length} normalized, ${results.length} with URL for "${trendingQuery}"`);
     return c.json({ results, category: trendingQuery, error: null });
   } catch (err) {
     console.error("[SerpAPI] Trending failed:", err);
@@ -615,11 +636,12 @@ app.post("/search/deals", async (c) => {
     const shoppingResults =
       (data.shopping_results as Record<string, unknown>[]) || [];
 
-    const results = shoppingResults.slice(0, 15).map(
+    const allResults = shoppingResults.slice(0, 15).map(
       (item: Record<string, unknown>) => mapShoppingItem(item, country)
     );
+    const results = allResults.filter((r) => r.link);
 
-    console.log(`[SerpAPI] Deals: ${results.length} results`);
+    console.log(`[SerpAPI] Deals: ${allResults.length} normalized, ${results.length} with URL`);
     return c.json({ results, error: null });
   } catch (err) {
     console.error("[SerpAPI] Deals failed:", err);
@@ -1049,9 +1071,10 @@ app.post("/search/visual", async (c) => {
         const shopData = (await shopResp.json()) as Record<string, unknown>;
         const items = (shopData.shopping_results as Record<string, unknown>[]) || [];
 
-        shoppingResults = items.slice(0, 20).map((item: Record<string, unknown>) => mapShoppingItem(item, country));
+        const allShopResults = items.slice(0, 20).map((item: Record<string, unknown>) => mapShoppingItem(item, country));
+        shoppingResults = allShopResults.filter((r) => r.link);
 
-        console.log(`[SerpAPI] Shopping found ${shoppingResults.length} results`);
+        console.log(`[SerpAPI] Visual shopping: ${allShopResults.length} normalized, ${shoppingResults.length} with URL`);
       }
     }
 
@@ -1123,12 +1146,13 @@ app.post("/search/barcode", async (c) => {
     const shoppingResults =
       (data.shopping_results as Record<string, unknown>[]) || [];
 
-    const results = shoppingResults.slice(0, 15).map(
+    const allResults = shoppingResults.slice(0, 15).map(
       (item: Record<string, unknown>) => mapShoppingItem(item, country)
     );
+    const results = allResults.filter((r) => r.link);
 
     console.log(
-      `[SerpAPI] Barcode search found ${results.length} results for "${barcode}"`
+      `[SerpAPI] Barcode search "${barcode}": ${allResults.length} normalized, ${results.length} with URL`
     );
     return c.json({ results, barcode, error: null });
   } catch (err) {

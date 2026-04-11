@@ -447,10 +447,17 @@ export default function ProductDetailScreen() {
                 <Text style={[styles.sectionLabel, { color: colors.text }]}>Store Comparison</Text>
                 {product.alternatives.map((alt, index) => {
                   const altPrice = format(alt.price, alt.currency);
+                  const hasUrl = Boolean(alt.url);
                   return (
-                    <View
+                    <Pressable
                       key={`${alt.store}-${index}`}
-                      style={[styles.altCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                      onPress={() => {
+                        if (hasUrl) {
+                          console.log(`[ProductDetail] Opening alternative store URL: ${alt.url}`);
+                          void Linking.openURL(alt.url);
+                        }
+                      }}
+                      style={[styles.altCard, { backgroundColor: colors.surface, borderColor: colors.borderLight, opacity: hasUrl ? 1 : 0.6 }]}
                     >
                       <View style={styles.altLeft}>
                         <Text style={[styles.altStore, { color: colors.text }]}>{alt.store}</Text>
@@ -464,8 +471,11 @@ export default function ProductDetailScreen() {
                           )}
                         </View>
                       </View>
-                      <Text style={[styles.altPrice, { color: colors.primary }]}>{altPrice}</Text>
-                    </View>
+                      <View style={styles.altRight}>
+                        <Text style={[styles.altPrice, { color: colors.primary }]}>{altPrice}</Text>
+                        {hasUrl && <ExternalLink size={14} color={colors.textTertiary} />}
+                      </View>
+                    </Pressable>
                   );
                 })}
               </View>
@@ -486,10 +496,17 @@ export default function ProductDetailScreen() {
                   const convertedOriginal = convert(product.price, product.currency);
                   const convertedBest = convert(bestResult.price, bestResult.currency);
                   const savings = convertedOriginal - convertedBest;
+                  const bestLink = bestResult.link;
 
                   return (
-                    <View
+                    <Pressable
                       key={countryData.country}
+                      onPress={() => {
+                        if (bestLink) {
+                          console.log(`[ProductDetail] Opening comparison link: ${bestLink}`);
+                          void Linking.openURL(bestLink);
+                        }
+                      }}
                       style={[styles.countryCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
                     >
                       <View style={styles.countryHeader}>
@@ -520,17 +537,33 @@ export default function ProductDetailScreen() {
                       </View>
                       {countryData.results.length > 1 && (
                         <View style={[styles.moreStores, { borderTopColor: colors.borderLight }]}>
-                          {countryData.results.slice(1, 3).map((r, ri) => (
-                            <View key={`more-${ri}`} style={styles.moreStoreRow}>
-                              <Text style={[styles.moreStoreName, { color: colors.textSecondary }]}>{r.store}</Text>
-                              <Text style={[styles.moreStorePrice, { color: colors.textSecondary }]}>
-                                {format(r.price, r.currency)}
-                              </Text>
-                            </View>
-                          ))}
+                          {countryData.results.slice(1, 3).map((r, ri) => {
+                            const moreLink = r.link;
+                            return (
+                              <Pressable
+                                key={`more-${ri}`}
+                                onPress={(e) => {
+                                  e.stopPropagation?.();
+                                  if (moreLink) {
+                                    console.log(`[ProductDetail] Opening more store link: ${moreLink}`);
+                                    void Linking.openURL(moreLink);
+                                  }
+                                }}
+                                style={styles.moreStoreRow}
+                              >
+                                <Text style={[styles.moreStoreName, { color: colors.textSecondary }]}>{r.store}</Text>
+                                <View style={{ flexDirection: "row" as const, alignItems: "center" as const, gap: 6 }}>
+                                  <Text style={[styles.moreStorePrice, { color: colors.textSecondary }]}>
+                                    {format(r.price, r.currency)}
+                                  </Text>
+                                  {moreLink ? <ExternalLink size={10} color={colors.textTertiary} /> : null}
+                                </View>
+                              </Pressable>
+                            );
+                          })}
                         </View>
                       )}
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>
@@ -854,7 +887,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   altLeft: {
+    flex: 1,
     gap: 4,
+  },
+  altRight: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
   },
   altStore: {
     fontSize: 15,

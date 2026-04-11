@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Platform,
   LayoutChangeEvent,
+  Linking,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -1509,6 +1510,8 @@ export default function AddScreen() {
                           onPress={() => {
                             if (match.link) {
                               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              console.log(`[VisualMatch] Opening link: ${match.link}`);
+                              void Linking.openURL(match.link);
                             }
                           }}
                           style={[
