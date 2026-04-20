@@ -1,20 +1,52 @@
-import { Platform } from 'react-native';
-
 const getBaseUrl = () => {
   const url = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
   if (!url) {
-    console.warn("EXPO_PUBLIC_RORK_API_BASE_URL is not set");
     return "";
   }
   return url.replace(/\/+$/, "");
 };
 
-const logApiError = (label: string, err: unknown) => {
-  if (Platform.OS === 'web') {
-    console.warn(`${label}:`, err);
-  } else {
-    console.error(`${label}:`, err);
+let backendReachable: boolean | null = null;
+let backendProbePromise: Promise<boolean> | null = null;
+let backendUnreachableWarned = false;
+
+async function probeBackend(): Promise<boolean> {
+  const baseUrl = getBaseUrl();
+  if (!baseUrl) return false;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(`${baseUrl}/api/`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return false;
+    const contentType = res.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) return false;
+    return true;
+  } catch {
+    return false;
   }
+}
+
+async function isBackendAvailable(): Promise<boolean> {
+  if (backendReachable !== null) return backendReachable;
+  if (!backendProbePromise) {
+    backendProbePromise = probeBackend().then((ok) => {
+      backendReachable = ok;
+      if (!ok && !backendUnreachableWarned) {
+        backendUnreachableWarned = true;
+        console.log("[API] Backend not reachable — requests will be skipped and return empty results.");
+      }
+      return ok;
+    });
+  }
+  return backendProbePromise;
+}
+
+const logApiError = (label: string, err: unknown) => {
+  console.log(`${label}:`, err instanceof Error ? err.message : String(err));
 };
 
 export interface SerpApiResult {
@@ -114,8 +146,8 @@ export interface DbHealthResult {
 export async function scrapeProductUrl(url: string): Promise<ScrapeResult> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) {
-      return { title: "", image: "", description: "", price: 0, currency: "", store: "", url, error: "API URL not configured" };
+    if (!baseUrl || !(await isBackendAvailable())) {
+      return { title: "", image: "", description: "", price: 0, currency: "", store: "", url, error: "Backend unavailable" };
     }
 
     console.log(`[API] Scraping URL: ${url}`);
@@ -149,8 +181,8 @@ export async function searchProducts(
 ): Promise<{ results: SerpApiResult[]; error: string | null }> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) {
-      return { results: [], error: "API URL not configured" };
+    if (!baseUrl || !(await isBackendAvailable())) {
+      return { results: [], error: "Backend unavailable" };
     }
 
     console.log(`[API] Searching products: "${query}" in ${country}`);
@@ -192,8 +224,8 @@ export async function getProductDetail(
 ): Promise<ProductDetailResult> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) {
-      return { title: "", description: "", prices: null, images: [], highlights: [], sellers: [], error: "API URL not configured" };
+    if (!baseUrl || !(await isBackendAvailable())) {
+      return { title: "", description: "", prices: null, images: [], highlights: [], sellers: [], error: "Backend unavailable" };
     }
 
     console.log(`[API] Getting product detail: ${pageToken ? "via immersive token" : productId}`);
@@ -226,8 +258,8 @@ export async function comparePrices(
 ): Promise<PriceComparisonResult> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) {
-      return { comparison: [], error: "API URL not configured" };
+    if (!baseUrl || !(await isBackendAvailable())) {
+      return { comparison: [], error: "Backend unavailable" };
     }
 
     console.log(`[API] Comparing prices for: "${query}" across ${countries.join(", ")}`);
@@ -260,8 +292,8 @@ export async function fetchTrendingProducts(
 ): Promise<TrendingResult> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) {
-      return { results: [], category: "", error: "API URL not configured" };
+    if (!baseUrl || !(await isBackendAvailable())) {
+      return { results: [], category: "", error: "Backend unavailable" };
     }
 
     console.log(`[API] Fetching trending in ${country}`);
@@ -295,8 +327,8 @@ export async function fetchDeals(
 ): Promise<DealsResult> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) {
-      return { results: [], error: "API URL not configured" };
+    if (!baseUrl || !(await isBackendAvailable())) {
+      return { results: [], error: "Backend unavailable" };
     }
 
     console.log(`[API] Fetching deals: ${category} in ${country}`);
@@ -328,8 +360,8 @@ export async function checkPrices(
 ): Promise<PriceCheckResult> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) {
-      return { results: [], error: "API URL not configured" };
+    if (!baseUrl || !(await isBackendAvailable())) {
+      return { results: [], error: "Backend unavailable" };
     }
 
     console.log(`[API] Checking prices for ${products.length} products`);
@@ -379,7 +411,7 @@ export async function recordPriceHistory(
 ): Promise<PriceHistoryRecordResult> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) {
+    if (!baseUrl || !(await isBackendAvailable())) {
       return {
         entry: { productId, price, currency, store, checkedAt: new Date().toISOString() },
         livePrice: null,
@@ -427,7 +459,7 @@ export async function savePriceAlertsToBackend(
 ): Promise<{ success: boolean }> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) return { success: false };
+    if (!baseUrl || !(await isBackendAvailable())) return { success: false };
 
     console.log(`[API] Saving price alerts for user: ${userId}`);
     const response = await fetch(`${baseUrl}/api/price-alerts/save`, {
@@ -449,7 +481,7 @@ export async function loadPriceAlertsFromBackend(
 ): Promise<{ alerts: unknown[]; priceHistory: Record<string, unknown[]>; priceDrops: unknown[] }> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) return { alerts: [], priceHistory: {}, priceDrops: [] };
+    if (!baseUrl || !(await isBackendAvailable())) return { alerts: [], priceHistory: {}, priceDrops: [] };
 
     console.log(`[API] Loading price alerts for user: ${userId}`);
     const response = await fetch(`${baseUrl}/api/price-alerts/load`, {
@@ -480,8 +512,8 @@ export async function searchByBarcode(
 ): Promise<BarcodeSearchResult> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) {
-      return { results: [], barcode, error: "API URL not configured" };
+    if (!baseUrl || !(await isBackendAvailable())) {
+      return { results: [], barcode, error: "Backend unavailable" };
     }
 
     console.log(`[API] Barcode search: "${barcode}" in ${country}`);
@@ -534,8 +566,8 @@ export async function searchByImage(
 ): Promise<VisualSearchResult> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) {
-      return { visualMatches: [], shoppingResults: [], searchQuery: "", imageUrl: "", error: "API URL not configured" };
+    if (!baseUrl || !(await isBackendAvailable())) {
+      return { visualMatches: [], shoppingResults: [], searchQuery: "", imageUrl: "", error: "Backend unavailable" };
     }
 
     console.log(`[API] Visual search in ${country}${city ? `, city: ${city}` : ""}`);
@@ -570,8 +602,8 @@ export async function searchByImage(
 export async function checkDatabaseHealth(): Promise<DbHealthResult> {
   try {
     const baseUrl = getBaseUrl();
-    if (!baseUrl) {
-      return { status: "error", message: "API URL not configured", tables: {} };
+    if (!baseUrl || !(await isBackendAvailable())) {
+      return { status: "error", message: "Backend unavailable", tables: {} };
     }
 
     console.log("[API] Checking database health...");
