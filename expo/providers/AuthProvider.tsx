@@ -110,10 +110,27 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       });
 
       if (error) {
-        console.log("[Auth] Sign up error:", error.message);
-        throw error;
+        console.log("[Auth] Sign up error:", error.message, "status:", error.status);
+        const msg = error.message.toLowerCase();
+        if (
+          msg.includes("already registered") ||
+          msg.includes("already exists") ||
+          msg.includes("already been registered") ||
+          msg.includes("user already") ||
+          msg.includes("email address is already") ||
+          error.status === 422
+        ) {
+          throw new Error("Email already exists, try another email.");
+        }
+        throw new Error(error.message || "Sign up failed. Please try again.");
       }
       console.log("[Auth] Sign up successful:", data.user?.id);
+
+      const identities = data.user?.identities;
+      if (data.user && Array.isArray(identities) && identities.length === 0) {
+        console.log("[Auth] Empty identities array — email already exists");
+        throw new Error("Email already exists, try another email.");
+      }
 
       let finalData = data;
       if (!data.session) {
@@ -124,6 +141,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         });
         if (signInError) {
           console.log("[Auth] Auto sign-in after signup failed:", signInError.message);
+          const sMsg = signInError.message.toLowerCase();
+          if (sMsg.includes("invalid login") || sMsg.includes("invalid credentials")) {
+            throw new Error("Email already exists, try another email.");
+          }
           throw signInError;
         }
         console.log("[Auth] Auto sign-in after signup successful");
