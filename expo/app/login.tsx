@@ -183,6 +183,16 @@ export default function LoginScreen() {
               {errors.password ? (
                 <Text style={[styles.errorText, { color: colors.error }]}>{errors.password}</Text>
               ) : null}
+              <Pressable
+                testID="forgot-password-link"
+                onPress={() => router.push("/forgot-password")}
+                hitSlop={8}
+                style={styles.forgotWrap}
+              >
+                <Text style={[styles.forgotText, { color: colors.primary }]}>
+                  Forgot password?
+                </Text>
+              </Pressable>
             </View>
 
             <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
@@ -347,5 +357,15 @@ const styles = StyleSheet.create({
   demoButtonText: {
     fontSize: 14,
     fontWeight: "500" as const,
+  },
+  forgotWrap: {
+    alignSelf: "flex-end",
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    marginTop: 2,
+  },
+  forgotText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
   },
 });

@@ -220,6 +220,22 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ email }: { email: string }) => {
+      console.log("[Auth] Sending password reset email to:", email);
+      const redirectTo = typeof window !== "undefined" ? window.location.origin : undefined;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo,
+      });
+      if (error) {
+        console.log("[Auth] Reset password error:", error.message);
+        throw new Error(error.message || "Failed to send reset email. Please try again.");
+      }
+      console.log("[Auth] Password reset email sent");
+      return { email };
+    },
+  });
+
   const updateProfileMutation = useMutation({
     mutationFn: async (updates: Partial<Pick<UserProfile, "full_name" | "country" | "currency" | "avatar_url">>) => {
       if (!user) throw new Error("Not authenticated");
@@ -344,6 +360,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       signUp: signUpMutation.mutateAsync,
       signIn: signInMutation.mutateAsync,
       signOut: signOutMutation.mutateAsync,
+      resetPassword: resetPasswordMutation.mutateAsync,
+      isResettingPassword: resetPasswordMutation.isPending,
       deleteAccount: deleteAccountMutation.mutateAsync,
       updateProfile: updateProfileMutation.mutateAsync,
       isSigningUp: signUpMutation.isPending,
@@ -364,6 +382,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       signUpMutation.mutateAsync,
       signInMutation.mutateAsync,
       signOutMutation.mutateAsync,
+      resetPasswordMutation.mutateAsync,
+      resetPasswordMutation.isPending,
       deleteAccountMutation.mutateAsync,
       updateProfileMutation.mutateAsync,
       signUpMutation.isPending,
