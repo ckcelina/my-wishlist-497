@@ -115,10 +115,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         });
         if (signInError) {
           console.log("[Auth] Auto sign-in after signup failed:", signInError.message);
-        } else {
-          console.log("[Auth] Auto sign-in after signup successful");
-          return signInData;
+          throw signInError;
         }
+        console.log("[Auth] Auto sign-in after signup successful");
+        return signInData;
       }
 
       return data;

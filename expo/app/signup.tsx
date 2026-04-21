@@ -113,10 +113,10 @@ export default function SignUpScreen() {
       }
 
       if (result.session) {
-        console.log("[SignUp] Auto-signed in, AuthGate will redirect");
+        console.log("[SignUp] Auto-signed in, AuthGate will redirect to app");
+        router.replace("/");
       } else {
-        console.log("[SignUp] No session returned; routing to login");
-        router.replace("/login");
+        console.log("[SignUp] No session returned; AuthGate will handle routing");
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Sign up failed. Please try again.";
