@@ -91,22 +91,31 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       email,
       password,
       fullName,
+      country,
+      currency,
     }: {
       email: string;
       password: string;
       fullName: string;
+      country?: string;
+      currency?: string;
     }) => {
+      console.log("[Auth] Signing up:", email);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { full_name: fullName },
+          data: { full_name: fullName, country: country ?? "", currency: currency ?? "" },
         },
       });
 
-      if (error) throw error;
-      console.log("Sign up successful:", data.user?.id);
+      if (error) {
+        console.log("[Auth] Sign up error:", error.message);
+        throw error;
+      }
+      console.log("[Auth] Sign up successful:", data.user?.id);
 
+      let finalData = data;
       if (!data.session) {
         console.log("[Auth] No session after signUp, attempting auto sign-in...");
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -118,10 +127,37 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           throw signInError;
         }
         console.log("[Auth] Auto sign-in after signup successful");
-        return signInData;
+        finalData = signInData;
       }
 
-      return data;
+      const userId = finalData.user?.id;
+      if (userId) {
+        try {
+          console.log("[Auth] Upserting profile row for:", userId);
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .upsert(
+              {
+                id: userId,
+                full_name: fullName,
+                email,
+                country: country ?? "",
+                currency: currency ?? "",
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "id" }
+            );
+          if (profileError) {
+            console.log("[Auth] Profile upsert error (non-fatal):", profileError.message);
+          } else {
+            console.log("[Auth] Profile row created/updated successfully");
+          }
+        } catch (e) {
+          console.log("[Auth] Profile upsert exception (non-fatal):", e);
+        }
+      }
+
+      return finalData;
     },
   });
 

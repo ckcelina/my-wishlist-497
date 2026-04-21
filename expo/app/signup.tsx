@@ -104,6 +104,8 @@ export default function SignUpScreen() {
         email: email.trim().toLowerCase(),
         password,
         fullName: fullName.trim(),
+        country: selectedCountry?.code ?? "",
+        currency: selectedCountry?.currency ?? "",
       });
       console.log("[SignUp] Sign up successful, session:", result.session ? "exists" : "none");
 
