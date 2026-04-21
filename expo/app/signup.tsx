@@ -425,7 +425,10 @@ export default function SignUpScreen() {
       </KeyboardAvoidingView>
 
       <Modal visible={showCountryPicker} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalOverlay}
+        >
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Select Country</Text>
@@ -460,7 +463,7 @@ export default function SignUpScreen() {
               style={styles.modalList}
             />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
