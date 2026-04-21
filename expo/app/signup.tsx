@@ -115,11 +115,8 @@ export default function SignUpScreen() {
       if (result.session) {
         console.log("[SignUp] Auto-signed in, AuthGate will redirect");
       } else {
-        Alert.alert(
-          "Check Your Email",
-          "We sent a confirmation link to your email. Please verify your account, then sign in.",
-          [{ text: "Go to Sign In", onPress: () => router.replace("/login") }]
-        );
+        console.log("[SignUp] No session returned; routing to login");
+        router.replace("/login");
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Sign up failed. Please try again.";
