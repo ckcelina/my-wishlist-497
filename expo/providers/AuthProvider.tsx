@@ -133,13 +133,32 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       email: string;
       password: string;
     }) => {
+      console.log("[Auth] Attempting sign in for:", email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
-      console.log("Sign in successful:", data.user?.id);
+      if (error) {
+        console.log("[Auth] Sign in error:", error.message, "status:", error.status);
+        const msg = error.message.toLowerCase();
+        if (msg.includes("email not confirmed")) {
+          throw new Error("Please confirm your email before signing in. Check your inbox for a verification link.");
+        }
+        if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
+          throw new Error("Incorrect email or password. Please try again.");
+        }
+        if (msg.includes("network") || msg.includes("fetch")) {
+          throw new Error("Network error. Please check your connection and try again.");
+        }
+        throw new Error(error.message || "Login failed. Please try again.");
+      }
+
+      if (!data.session || !data.user) {
+        throw new Error("Login failed. No session returned.");
+      }
+
+      console.log("[Auth] Sign in successful:", data.user?.id);
       return data;
     },
   });
